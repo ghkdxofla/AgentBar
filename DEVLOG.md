@@ -124,7 +124,13 @@
 - Views updated to handle optional `weeklyUsage` (DetailPopoverView, StackedBarView, MiniBarView)
 - All 35 tests passing
 
-## Iteration 17: Fix Claude token counting + Z.ai label
-- **Claude token undercounting fix**: `rateLimitTokens` was `input_tokens + output_tokens` (~88K/5h) — missing `cache_creation_input_tokens` which Anthropic explicitly counts toward rate limits. New formula: `input_tokens + output_tokens + cache_creation_input_tokens` (~2.7M/5h). `cache_read_input_tokens` remain excluded (free on current models per Anthropic API docs)
-- **Z.ai label**: Shortened "Quota" to "Qt" to prevent line wrapping in the popover MetricRow
-- All 35 tests passing
+## Iteration 17: Cost-based Claude usage + Z.ai label
+- **Claude usage: cost-based calculation**: Raw token counting didn't match dashboard. Reverse-engineered the formula by comparing with dashboard values (5h=19%, 7d=45%):
+  - `cost = input×$15/M + output×$75/M + cache_creation×$18.75/M + cache_read×$1.50/M` (model-specific pricing)
+  - `ClaudeModelPricing` struct with Opus/Sonnet/Haiku pricing, selected via `model` field in JSONL records
+  - Budgets: Max 5x = $103/5h, $1,133/7d; Max 20x = $412/5h, $4,532/7d (11:1 window ratio)
+  - Matches dashboard: `floor($20.53/$103×100)=19%`, `floor($511/$1133×100)=45%`
+- **Settings**: Claude limits changed from token fields to dollar budgets (`claudeFiveHourBudget`/`claudeWeeklyBudget`)
+- **Z.ai label**: Shortened "Quota" to "Qt" to prevent line wrapping
+- Tests: added `testCostIncludesAllTokenTypes`, `testModelSpecificPricing`; updated all assertions to dollar values
+- All 36 tests passing

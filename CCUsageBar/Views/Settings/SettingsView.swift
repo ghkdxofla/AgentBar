@@ -11,8 +11,8 @@ struct SettingsView: View {
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
     @AppStorage("claudePlan") private var claudePlan: String = ClaudePlan.max5x.rawValue
-    @AppStorage("claudeFiveHourLimit") private var claudeFiveHourLimit: Double = 2_500_000
-    @AppStorage("claudeWeeklyLimit") private var claudeWeeklyLimit: Double = 50_000_000
+    @AppStorage("claudeFiveHourBudget") private var claudeFiveHourBudget: Double = 103.0
+    @AppStorage("claudeWeeklyBudget") private var claudeWeeklyBudget: Double = 1133.0
 
     @AppStorage("codexEnabled") private var codexEnabled = true
     @AppStorage("codexPlan") private var codexPlan: String = CodexPlan.pro.rawValue
@@ -53,35 +53,35 @@ struct SettingsView: View {
                 }
                 .onChange(of: claudePlan) { newValue in
                     if let plan = ClaudePlan(rawValue: newValue), plan != .custom {
-                        claudeFiveHourLimit = plan.fiveHourTokenLimit
-                        claudeWeeklyLimit = plan.weeklyTokenLimit
+                        claudeFiveHourBudget = plan.fiveHourBudget
+                        claudeWeeklyBudget = plan.weeklyBudget
                     }
                     NotificationCenter.default.post(name: .limitsChanged, object: nil)
                 }
 
                 HStack {
-                    Text("5h token limit:")
-                    TextField("", value: $claudeFiveHourLimit, format: .number)
+                    Text("5h budget:")
+                    TextField("", value: $claudeFiveHourBudget, format: .number)
                         .frame(width: 120)
                         .disabled(claudePlan != ClaudePlan.custom.rawValue)
-                    Text("tokens")
+                    Text("USD")
                         .foregroundStyle(.secondary)
                 }
-                .onChange(of: claudeFiveHourLimit) { _ in
+                .onChange(of: claudeFiveHourBudget) { _ in
                     if claudePlan == ClaudePlan.custom.rawValue {
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
                 }
 
                 HStack {
-                    Text("Weekly token limit:")
-                    TextField("", value: $claudeWeeklyLimit, format: .number)
+                    Text("Weekly budget:")
+                    TextField("", value: $claudeWeeklyBudget, format: .number)
                         .frame(width: 120)
                         .disabled(claudePlan != ClaudePlan.custom.rawValue)
-                    Text("tokens")
+                    Text("USD")
                         .foregroundStyle(.secondary)
                 }
-                .onChange(of: claudeWeeklyLimit) { _ in
+                .onChange(of: claudeWeeklyBudget) { _ in
                     if claudePlan == ClaudePlan.custom.rawValue {
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
