@@ -6,7 +6,7 @@ import Combine
 final class StatusBarController {
     private var statusItem: NSStatusItem?
     private var hostingView: NSHostingView<StackedBarView>?
-    private var cancellable: AnyCancellable?
+    private var cancellables: Set<AnyCancellable> = []
 
     private let viewModel: UsageViewModel
 
@@ -28,11 +28,16 @@ final class StatusBarController {
         self.hostingView = hosting
 
         // Observe ViewModel changes
-        cancellable = viewModel.$usageData
+        viewModel.$usageData
+            .combineLatest(viewModel.$lastError)
             .receive(on: RunLoop.main)
-            .sink { [weak self] data in
-                self?.hostingView?.rootView = StackedBarView(services: data)
+            .sink { [weak self] data, error in
+                self?.hostingView?.rootView = StackedBarView(
+                    services: data,
+                    hasError: error != nil
+                )
             }
+            .store(in: &cancellables)
 
         // Click action — toggle popover
         button.target = self
