@@ -10,20 +10,17 @@ final class GeminiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .gemini
 
     private let logsRootDir: URL
-    private let minuteRequestLimit: Double
     private let dailyRequestLimit: Double
     private let nowProvider: @Sendable () -> Date
     private let calendar: Calendar
 
     init(
         logsRootDir: URL? = nil,
-        minuteRequestLimit: Double = 60,
         dailyRequestLimit: Double = 1_000,
         nowProvider: @escaping @Sendable () -> Date = Date.init
     ) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         self.logsRootDir = logsRootDir ?? home.appendingPathComponent(".gemini/tmp")
-        self.minuteRequestLimit = minuteRequestLimit
         self.dailyRequestLimit = dailyRequestLimit
         self.nowProvider = nowProvider
 
@@ -40,29 +37,20 @@ final class GeminiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let now = nowProvider()
         let usageEvents = scanUsageEvents(now: now)
 
-        let minuteCutoff = now.addingTimeInterval(-60)
-        let minuteEvents = usageEvents.filter { $0 >= minuteCutoff && $0 <= now }
-
         let dayStart = calendar.startOfDay(for: now)
         let dayEvents = usageEvents.filter { $0 >= dayStart && $0 <= now }
 
-        let minuteReset = minuteEvents.min()?.addingTimeInterval(60)
         let dayReset = calendar.date(byAdding: .day, value: 1, to: dayStart)
 
         return UsageData(
             service: .gemini,
             fiveHourUsage: UsageMetric(
-                used: Double(minuteEvents.count),
-                total: minuteRequestLimit,
-                unit: .requests,
-                resetTime: minuteReset
-            ),
-            weeklyUsage: UsageMetric(
                 used: Double(dayEvents.count),
                 total: dailyRequestLimit,
                 unit: .requests,
                 resetTime: dayReset
             ),
+            weeklyUsage: nil,
             lastUpdated: now,
             isAvailable: true
         )

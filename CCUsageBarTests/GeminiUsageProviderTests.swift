@@ -29,7 +29,6 @@ final class GeminiUsageProviderTests: XCTestCase {
 
         let provider = GeminiUsageProvider(
             logsRootDir: tempDir,
-            minuteRequestLimit: 60,
             dailyRequestLimit: 1_000,
             nowProvider: { now }
         )
@@ -38,9 +37,10 @@ final class GeminiUsageProviderTests: XCTestCase {
 
         XCTAssertEqual(usage.service, .gemini)
         XCTAssertEqual(usage.fiveHourUsage.unit, .requests)
-        XCTAssertEqual(usage.weeklyUsage?.unit, .requests)
-        XCTAssertEqual(usage.fiveHourUsage.used, 1)
-        XCTAssertEqual(usage.weeklyUsage?.used, 2)
+        // Daily window: "Build me a parser" (-30s) + "Summarize this file" (-2h) = 2
+        // "Old request" (-30h) is outside the Pacific day
+        XCTAssertEqual(usage.fiveHourUsage.used, 2)
+        XCTAssertNil(usage.weeklyUsage)
     }
 
     func testComputesResetTimes() async throws {
@@ -51,13 +51,11 @@ final class GeminiUsageProviderTests: XCTestCase {
 
         let provider = GeminiUsageProvider(
             logsRootDir: tempDir,
-            minuteRequestLimit: 60,
             dailyRequestLimit: 1_000,
             nowProvider: { now }
         )
 
         let usage = try await provider.fetchUsage()
-        let expectedMinuteReset = now.addingTimeInterval(45)
 
         var pacificCalendar = Calendar(identifier: .gregorian)
         pacificCalendar.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
@@ -65,16 +63,10 @@ final class GeminiUsageProviderTests: XCTestCase {
         let expectedDayReset = pacificCalendar.date(byAdding: .day, value: 1, to: dayStart)
 
         XCTAssertNotNil(usage.fiveHourUsage.resetTime)
-        XCTAssertNotNil(usage.weeklyUsage?.resetTime)
         XCTAssertNotNil(expectedDayReset)
 
         XCTAssertEqual(
             usage.fiveHourUsage.resetTime!.timeIntervalSince1970,
-            expectedMinuteReset.timeIntervalSince1970,
-            accuracy: 1
-        )
-        XCTAssertEqual(
-            usage.weeklyUsage!.resetTime!.timeIntervalSince1970,
             expectedDayReset!.timeIntervalSince1970,
             accuracy: 1
         )

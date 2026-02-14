@@ -165,3 +165,10 @@
 - **New `UsageUnit.percent`**: Added to support direct percentage display. `MetricRow` shows "19%" instead of "19.0M / 45.0M tokens" for percent-based metrics.
 - **Tests rewritten**: 8 new API-based tests using `MockURLProtocol` for URLSession stubbing: API response parsing, reset time parsing, percentage calculation, null window handling, 401 error handling, missing credentials, header verification, extra field tolerance. `JSONLParserTests` updated to use local test struct instead of removed `ClaudeMessageRecord`.
 - All 41 tests passing
+
+## Iteration 21: Gemini simplification + UI polish
+- **Gemini daily-only window**: Removed 1-minute (RPM) rate window — only the daily (RPD) limit is meaningful for monitoring. Gemini now shows a single "1d" row like Z.ai shows "Qt", with `weeklyUsage: nil`.
+- **Rename "Google Gemini CLI" → "Google Gemini"**: Updated `ServiceType.gemini` rawValue and Settings section header.
+- **Settings cleanup**: Removed `geminiMinuteLimit` AppStorage and UI field. Only daily request limit remains configurable.
+- **Popover focus ring fix**: Added `.focusable(false)` to settings gear button to prevent blue focus ring on popover open.
+- All 41 tests passing

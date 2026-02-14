@@ -17,7 +17,6 @@ struct SettingsView: View {
     @AppStorage("codexWeeklyLimit") private var codexWeeklyLimit: Double = 100_000_000
 
     @AppStorage("geminiEnabled") private var geminiEnabled = true
-    @AppStorage("geminiMinuteLimit") private var geminiMinuteLimit: Double = 60
     @AppStorage("geminiDailyLimit") private var geminiDailyLimit: Double = 1_000
 
     @AppStorage("zaiEnabled") private var zaiEnabled = true
@@ -112,26 +111,15 @@ struct SettingsView: View {
                 }
             }
 
-            // Google Gemini CLI
-            Section("Google Gemini CLI") {
+            // Google Gemini
+            Section("Google Gemini") {
                 Toggle("Enabled", isOn: $geminiEnabled)
                     .onChange(of: geminiEnabled) { _ in
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
 
                 HStack {
-                    Text("1m request limit:")
-                    TextField("", value: $geminiMinuteLimit, format: .number)
-                        .frame(width: 120)
-                    Text("requests")
-                        .foregroundStyle(.secondary)
-                }
-                .onChange(of: geminiMinuteLimit) { _ in
-                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
-                }
-
-                HStack {
-                    Text("1d request limit:")
+                    Text("Daily request limit:")
                     TextField("", value: $geminiDailyLimit, format: .number)
                         .frame(width: 120)
                     Text("requests")
@@ -141,7 +129,7 @@ struct SettingsView: View {
                     NotificationCenter.default.post(name: .limitsChanged, object: nil)
                 }
 
-                Text("Usage is derived from local Gemini CLI logs in ~/.gemini/tmp")
+                Text("Usage is derived from local Gemini logs in ~/.gemini/tmp")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
