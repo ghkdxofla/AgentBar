@@ -68,15 +68,18 @@ final class UsageViewModelTests: XCTestCase {
     func testServiceOrderIsMaintained() async {
         // Provide in reverse order
         let zai = MockUsageProvider(serviceType: .zai, result: .success(UsageData.mock(service: .zai)))
+        let gemini = MockUsageProvider(serviceType: .gemini, result: .success(UsageData.mock(service: .gemini)))
         let claude = MockUsageProvider(serviceType: .claude, result: .success(UsageData.mock(service: .claude)))
         let codex = MockUsageProvider(serviceType: .codex, result: .success(UsageData.mock(service: .codex)))
 
-        let vm = UsageViewModel(providers: [zai, claude, codex])
+        let vm = UsageViewModel(providers: [zai, gemini, claude, codex])
         await vm.fetchAllUsage()
 
-        XCTAssertEqual(vm.usageData.count, 3)
+        XCTAssertEqual(vm.usageData.count, 4)
         XCTAssertEqual(vm.usageData[0].service, .claude)
         XCTAssertEqual(vm.usageData[1].service, .codex)
-        XCTAssertEqual(vm.usageData[2].service, .zai)
+        XCTAssertEqual(vm.usageData[2].service, .gemini)
+        XCTAssertEqual(vm.usageData[3].service, .zai)
     }
+
 }

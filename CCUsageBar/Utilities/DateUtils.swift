@@ -26,6 +26,21 @@ enum DateUtils {
         date.addingTimeInterval(windowDuration)
     }
 
+    static func nextResetAligned(
+        to anchor: Date,
+        windowDuration: TimeInterval,
+        relativeTo now: Date = Date()
+    ) -> Date {
+        guard windowDuration > 0 else { return now }
+
+        let elapsed = now.timeIntervalSince(anchor)
+        guard elapsed > 0 else { return anchor }
+
+        let completedWindows = floor(elapsed / windowDuration)
+        let nextWindowIndex = completedWindows + 1
+        return anchor.addingTimeInterval(nextWindowIndex * windowDuration)
+    }
+
     static func parseISO8601(_ string: String) -> Date? {
         let withFrac = ISO8601DateFormatter()
         withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -33,6 +48,13 @@ enum DateUtils {
 
         let noFrac = ISO8601DateFormatter()
         noFrac.formatOptions = [.withInternetDateTime]
-        return noFrac.date(from: string)
+        if let date = noFrac.date(from: string) { return date }
+
+        // Handles timestamps like "2025-06-05T17:12:37.153082Z" from ~/.claude.json
+        let microsecondFormatter = DateFormatter()
+        microsecondFormatter.locale = Locale(identifier: "en_US_POSIX")
+        microsecondFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        microsecondFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX"
+        return microsecondFormatter.date(from: string)
     }
 }

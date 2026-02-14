@@ -11,13 +11,17 @@ struct SettingsView: View {
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
     @AppStorage("claudePlan") private var claudePlan: String = ClaudePlan.max5x.rawValue
-    @AppStorage("claudeFiveHourBudget") private var claudeFiveHourBudget: Double = 103.0
-    @AppStorage("claudeWeeklyBudget") private var claudeWeeklyBudget: Double = 1133.0
+    @AppStorage("claudeFiveHourLimit") private var claudeFiveHourLimit: Double = 45_000_000
+    @AppStorage("claudeWeeklyLimit") private var claudeWeeklyLimit: Double = 500_000_000
 
     @AppStorage("codexEnabled") private var codexEnabled = true
     @AppStorage("codexPlan") private var codexPlan: String = CodexPlan.pro.rawValue
     @AppStorage("codexFiveHourLimit") private var codexFiveHourLimit: Double = 10_000_000
     @AppStorage("codexWeeklyLimit") private var codexWeeklyLimit: Double = 100_000_000
+
+    @AppStorage("geminiEnabled") private var geminiEnabled = true
+    @AppStorage("geminiMinuteLimit") private var geminiMinuteLimit: Double = 60
+    @AppStorage("geminiDailyLimit") private var geminiDailyLimit: Double = 1_000
 
     @AppStorage("zaiEnabled") private var zaiEnabled = true
 
@@ -45,6 +49,9 @@ struct SettingsView: View {
             // Claude Code
             Section("Claude Code") {
                 Toggle("Enabled", isOn: $claudeEnabled)
+                    .onChange(of: claudeEnabled) { _ in
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
 
                 Picker("Plan", selection: $claudePlan) {
                     ForEach(ClaudePlan.allCases, id: \.rawValue) { plan in
@@ -53,35 +60,35 @@ struct SettingsView: View {
                 }
                 .onChange(of: claudePlan) { newValue in
                     if let plan = ClaudePlan(rawValue: newValue), plan != .custom {
-                        claudeFiveHourBudget = plan.fiveHourBudget
-                        claudeWeeklyBudget = plan.weeklyBudget
+                        claudeFiveHourLimit = plan.fiveHourTokenLimit
+                        claudeWeeklyLimit = plan.weeklyTokenLimit
                     }
                     NotificationCenter.default.post(name: .limitsChanged, object: nil)
                 }
 
                 HStack {
-                    Text("5h budget:")
-                    TextField("", value: $claudeFiveHourBudget, format: .number)
+                    Text("5h token limit:")
+                    TextField("", value: $claudeFiveHourLimit, format: .number)
                         .frame(width: 120)
                         .disabled(claudePlan != ClaudePlan.custom.rawValue)
-                    Text("USD")
+                    Text("tokens")
                         .foregroundStyle(.secondary)
                 }
-                .onChange(of: claudeFiveHourBudget) { _ in
+                .onChange(of: claudeFiveHourLimit) { _ in
                     if claudePlan == ClaudePlan.custom.rawValue {
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
                 }
 
                 HStack {
-                    Text("Weekly budget:")
-                    TextField("", value: $claudeWeeklyBudget, format: .number)
+                    Text("Weekly token limit:")
+                    TextField("", value: $claudeWeeklyLimit, format: .number)
                         .frame(width: 120)
                         .disabled(claudePlan != ClaudePlan.custom.rawValue)
-                    Text("USD")
+                    Text("tokens")
                         .foregroundStyle(.secondary)
                 }
-                .onChange(of: claudeWeeklyBudget) { _ in
+                .onChange(of: claudeWeeklyLimit) { _ in
                     if claudePlan == ClaudePlan.custom.rawValue {
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
@@ -91,6 +98,9 @@ struct SettingsView: View {
             // OpenAI Codex
             Section("OpenAI Codex") {
                 Toggle("Enabled", isOn: $codexEnabled)
+                    .onChange(of: codexEnabled) { _ in
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
                 HStack {
                     Text("API Key:")
                     SecureField("sk-...", text: $openaiAPIKey)
@@ -143,9 +153,46 @@ struct SettingsView: View {
                 }
             }
 
+            // Google Gemini CLI
+            Section("Google Gemini CLI") {
+                Toggle("Enabled", isOn: $geminiEnabled)
+                    .onChange(of: geminiEnabled) { _ in
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
+
+                HStack {
+                    Text("1m request limit:")
+                    TextField("", value: $geminiMinuteLimit, format: .number)
+                        .frame(width: 120)
+                    Text("requests")
+                        .foregroundStyle(.secondary)
+                }
+                .onChange(of: geminiMinuteLimit) { _ in
+                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                }
+
+                HStack {
+                    Text("1d request limit:")
+                    TextField("", value: $geminiDailyLimit, format: .number)
+                        .frame(width: 120)
+                    Text("requests")
+                        .foregroundStyle(.secondary)
+                }
+                .onChange(of: geminiDailyLimit) { _ in
+                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                }
+
+                Text("Usage is derived from local Gemini CLI logs in ~/.gemini/tmp")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // Z.ai
             Section("Z.ai Coding Plan") {
                 Toggle("Enabled", isOn: $zaiEnabled)
+                    .onChange(of: zaiEnabled) { _ in
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
                 HStack {
                     Text("API Key:")
                     SecureField("API key", text: $zaiAPIKey)
@@ -161,7 +208,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 580)
+        .frame(width: 450, height: 640)
         .onAppear {
             loadAPIKeys()
         }

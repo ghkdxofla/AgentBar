@@ -40,17 +40,24 @@ struct SingleBarView: View {
 
     private var barHeight: CGFloat {
         switch serviceCount {
-        case 1: 12
-        case 2: 8
-        default: 5
+        case 1: return 12
+        case 2: return 8
+        case 3: return 5
+        case 4: return 4
+        default:
+            let spacing = CGFloat(max(serviceCount - 1, 0))
+            let available = 20 - spacing
+            return max(3, floor(available / CGFloat(max(serviceCount, 1))))
         }
     }
 
     private var fontSize: CGFloat {
         switch serviceCount {
-        case 1: 8
-        case 2: 7
-        default: 6
+        case 1: return 8
+        case 2: return 7
+        case 3: return 6
+        case 4: return 5.5
+        default: return 5
         }
     }
 

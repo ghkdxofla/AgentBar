@@ -79,8 +79,8 @@ final class UsageViewModel: ObservableObject {
             }
         }
 
-        // Sort by service order: claude, codex, zai
-        let order: [ServiceType] = [.claude, .codex, .zai]
+        // Sort by service order: claude, codex, gemini, zai
+        let order: [ServiceType] = [.claude, .codex, .gemini, .zai]
         results.sort { a, b in
             (order.firstIndex(of: a.service) ?? 0) < (order.firstIndex(of: b.service) ?? 0)
         }
@@ -93,18 +93,22 @@ final class UsageViewModel: ObservableObject {
 
     private static func buildProviders() -> [any UsageProviderProtocol] {
         let defaults = UserDefaults.standard
+        let claudeEnabled = defaults.bool(forKey: "claudeEnabled", defaultValue: true)
+        let codexEnabled = defaults.bool(forKey: "codexEnabled", defaultValue: true)
+        let geminiEnabled = defaults.bool(forKey: "geminiEnabled", defaultValue: true)
+        let zaiEnabled = defaults.bool(forKey: "zaiEnabled", defaultValue: true)
 
-        // Claude budgets from AppStorage (API-equivalent dollars)
+        // Claude token limits from AppStorage
         let claudePlanRaw = defaults.string(forKey: "claudePlan") ?? ClaudePlan.max5x.rawValue
         let claudePlan = ClaudePlan(rawValue: claudePlanRaw) ?? .max5x
         let claudeFiveHour: Double
         let claudeWeekly: Double
         if claudePlan == .custom {
-            claudeFiveHour = defaults.double(forKey: "claudeFiveHourBudget").nonZero ?? ClaudePlan.max5x.fiveHourBudget
-            claudeWeekly = defaults.double(forKey: "claudeWeeklyBudget").nonZero ?? ClaudePlan.max5x.weeklyBudget
+            claudeFiveHour = defaults.double(forKey: "claudeFiveHourLimit").nonZero ?? ClaudePlan.max5x.fiveHourTokenLimit
+            claudeWeekly = defaults.double(forKey: "claudeWeeklyLimit").nonZero ?? ClaudePlan.max5x.weeklyTokenLimit
         } else {
-            claudeFiveHour = claudePlan.fiveHourBudget
-            claudeWeekly = claudePlan.weeklyBudget
+            claudeFiveHour = claudePlan.fiveHourTokenLimit
+            claudeWeekly = claudePlan.weeklyTokenLimit
         }
 
         // Codex limits from AppStorage
@@ -120,22 +124,50 @@ final class UsageViewModel: ObservableObject {
             codexWeekly = codexPlan.weeklyTokenLimit
         }
 
-        return [
-            ClaudeUsageProvider(
-                fiveHourBudget: claudeFiveHour,
-                weeklyBudget: claudeWeekly
-            ),
-            CodexUsageProvider(
+        // Gemini request limits from AppStorage
+        let geminiMinuteLimit = defaults.double(forKey: "geminiMinuteLimit").nonZero ?? 60
+        let geminiDailyLimit = defaults.double(forKey: "geminiDailyLimit").nonZero ?? 1_000
+
+        var providers: [any UsageProviderProtocol] = []
+
+        if claudeEnabled {
+            providers.append(ClaudeUsageProvider(
+                fiveHourTokenLimit: claudeFiveHour,
+                weeklyTokenLimit: claudeWeekly
+            ))
+        }
+
+        if codexEnabled {
+            providers.append(CodexUsageProvider(
                 fiveHourTokenLimit: codexFiveHour,
                 weeklyTokenLimit: codexWeekly
-            ),
-            ZaiUsageProvider()
-        ]
+            ))
+        }
+
+        if geminiEnabled {
+            providers.append(GeminiUsageProvider(
+                minuteRequestLimit: geminiMinuteLimit,
+                dailyRequestLimit: geminiDailyLimit
+            ))
+        }
+
+        if zaiEnabled {
+            providers.append(ZaiUsageProvider())
+        }
+
+        return providers
     }
 }
 
 private extension Double {
     var nonZero: Double? {
         self > 0 ? self : nil
+    }
+}
+
+private extension UserDefaults {
+    func bool(forKey key: String, defaultValue: Bool) -> Bool {
+        guard object(forKey: key) != nil else { return defaultValue }
+        return bool(forKey: key)
     }
 }
