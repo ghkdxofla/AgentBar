@@ -27,4 +27,5 @@ enum UsageUnit: String, Sendable {
     case tokens = "tokens"
     case requests = "requests"
     case dollars = "USD"
+    case percent = "%"
 }

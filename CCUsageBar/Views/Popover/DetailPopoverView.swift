@@ -107,14 +107,19 @@ struct MetricRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 20, alignment: .leading)
-            Text(formatValue(metric.used, unit: metric.unit))
-                .font(.caption.monospacedDigit())
-            Text("/")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(formatValue(metric.total, unit: metric.unit))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+            if metric.unit == .percent {
+                Text(formatValue(metric.used, unit: metric.unit))
+                    .font(.caption.monospacedDigit())
+            } else {
+                Text(formatValue(metric.used, unit: metric.unit))
+                    .font(.caption.monospacedDigit())
+                Text("/")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(formatValue(metric.total, unit: metric.unit))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
             if let reset = metric.resetTime {
                 let remaining = reset.timeIntervalSinceNow
@@ -162,6 +167,8 @@ struct MetricRow: View {
             return String(format: "%.0f", value)
         case .requests:
             return String(format: "%.0f", value)
+        case .percent:
+            return String(format: "%.0f%%", value)
         }
     }
 }
