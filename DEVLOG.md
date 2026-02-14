@@ -104,3 +104,12 @@
 - Rewrote all Z.ai Decodable models to match verified API responses
 - Z.ai now displays request-based usage (TIME_LIMIT) with proper reset times
 - All 35 tests passing
+
+## Iteration 15: Menu bar visibility + reset time display
+- **Menu bar labels**: Added short service names (CC/CX/Z) before each bar in service color
+- **Bar background**: Changed from gray 20% opacity to service-colored 15% opacity — bars are visible even at 0% usage
+- **Minimum bar width**: Usage bars have 2px minimum when > 0% so tiny usage is still visible
+- **Reset time in popover**: Each metric row (5h/7d) now shows remaining time until window reset inline (e.g. "4h 23m" with arrow icon), supports d/h/m formatting
+- Removed standalone reset text block from ServiceDetailRow, integrated into MetricRow
+- `ServiceType.shortName` added: CC (Claude Code), CX (Codex), Z (Z.ai)
+- Status bar width increased from 70 to 90px to accommodate labels

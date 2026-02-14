@@ -15,15 +15,15 @@ final class StatusBarController {
     }
 
     func setup() {
-        statusItem = NSStatusBar.system.statusItem(withLength: 70)
+        statusItem = NSStatusBar.system.statusItem(withLength: 90)
 
         guard let button = statusItem?.button else { return }
 
         let barView = StackedBarView(services: viewModel.usageData)
         let hosting = NSHostingView(rootView: barView)
-        hosting.frame = NSRect(x: 0, y: 0, width: 64, height: 22)
+        hosting.frame = NSRect(x: 0, y: 0, width: 84, height: 22)
 
-        button.frame = NSRect(x: 0, y: 0, width: 70, height: 22)
+        button.frame = NSRect(x: 0, y: 0, width: 90, height: 22)
         button.addSubview(hosting)
         self.hostingView = hosting
 
