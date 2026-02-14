@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StackedBarView: View {
     let services: [UsageData]
+    var hasError: Bool = false
 
     private var activeServices: [UsageData] {
         services.filter(\.isAvailable)
@@ -9,10 +10,18 @@ struct StackedBarView: View {
 
     var body: some View {
         if activeServices.isEmpty {
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-                .frame(width: 24, height: 20)
+            HStack(spacing: 2) {
+                if hasError {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                } else {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 24, height: 20)
         } else {
             VStack(spacing: 1) {
                 ForEach(activeServices) { data in
