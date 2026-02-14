@@ -28,7 +28,7 @@ struct StackedBarView: View {
                     SingleBarView(usage: data, serviceCount: activeServices.count)
                 }
             }
-            .frame(width: 64, height: 20)
+            .frame(height: 20)
             .padding(.horizontal, 2)
         }
     }
@@ -46,22 +46,41 @@ struct SingleBarView: View {
         }
     }
 
+    private var fontSize: CGFloat {
+        switch serviceCount {
+        case 1: 8
+        case 2: 7
+        default: 6
+        }
+    }
+
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                // Background
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Color.gray.opacity(0.2))
+        HStack(spacing: 2) {
+            Text(usage.service.shortName)
+                .font(.system(size: fontSize, weight: .medium, design: .rounded))
+                .foregroundStyle(usage.service.darkColor)
+                .frame(width: 14, alignment: .trailing)
 
-                // Weekly usage (light color)
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(usage.service.lightColor)
-                    .frame(width: geo.size.width * usage.weeklyUsage.percentage)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    // Background — visible outline when empty
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(usage.service.darkColor.opacity(0.15))
 
-                // 5-hour usage (dark color, overlaps weekly)
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(usage.service.darkColor)
-                    .frame(width: geo.size.width * usage.fiveHourUsage.percentage)
+                    // Weekly usage (light color)
+                    if usage.weeklyUsage.percentage > 0 {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(usage.service.lightColor)
+                            .frame(width: max(2, geo.size.width * usage.weeklyUsage.percentage))
+                    }
+
+                    // 5-hour usage (dark color, overlaps weekly)
+                    if usage.fiveHourUsage.percentage > 0 {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(usage.service.darkColor)
+                            .frame(width: max(2, geo.size.width * usage.fiveHourUsage.percentage))
+                    }
+                }
             }
         }
         .frame(height: barHeight)

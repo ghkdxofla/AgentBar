@@ -90,26 +90,8 @@ struct ServiceDetailRow: View {
 
             MetricRow(label: "5h", metric: data.fiveHourUsage)
             MetricRow(label: "7d", metric: data.weeklyUsage)
-
-            if let reset = data.fiveHourUsage.resetTime {
-                let remaining = reset.timeIntervalSinceNow
-                if remaining > 0 {
-                    Text("Reset: \(formatDuration(remaining))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
         .padding(.vertical, 4)
-    }
-
-    private func formatDuration(_ interval: TimeInterval) -> String {
-        let hours = Int(interval) / 3600
-        let minutes = (Int(interval) % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        }
-        return "\(minutes)m"
     }
 }
 
@@ -132,10 +114,37 @@ struct MetricRow: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
             Spacer()
+            if let reset = metric.resetTime {
+                let remaining = reset.timeIntervalSinceNow
+                if remaining > 0 {
+                    Text(formatDuration(remaining))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.secondary)
+                }
+            }
             Text("\(Int(metric.percentage * 100))%")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(metric.percentage > 0.8 ? .red : .primary)
+                .frame(width: 30, alignment: .trailing)
         }
+    }
+
+    private func formatDuration(_ interval: TimeInterval) -> String {
+        let totalMinutes = Int(interval) / 60
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if hours >= 24 {
+            let days = hours / 24
+            let remainHours = hours % 24
+            return "\(days)d \(remainHours)h"
+        }
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(minutes)m"
     }
 
     private func formatValue(_ value: Double, unit: UsageUnit) -> String {

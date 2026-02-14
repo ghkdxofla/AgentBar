@@ -21,6 +21,14 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    var shortName: String {
+        switch self {
+        case .claude: "CC"
+        case .codex:  "CX"
+        case .zai:    "Z"
+        }
+    }
+
     var keychainAccount: String {
         switch self {
         case .claude: "claude"
