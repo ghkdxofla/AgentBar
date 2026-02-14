@@ -23,7 +23,6 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let projectDir = tempDir.appendingPathComponent("test-project")
         let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
         let now = ISO8601DateFormatter().string(from: Date())
-        // No model field → defaults to Opus pricing
         let content = """
         {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":1000,"output_tokens":500}}}
         {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_2","usage":{"input_tokens":2000,"output_tokens":800}}}
@@ -35,15 +34,14 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         XCTAssertEqual(usage.service, .claude)
         XCTAssertTrue(usage.isAvailable)
-        XCTAssertEqual(usage.fiveHourUsage.unit, .dollars)
-        // Opus: input=$15/M, output=$75/M
-        // msg_1: 1000*15/1M + 500*75/1M = 0.015 + 0.0375 = 0.0525
-        // msg_2: 2000*15/1M + 800*75/1M = 0.030 + 0.060 = 0.090
-        // Total: 0.1425
-        XCTAssertEqual(usage.fiveHourUsage.used, 0.1425, accuracy: 0.001)
+        XCTAssertEqual(usage.fiveHourUsage.unit, .tokens)
+        // msg_1: 1000 + 500 = 1500
+        // msg_2: 2000 + 800 = 2800
+        // Total: 4300
+        XCTAssertEqual(usage.fiveHourUsage.used, 4300)
     }
 
-    func testCostIncludesAllTokenTypes() async throws {
+    func testSumsAllTokenTypes() async throws {
         let projectDir = tempDir.appendingPathComponent("test-project")
         let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
         let now = ISO8601DateFormatter().string(from: Date())
@@ -55,27 +53,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let provider = ClaudeUsageProvider(projectsDir: tempDir)
         let usage = try await provider.fetchUsage()
 
-        // Opus pricing: input=$15/M, output=$75/M, cache_creation=$18.75/M, cache_read=$1.50/M
-        // 100*15/1M + 50*75/1M + 3000*18.75/1M + 50000*1.50/1M
-        // = 0.0015 + 0.00375 + 0.05625 + 0.075 = 0.1365
-        XCTAssertEqual(usage.fiveHourUsage.used, 0.1365, accuracy: 0.001)
-    }
-
-    func testModelSpecificPricing() async throws {
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
-        let now = ISO8601DateFormatter().string(from: Date())
-        let content = """
-        {"type":"assistant","timestamp":"\(now)","model":"claude-sonnet-4-5-20250929","message":{"id":"msg_1","usage":{"input_tokens":1000,"output_tokens":1000}}}
-        """
-        try content.write(to: sessionFile, atomically: true, encoding: .utf8)
-
-        let provider = ClaudeUsageProvider(projectsDir: tempDir)
-        let usage = try await provider.fetchUsage()
-
-        // Sonnet: input=$3/M, output=$15/M
-        // 1000*3/1M + 1000*15/1M = 0.003 + 0.015 = 0.018
-        XCTAssertEqual(usage.fiveHourUsage.used, 0.018, accuracy: 0.001)
+        // All 4 types: 100 + 50 + 50000 + 3000 = 53150
+        XCTAssertEqual(usage.fiveHourUsage.used, 53150)
     }
 
     func testDeduplicatesStreamingRecords() async throws {
@@ -93,8 +72,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let provider = ClaudeUsageProvider(projectsDir: tempDir)
         let usage = try await provider.fetchUsage()
 
-        // Only last record: 1000*15/1M + 500*75/1M = 0.015 + 0.0375 = 0.0525
-        XCTAssertEqual(usage.fiveHourUsage.used, 0.0525, accuracy: 0.001)
+        // Only last record: 1000 + 500 = 1500
+        XCTAssertEqual(usage.fiveHourUsage.used, 1500)
     }
 
     func testIgnoresOldFiles() async throws {
@@ -148,7 +127,33 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let provider = ClaudeUsageProvider(projectsDir: tempDir)
         let usage = try await provider.fetchUsage()
 
-        // Opus: 100*15/1M + 50*75/1M = 0.0015 + 0.00375 = 0.00525
-        XCTAssertEqual(usage.fiveHourUsage.used, 0.00525, accuracy: 0.0001)
+        // Only assistant record: 100 + 50 = 150
+        XCTAssertEqual(usage.fiveHourUsage.used, 150)
+    }
+
+    func testUsesSessionStartForFiveHourReset() async throws {
+        let fixedNow = DateUtils.parseISO8601("2026-02-14T12:54:00Z")!
+        let projectDir = tempDir.appendingPathComponent("test-project")
+        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
+        let userStartTs = "2026-02-14T03:03:35.530Z"
+        let assistantTs = "2026-02-14T08:54:13.000Z"
+        try """
+        {"type":"user","sessionId":"session_1","timestamp":"\(userStartTs)","message":{"role":"user","content":"hello"}}
+        {"type":"assistant","sessionId":"session_1","timestamp":"\(assistantTs)","model":"claude-opus-4-6","message":{"id":"msg_session","usage":{"input_tokens":100,"output_tokens":50}}}
+        """.write(to: sessionFile, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeUsageProvider(
+            projectsDir: tempDir,
+            nowProvider: { fixedNow }
+        )
+        let usage = try await provider.fetchUsage()
+        let expected = DateUtils.parseISO8601("2026-02-14T13:03:35.530Z")!
+
+        XCTAssertNotNil(usage.fiveHourUsage.resetTime)
+        XCTAssertEqual(
+            usage.fiveHourUsage.resetTime!.timeIntervalSince1970,
+            expected.timeIntervalSince1970,
+            accuracy: 0.001
+        )
     }
 }
