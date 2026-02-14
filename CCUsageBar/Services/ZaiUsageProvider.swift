@@ -60,23 +60,35 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             throw APIError.noData
         }
 
-        // TIME_LIMIT is the active rate limit (requests per monthly window)
+        // TOKENS_LIMIT = 5h prompt window (percent-based, no used/total counts)
+        let tokensLimit = limits.first { $0.type == "TOKENS_LIMIT" }
+        let fiveHourPercent = tokensLimit?.percentage ?? 0
+        let fiveHourReset: Date? = tokensLimit?.nextResetTime.map {
+            Date(timeIntervalSince1970: $0 / 1000)
+        }
+
+        // TIME_LIMIT = monthly MCP allocation (request count)
         let timeLimit = limits.first { $0.type == "TIME_LIMIT" }
-        let quotaUsed = timeLimit?.currentValue ?? 0
-        let quotaTotal = timeLimit?.usage ?? 0
-        let nextReset: Date? = timeLimit?.nextResetTime.map {
+        let mcpUsed = timeLimit?.currentValue ?? 0
+        let mcpTotal = timeLimit?.usage ?? 0
+        let mcpReset: Date? = timeLimit?.nextResetTime.map {
             Date(timeIntervalSince1970: $0 / 1000)
         }
 
         return UsageData(
             service: .zai,
             fiveHourUsage: UsageMetric(
-                used: quotaUsed,
-                total: quotaTotal,
-                unit: .requests,
-                resetTime: nextReset
+                used: fiveHourPercent,
+                total: 100,
+                unit: .percent,
+                resetTime: fiveHourReset
             ),
-            weeklyUsage: nil,
+            weeklyUsage: UsageMetric(
+                used: mcpUsed,
+                total: mcpTotal,
+                unit: .requests,
+                resetTime: mcpReset
+            ),
             lastUpdated: now,
             isAvailable: true
         )

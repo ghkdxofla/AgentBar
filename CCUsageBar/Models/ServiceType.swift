@@ -35,14 +35,16 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
 
     var fiveHourLabel: String {
         switch self {
-        case .zai: "Qt"
         case .gemini: "1d"
         default: "5h"
         }
     }
 
     var weeklyLabel: String {
-        "7d"
+        switch self {
+        case .zai: "MCP"
+        default: "7d"
+        }
     }
 
     var keychainAccount: String {
