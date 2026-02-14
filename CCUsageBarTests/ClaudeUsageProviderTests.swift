@@ -50,8 +50,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let provider = ClaudeUsageProvider(projectsDir: tempDir)
         let usage = try await provider.fetchUsage()
 
-        // Only input_tokens + output_tokens = 150 (cache_read excluded)
-        XCTAssertEqual(usage.fiveHourUsage.used, 150)
+        // input_tokens + output_tokens + cache_creation = 100+50+3000 = 3150 (cache_read excluded)
+        XCTAssertEqual(usage.fiveHourUsage.used, 3150)
     }
 
     func testDeduplicatesStreamingRecords() async throws {
