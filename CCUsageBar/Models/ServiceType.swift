@@ -31,7 +31,7 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
 
     var fiveHourLabel: String {
         switch self {
-        case .zai: "Quota"
+        case .zai: "Qt"
         default: "5h"
         }
     }

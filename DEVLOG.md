@@ -123,3 +123,8 @@
 - Removed unused `ZaiModelUsageResponse`, `ZaiModelUsageData`, `ZaiTotalUsage` models and `fetchWeeklyUsage()` method
 - Views updated to handle optional `weeklyUsage` (DetailPopoverView, StackedBarView, MiniBarView)
 - All 35 tests passing
+
+## Iteration 17: Fix Claude token counting + Z.ai label
+- **Claude token undercounting fix**: `rateLimitTokens` was `input_tokens + output_tokens` (~88K/5h) — missing `cache_creation_input_tokens` which Anthropic explicitly counts toward rate limits. New formula: `input_tokens + output_tokens + cache_creation_input_tokens` (~2.7M/5h). `cache_read_input_tokens` remain excluded (free on current models per Anthropic API docs)
+- **Z.ai label**: Shortened "Quota" to "Qt" to prevent line wrapping in the popover MetricRow
+- All 35 tests passing

@@ -22,9 +22,10 @@ struct ClaudeTokenUsage: Decodable, Sendable {
     let cache_read_input_tokens: Int?
     let cache_creation_input_tokens: Int?
 
-    /// Rate-limit relevant tokens only: input + output (cache reads are free)
+    /// Rate-limit relevant tokens: input + output + cache_creation
+    /// (cache reads are free and excluded per Anthropic API docs)
     var rateLimitTokens: Int {
-        (input_tokens ?? 0) + (output_tokens ?? 0)
+        (input_tokens ?? 0) + (output_tokens ?? 0) + (cache_creation_input_tokens ?? 0)
     }
 }
 
