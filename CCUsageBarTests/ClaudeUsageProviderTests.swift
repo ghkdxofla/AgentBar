@@ -3,157 +3,222 @@ import XCTest
 
 final class ClaudeUsageProviderTests: XCTestCase {
 
-    var tempDir: URL!
-
     override func setUp() {
         super.setUp()
-        tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-        // Create a subdirectory to mimic a project folder
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        try! FileManager.default.createDirectory(at: projectDir, withIntermediateDirectories: true)
+        MockURLProtocol.reset()
     }
 
     override func tearDown() {
-        try? FileManager.default.removeItem(at: tempDir)
+        MockURLProtocol.reset()
         super.tearDown()
     }
 
-    func testParsesRecentSessionFiles() async throws {
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
-        let now = ISO8601DateFormatter().string(from: Date())
-        let content = """
-        {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":1000,"output_tokens":500}}}
-        {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_2","usage":{"input_tokens":2000,"output_tokens":800}}}
+    func testFetchesUsageFromAPI() async throws {
+        let json = """
+        {
+            "five_hour": {"utilization": 19.0, "resets_at": "2026-02-14T18:00:01.107582+00:00"},
+            "seven_day": {"utilization": 50.0, "resets_at": "2026-02-16T09:00:00.107602+00:00"}
+        }
         """
-        try content.write(to: sessionFile, atomically: true, encoding: .utf8)
+        MockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
 
-        let provider = ClaudeUsageProvider(projectsDir: tempDir)
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" }
+        )
+
         let usage = try await provider.fetchUsage()
 
         XCTAssertEqual(usage.service, .claude)
         XCTAssertTrue(usage.isAvailable)
-        XCTAssertEqual(usage.fiveHourUsage.unit, .tokens)
-        // msg_1: 1000 + 500 = 1500
-        // msg_2: 2000 + 800 = 2800
-        // Total: 4300
-        XCTAssertEqual(usage.fiveHourUsage.used, 4300)
+        XCTAssertEqual(usage.fiveHourUsage.unit, .percent)
+        XCTAssertEqual(usage.fiveHourUsage.used, 19.0)
+        XCTAssertEqual(usage.fiveHourUsage.total, 100)
+        XCTAssertEqual(usage.weeklyUsage?.used, 50.0)
+        XCTAssertEqual(usage.weeklyUsage?.total, 100)
     }
 
-    func testSumsAllTokenTypes() async throws {
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
-        let now = ISO8601DateFormatter().string(from: Date())
-        let content = """
-        {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":50,"cache_read_input_tokens":50000,"cache_creation_input_tokens":3000}}}
+    func testParsesResetTimes() async throws {
+        let json = """
+        {
+            "five_hour": {"utilization": 5.0, "resets_at": "2026-02-14T18:00:01.107582+00:00"},
+            "seven_day": {"utilization": 10.0, "resets_at": "2026-02-16T09:00:00.107602+00:00"}
+        }
         """
-        try content.write(to: sessionFile, atomically: true, encoding: .utf8)
+        MockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
 
-        let provider = ClaudeUsageProvider(projectsDir: tempDir)
-        let usage = try await provider.fetchUsage()
-
-        // All 4 types: 100 + 50 + 50000 + 3000 = 53150
-        XCTAssertEqual(usage.fiveHourUsage.used, 53150)
-    }
-
-    func testDeduplicatesStreamingRecords() async throws {
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
-        let now = ISO8601DateFormatter().string(from: Date())
-        // Same message ID appears 3 times (streaming updates) — only last should count
-        let content = """
-        {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":10,"output_tokens":5}}}
-        {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":50}}}
-        {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":1000,"output_tokens":500}}}
-        """
-        try content.write(to: sessionFile, atomically: true, encoding: .utf8)
-
-        let provider = ClaudeUsageProvider(projectsDir: tempDir)
-        let usage = try await provider.fetchUsage()
-
-        // Only last record: 1000 + 500 = 1500
-        XCTAssertEqual(usage.fiveHourUsage.used, 1500)
-    }
-
-    func testIgnoresOldFiles() async throws {
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        let oldFile = projectDir.appendingPathComponent("old_session.jsonl")
-        let oldDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-8 * 24 * 3600))
-        try """
-        {"type":"assistant","timestamp":"\(oldDate)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":5000,"output_tokens":1000}}}
-        """.write(to: oldFile, atomically: true, encoding: .utf8)
-
-        let eightDaysAgo = Date().addingTimeInterval(-8 * 24 * 3600)
-        try FileManager.default.setAttributes(
-            [.modificationDate: eightDaysAgo],
-            ofItemAtPath: oldFile.path
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" }
         )
 
-        let provider = ClaudeUsageProvider(projectsDir: tempDir)
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertNotNil(usage.fiveHourUsage.resetTime)
+        XCTAssertNotNil(usage.weeklyUsage?.resetTime)
+
+        // Verify reset time is in the future relative to the test fixture date
+        let expectedFiveHour = DateUtils.parseISO8601("2026-02-14T18:00:01.107582+00:00")!
+        XCTAssertEqual(
+            usage.fiveHourUsage.resetTime!.timeIntervalSince1970,
+            expectedFiveHour.timeIntervalSince1970,
+            accuracy: 1
+        )
+    }
+
+    func testPercentageCalculation() async throws {
+        let json = """
+        {
+            "five_hour": {"utilization": 85.0, "resets_at": null},
+            "seven_day": {"utilization": 42.0, "resets_at": null}
+        }
+        """
+        MockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" }
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        // percentage = used / total = 85 / 100 = 0.85
+        XCTAssertEqual(usage.fiveHourUsage.percentage, 0.85, accuracy: 0.001)
+        XCTAssertEqual(usage.weeklyUsage!.percentage, 0.42, accuracy: 0.001)
+    }
+
+    func testHandlesNullWindows() async throws {
+        let json = """
+        {
+            "five_hour": null,
+            "seven_day": null
+        }
+        """
+        MockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" }
+        )
+
         let usage = try await provider.fetchUsage()
 
         XCTAssertEqual(usage.fiveHourUsage.used, 0)
         XCTAssertEqual(usage.weeklyUsage?.used, 0)
+        XCTAssertNil(usage.fiveHourUsage.resetTime)
     }
 
-    func testHandlesMissingDirectory() async {
+    func testHandlesUnauthorized() async throws {
+        MockURLProtocol.stubResponse(data: Data(), statusCode: 401)
+
         let provider = ClaudeUsageProvider(
-            projectsDir: URL(fileURLWithPath: "/nonexistent/path")
+            session: MockURLProtocol.session(),
+            credentialProvider: { "expired-token" }
         )
+
+        do {
+            _ = try await provider.fetchUsage()
+            XCTFail("Should have thrown")
+        } catch {
+            // Expected — unauthorized
+        }
+    }
+
+    func testHandlesMissingCredentials() async {
+        let provider = ClaudeUsageProvider(
+            credentialProvider: { nil }
+        )
+
         let isConfigured = await provider.isConfigured()
         XCTAssertFalse(isConfigured)
     }
 
-    func testHandlesEmptyDirectory() async throws {
-        let provider = ClaudeUsageProvider(projectsDir: tempDir)
-        let usage = try await provider.fetchUsage()
-
-        XCTAssertEqual(usage.fiveHourUsage.used, 0)
-        XCTAssertTrue(usage.isAvailable)
-    }
-
-    func testIgnoresNonAssistantRecords() async throws {
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
-        let now = ISO8601DateFormatter().string(from: Date())
-        let content = """
-        {"type":"user","timestamp":"\(now)","message":{"role":"user","content":"hello"}}
-        {"type":"file-history-snapshot"}
-        {"type":"assistant","timestamp":"\(now)","model":"claude-opus-4-6","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":50}}}
+    func testSendsCorrectHeaders() async throws {
+        let json = """
+        {"five_hour": {"utilization": 0, "resets_at": null}, "seven_day": null}
         """
-        try content.write(to: sessionFile, atomically: true, encoding: .utf8)
-
-        let provider = ClaudeUsageProvider(projectsDir: tempDir)
-        let usage = try await provider.fetchUsage()
-
-        // Only assistant record: 100 + 50 = 150
-        XCTAssertEqual(usage.fiveHourUsage.used, 150)
-    }
-
-    func testUsesSessionStartForFiveHourReset() async throws {
-        let fixedNow = DateUtils.parseISO8601("2026-02-14T12:54:00Z")!
-        let projectDir = tempDir.appendingPathComponent("test-project")
-        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
-        let userStartTs = "2026-02-14T03:03:35.530Z"
-        let assistantTs = "2026-02-14T08:54:13.000Z"
-        try """
-        {"type":"user","sessionId":"session_1","timestamp":"\(userStartTs)","message":{"role":"user","content":"hello"}}
-        {"type":"assistant","sessionId":"session_1","timestamp":"\(assistantTs)","model":"claude-opus-4-6","message":{"id":"msg_session","usage":{"input_tokens":100,"output_tokens":50}}}
-        """.write(to: sessionFile, atomically: true, encoding: .utf8)
+        MockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+        MockURLProtocol.onRequest = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer my-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "anthropic-beta"), "oauth-2025-04-20")
+            XCTAssertEqual(request.url, ClaudeUsageProvider.usageURL)
+        }
 
         let provider = ClaudeUsageProvider(
-            projectsDir: tempDir,
-            nowProvider: { fixedNow }
+            session: MockURLProtocol.session(),
+            credentialProvider: { "my-token" }
         )
-        let usage = try await provider.fetchUsage()
-        let expected = DateUtils.parseISO8601("2026-02-14T13:03:35.530Z")!
 
-        XCTAssertNotNil(usage.fiveHourUsage.resetTime)
-        XCTAssertEqual(
-            usage.fiveHourUsage.resetTime!.timeIntervalSince1970,
-            expected.timeIntervalSince1970,
-            accuracy: 0.001
-        )
+        _ = try await provider.fetchUsage()
     }
+
+    func testIgnoresExtraFields() async throws {
+        let json = """
+        {
+            "five_hour": {"utilization": 19.0, "resets_at": "2026-02-14T18:00:01+00:00"},
+            "seven_day": {"utilization": 50.0, "resets_at": "2026-02-16T09:00:00+00:00"},
+            "seven_day_opus": null,
+            "seven_day_sonnet": {"utilization": 3.0, "resets_at": "2026-02-17T00:00:00+00:00"},
+            "iguana_necktie": null,
+            "extra_usage": {"is_enabled": true, "monthly_limit": 5000}
+        }
+        """
+        MockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" }
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        // Should decode successfully ignoring unknown keys
+        XCTAssertEqual(usage.fiveHourUsage.used, 19.0)
+        XCTAssertEqual(usage.weeklyUsage?.used, 50.0)
+    }
+}
+
+// MARK: - Mock URL Protocol
+
+private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var stubData: Data = Data()
+    nonisolated(unsafe) static var stubStatusCode: Int = 200
+    nonisolated(unsafe) static var onRequest: ((URLRequest) -> Void)?
+
+    static func reset() {
+        stubData = Data()
+        stubStatusCode = 200
+        onRequest = nil
+    }
+
+    static func stubResponse(data: Data, statusCode: Int) {
+        stubData = data
+        stubStatusCode = statusCode
+    }
+
+    static func session() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: config)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        MockURLProtocol.onRequest?(request)
+
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: MockURLProtocol.stubStatusCode,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: MockURLProtocol.stubData)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

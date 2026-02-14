@@ -10,9 +10,6 @@ struct SettingsView: View {
     @AppStorage("refreshInterval") private var refreshInterval: Double = 60
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
-    @AppStorage("claudePlan") private var claudePlan: String = ClaudePlan.max5x.rawValue
-    @AppStorage("claudeFiveHourLimit") private var claudeFiveHourLimit: Double = 45_000_000
-    @AppStorage("claudeWeeklyLimit") private var claudeWeeklyLimit: Double = 500_000_000
 
     @AppStorage("codexEnabled") private var codexEnabled = true
     @AppStorage("codexPlan") private var codexPlan: String = CodexPlan.pro.rawValue
@@ -52,47 +49,9 @@ struct SettingsView: View {
                     .onChange(of: claudeEnabled) { _ in
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
-
-                Picker("Plan", selection: $claudePlan) {
-                    ForEach(ClaudePlan.allCases, id: \.rawValue) { plan in
-                        Text(plan.rawValue).tag(plan.rawValue)
-                    }
-                }
-                .onChange(of: claudePlan) { newValue in
-                    if let plan = ClaudePlan(rawValue: newValue), plan != .custom {
-                        claudeFiveHourLimit = plan.fiveHourTokenLimit
-                        claudeWeeklyLimit = plan.weeklyTokenLimit
-                    }
-                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
-                }
-
-                HStack {
-                    Text("5h token limit:")
-                    TextField("", value: $claudeFiveHourLimit, format: .number)
-                        .frame(width: 120)
-                        .disabled(claudePlan != ClaudePlan.custom.rawValue)
-                    Text("tokens")
-                        .foregroundStyle(.secondary)
-                }
-                .onChange(of: claudeFiveHourLimit) { _ in
-                    if claudePlan == ClaudePlan.custom.rawValue {
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
-                    }
-                }
-
-                HStack {
-                    Text("Weekly token limit:")
-                    TextField("", value: $claudeWeeklyLimit, format: .number)
-                        .frame(width: 120)
-                        .disabled(claudePlan != ClaudePlan.custom.rawValue)
-                    Text("tokens")
-                        .foregroundStyle(.secondary)
-                }
-                .onChange(of: claudeWeeklyLimit) { _ in
-                    if claudePlan == ClaudePlan.custom.rawValue {
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
-                    }
-                }
+                Text("Usage is fetched from Anthropic OAuth API using Claude Code credentials")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // OpenAI Codex

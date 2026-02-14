@@ -98,19 +98,6 @@ final class UsageViewModel: ObservableObject {
         let geminiEnabled = defaults.bool(forKey: "geminiEnabled", defaultValue: true)
         let zaiEnabled = defaults.bool(forKey: "zaiEnabled", defaultValue: true)
 
-        // Claude token limits from AppStorage
-        let claudePlanRaw = defaults.string(forKey: "claudePlan") ?? ClaudePlan.max5x.rawValue
-        let claudePlan = ClaudePlan(rawValue: claudePlanRaw) ?? .max5x
-        let claudeFiveHour: Double
-        let claudeWeekly: Double
-        if claudePlan == .custom {
-            claudeFiveHour = defaults.double(forKey: "claudeFiveHourLimit").nonZero ?? ClaudePlan.max5x.fiveHourTokenLimit
-            claudeWeekly = defaults.double(forKey: "claudeWeeklyLimit").nonZero ?? ClaudePlan.max5x.weeklyTokenLimit
-        } else {
-            claudeFiveHour = claudePlan.fiveHourTokenLimit
-            claudeWeekly = claudePlan.weeklyTokenLimit
-        }
-
         // Codex limits from AppStorage
         let codexPlanRaw = defaults.string(forKey: "codexPlan") ?? CodexPlan.pro.rawValue
         let codexPlan = CodexPlan(rawValue: codexPlanRaw) ?? .pro
@@ -131,10 +118,7 @@ final class UsageViewModel: ObservableObject {
         var providers: [any UsageProviderProtocol] = []
 
         if claudeEnabled {
-            providers.append(ClaudeUsageProvider(
-                fiveHourTokenLimit: claudeFiveHour,
-                weeklyTokenLimit: claudeWeekly
-            ))
+            providers.append(ClaudeUsageProvider())
         }
 
         if codexEnabled {

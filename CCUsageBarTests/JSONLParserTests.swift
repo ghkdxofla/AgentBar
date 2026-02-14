@@ -1,6 +1,18 @@
 import XCTest
 @testable import CCUsageBar
 
+private struct TestRecord: Decodable {
+    let type: String?
+    let timestamp: String?
+    let costUSD: Double?
+    let usage: TestUsage?
+}
+
+private struct TestUsage: Decodable {
+    let input_tokens: Int?
+    let output_tokens: Int?
+}
+
 final class JSONLParserTests: XCTestCase {
 
     func testParseValidJSONL() {
@@ -10,7 +22,7 @@ final class JSONLParserTests: XCTestCase {
         {"type":"assistant","timestamp":"2026-02-14T10:02:00Z","usage":{"input_tokens":200,"output_tokens":100},"costUSD":0.02}
         """
 
-        let records = JSONLParser.parse(input, as: ClaudeMessageRecord.self)
+        let records = JSONLParser.parse(input, as: TestRecord.self)
 
         XCTAssertEqual(records.count, 3)
         XCTAssertEqual(records[0].usage?.input_tokens, 100)
@@ -26,7 +38,7 @@ final class JSONLParserTests: XCTestCase {
         {"type":"assistant","usage":{"input_tokens":200}}
         """
 
-        let records = JSONLParser.parse(input, as: ClaudeMessageRecord.self)
+        let records = JSONLParser.parse(input, as: TestRecord.self)
 
         XCTAssertEqual(records.count, 2)
         XCTAssertEqual(records[0].usage?.input_tokens, 100)
@@ -34,7 +46,7 @@ final class JSONLParserTests: XCTestCase {
     }
 
     func testParseEmptyString() {
-        let records = JSONLParser.parse("", as: ClaudeMessageRecord.self)
+        let records = JSONLParser.parse("", as: TestRecord.self)
         XCTAssertTrue(records.isEmpty)
     }
 
@@ -53,7 +65,7 @@ final class JSONLParserTests: XCTestCase {
         }
         try lines.joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
 
-        let records = try JSONLParser.parseFile(file, as: ClaudeMessageRecord.self)
+        let records = try JSONLParser.parseFile(file, as: TestRecord.self)
         XCTAssertEqual(records.count, 100)
         XCTAssertEqual(records[0].usage?.input_tokens, 0)
         XCTAssertEqual(records[99].usage?.input_tokens, 990)
@@ -62,7 +74,7 @@ final class JSONLParserTests: XCTestCase {
     func testParseFileNonexistent() throws {
         let records = try JSONLParser.parseFile(
             URL(fileURLWithPath: "/nonexistent/file.jsonl"),
-            as: ClaudeMessageRecord.self
+            as: TestRecord.self
         )
         XCTAssertTrue(records.isEmpty)
     }
