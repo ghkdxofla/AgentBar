@@ -22,40 +22,50 @@ struct ClaudeTokenUsage: Decodable, Sendable {
     let cache_read_input_tokens: Int?
     let cache_creation_input_tokens: Int?
 
-    /// Rate-limit relevant tokens: input + output + cache_creation
-    /// (cache reads are free and excluded per Anthropic API docs)
-    var rateLimitTokens: Int {
-        (input_tokens ?? 0) + (output_tokens ?? 0) + (cache_creation_input_tokens ?? 0)
+    /// Compute API-equivalent cost using model-specific pricing ($/M tokens)
+    func cost(pricing: ClaudeModelPricing) -> Double {
+        Double(input_tokens ?? 0) * pricing.input / 1_000_000
+        + Double(output_tokens ?? 0) * pricing.output / 1_000_000
+        + Double(cache_creation_input_tokens ?? 0) * pricing.cacheCreation / 1_000_000
+        + Double(cache_read_input_tokens ?? 0) * pricing.cacheRead / 1_000_000
     }
 }
 
-struct StatsCacheEntry: Decodable, Sendable {
-    let totalCost: Double?
-    let totalInputTokens: Int?
-    let totalOutputTokens: Int?
-    let totalCacheReadTokens: Int?
-    let totalCacheWriteTokens: Int?
+struct ClaudeModelPricing: Sendable {
+    let input: Double       // $/M tokens
+    let output: Double
+    let cacheCreation: Double
+    let cacheRead: Double
+
+    static func forModel(_ model: String?) -> ClaudeModelPricing {
+        guard let model = model?.lowercased() else { return .opus }
+        if model.contains("opus")   { return .opus }
+        if model.contains("sonnet") { return .sonnet }
+        if model.contains("haiku")  { return .haiku }
+        return .opus // default to most expensive
+    }
+
+    static let opus   = ClaudeModelPricing(input: 15.0, output: 75.0, cacheCreation: 18.75, cacheRead: 1.50)
+    static let sonnet = ClaudeModelPricing(input: 3.0,  output: 15.0, cacheCreation: 3.75,  cacheRead: 0.30)
+    static let haiku  = ClaudeModelPricing(input: 0.80, output: 4.0,  cacheCreation: 1.00,  cacheRead: 0.08)
 }
 
 final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .claude
 
     private let projectsDir: URL
-    private let statsCachePath: URL
-    private let fiveHourTokenLimit: Double
-    private let weeklyTokenLimit: Double
+    private let fiveHourBudget: Double
+    private let weeklyBudget: Double
 
     init(
         projectsDir: URL? = nil,
-        statsCachePath: URL? = nil,
-        fiveHourTokenLimit: Double = 500_000,
-        weeklyTokenLimit: Double = 10_000_000
+        fiveHourBudget: Double = 103.0,
+        weeklyBudget: Double = 1133.0
     ) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         self.projectsDir = projectsDir ?? home.appendingPathComponent(".claude/projects")
-        self.statsCachePath = statsCachePath ?? home.appendingPathComponent(".claude/stats-cache.json")
-        self.fiveHourTokenLimit = fiveHourTokenLimit
-        self.weeklyTokenLimit = weeklyTokenLimit
+        self.fiveHourBudget = fiveHourBudget
+        self.weeklyBudget = weeklyBudget
     }
 
     func isConfigured() async -> Bool {
@@ -79,8 +89,8 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             return DateUtils.isWithinWeeklyWindow(date, relativeTo: now)
         }
 
-        let fiveHourTokens = totalTokens(from: fiveHourRecords)
-        let weeklyTokens = totalTokens(from: weeklyRecords)
+        let fiveHourCost = totalCost(from: fiveHourRecords)
+        let weeklyCost = totalCost(from: weeklyRecords)
 
         // Rolling window: earliest record in window + window duration = when usage starts dropping
         let fiveHourReset = earliestTimestamp(from: fiveHourRecords)
@@ -91,15 +101,15 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         return UsageData(
             service: .claude,
             fiveHourUsage: UsageMetric(
-                used: Double(fiveHourTokens),
-                total: fiveHourTokenLimit,
-                unit: .tokens,
+                used: fiveHourCost,
+                total: fiveHourBudget,
+                unit: .dollars,
                 resetTime: fiveHourReset
             ),
             weeklyUsage: UsageMetric(
-                used: Double(weeklyTokens),
-                total: weeklyTokenLimit,
-                unit: .tokens,
+                used: weeklyCost,
+                total: weeklyBudget,
+                unit: .dollars,
                 resetTime: weeklyReset
             ),
             lastUpdated: now,
@@ -118,7 +128,6 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let sevenDaysAgo = now.addingTimeInterval(-7 * 24 * 3600)
         var allRecords: [ClaudeMessageRecord] = []
 
-        // Enumerate project directories
         let projectDirs = try fm.contentsOfDirectory(
             at: projectsDir,
             includingPropertiesForKeys: [.contentModificationDateKey],
@@ -140,7 +149,6 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             for file in files {
                 guard file.pathExtension == "jsonl" else { continue }
 
-                // Skip files not modified in the last 7 days
                 if let attrs = try? fm.attributesOfItem(atPath: file.path),
                    let modDate = attrs[.modificationDate] as? Date,
                    modDate < sevenDaysAgo {
@@ -155,8 +163,6 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         return allRecords
     }
 
-    /// Streaming causes duplicate records with the same message ID.
-    /// Keep only the last occurrence of each message ID.
     private func deduplicateByMessageID(_ records: [ClaudeMessageRecord]) -> [ClaudeMessageRecord] {
         var lastByID: [String: ClaudeMessageRecord] = [:]
         var noIDRecords: [ClaudeMessageRecord] = []
@@ -179,10 +185,11 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             .min()
     }
 
-    private func totalTokens(from records: [ClaudeMessageRecord]) -> Int {
-        records.reduce(0) { sum, record in
-            let nested = record.message?.usage?.rateLimitTokens ?? 0
-            return sum + nested
+    private func totalCost(from records: [ClaudeMessageRecord]) -> Double {
+        records.reduce(0.0) { sum, record in
+            guard let usage = record.message?.usage else { return sum }
+            let pricing = ClaudeModelPricing.forModel(record.model)
+            return sum + usage.cost(pricing: pricing)
         }
     }
 }

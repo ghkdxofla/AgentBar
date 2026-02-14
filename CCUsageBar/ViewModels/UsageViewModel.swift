@@ -94,17 +94,17 @@ final class UsageViewModel: ObservableObject {
     private static func buildProviders() -> [any UsageProviderProtocol] {
         let defaults = UserDefaults.standard
 
-        // Claude limits from AppStorage
+        // Claude budgets from AppStorage (API-equivalent dollars)
         let claudePlanRaw = defaults.string(forKey: "claudePlan") ?? ClaudePlan.max5x.rawValue
         let claudePlan = ClaudePlan(rawValue: claudePlanRaw) ?? .max5x
         let claudeFiveHour: Double
         let claudeWeekly: Double
         if claudePlan == .custom {
-            claudeFiveHour = defaults.double(forKey: "claudeFiveHourLimit").nonZero ?? ClaudePlan.max5x.fiveHourTokenLimit
-            claudeWeekly = defaults.double(forKey: "claudeWeeklyLimit").nonZero ?? ClaudePlan.max5x.weeklyTokenLimit
+            claudeFiveHour = defaults.double(forKey: "claudeFiveHourBudget").nonZero ?? ClaudePlan.max5x.fiveHourBudget
+            claudeWeekly = defaults.double(forKey: "claudeWeeklyBudget").nonZero ?? ClaudePlan.max5x.weeklyBudget
         } else {
-            claudeFiveHour = claudePlan.fiveHourTokenLimit
-            claudeWeekly = claudePlan.weeklyTokenLimit
+            claudeFiveHour = claudePlan.fiveHourBudget
+            claudeWeekly = claudePlan.weeklyBudget
         }
 
         // Codex limits from AppStorage
@@ -122,8 +122,8 @@ final class UsageViewModel: ObservableObject {
 
         return [
             ClaudeUsageProvider(
-                fiveHourTokenLimit: claudeFiveHour,
-                weeklyTokenLimit: claudeWeekly
+                fiveHourBudget: claudeFiveHour,
+                weeklyBudget: claudeWeekly
             ),
             CodexUsageProvider(
                 fiveHourTokenLimit: codexFiveHour,

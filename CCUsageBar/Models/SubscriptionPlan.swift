@@ -5,19 +5,21 @@ enum ClaudePlan: String, CaseIterable, Codable, Sendable {
     case max20x = "Max 20x"
     case custom = "Custom"
 
-    var fiveHourTokenLimit: Double {
+    /// 5-hour burst budget in API-equivalent dollars
+    var fiveHourBudget: Double {
         switch self {
-        case .max5x: return 2_500_000
-        case .max20x: return 10_000_000
-        case .custom: return 0
+        case .max5x:  103.0
+        case .max20x: 412.0
+        case .custom: 0
         }
     }
 
-    var weeklyTokenLimit: Double {
+    /// Weekly sustained budget in API-equivalent dollars
+    var weeklyBudget: Double {
         switch self {
-        case .max5x: return 50_000_000
-        case .max20x: return 200_000_000
-        case .custom: return 0
+        case .max5x:  1133.0
+        case .max20x: 4532.0
+        case .custom: 0
         }
     }
 }
