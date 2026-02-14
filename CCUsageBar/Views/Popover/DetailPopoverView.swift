@@ -14,6 +14,7 @@ struct DetailPopoverView: View {
                     Image(systemName: "gearshape")
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
             }
 
             Divider()

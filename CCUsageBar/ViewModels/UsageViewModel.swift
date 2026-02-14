@@ -111,8 +111,7 @@ final class UsageViewModel: ObservableObject {
             codexWeekly = codexPlan.weeklyTokenLimit
         }
 
-        // Gemini request limits from AppStorage
-        let geminiMinuteLimit = defaults.double(forKey: "geminiMinuteLimit").nonZero ?? 60
+        // Gemini request limit from AppStorage
         let geminiDailyLimit = defaults.double(forKey: "geminiDailyLimit").nonZero ?? 1_000
 
         var providers: [any UsageProviderProtocol] = []
@@ -130,7 +129,6 @@ final class UsageViewModel: ObservableObject {
 
         if geminiEnabled {
             providers.append(GeminiUsageProvider(
-                minuteRequestLimit: geminiMinuteLimit,
                 dailyRequestLimit: geminiDailyLimit
             ))
         }
