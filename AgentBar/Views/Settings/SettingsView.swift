@@ -97,6 +97,7 @@ struct SettingsView: View {
                         .frame(width: 200)
                     Button("Save") {
                         saveAPIKey(openaiAPIKey, account: ServiceType.codex.keychainAccount)
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
                 }
 
@@ -151,6 +152,7 @@ struct SettingsView: View {
                         .frame(width: 200)
                     Button("Save") {
                         saveAPIKey(zaiAPIKey, account: ServiceType.zai.keychainAccount)
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
                 }
                 Text("Limits are fetched automatically from Z.ai API")
