@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct AgentBarApp: App {
+struct CCUsageBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {

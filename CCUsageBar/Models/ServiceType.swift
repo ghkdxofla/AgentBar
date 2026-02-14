@@ -3,7 +3,7 @@ import SwiftUI
 enum ServiceType: String, CaseIterable, Codable, Sendable {
     case claude = "Claude Code"
     case codex  = "OpenAI Codex"
-    case zai    = "Z.ai GLM"
+    case zai    = "Z.ai Coding Plan"
 
     var darkColor: Color {
         switch self {
@@ -28,6 +28,15 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
         case .zai:    "Z"
         }
     }
+
+    var fiveHourLabel: String {
+        switch self {
+        case .zai: "Quota"
+        default: "5h"
+        }
+    }
+
+    var weeklyLabel: String { "7d" }
 
     var keychainAccount: String {
         switch self {

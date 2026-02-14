@@ -7,7 +7,7 @@ struct DetailPopoverView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack {
-                Text("AgentBar")
+                Text("CCUsageBar")
                     .font(.headline)
                 Spacer()
                 Button(action: openSettings) {
@@ -88,8 +88,10 @@ struct ServiceDetailRow: View {
                     .frame(width: 60, height: 8)
             }
 
-            MetricRow(label: "5h", metric: data.fiveHourUsage)
-            MetricRow(label: "7d", metric: data.weeklyUsage)
+            MetricRow(label: data.service.fiveHourLabel, metric: data.fiveHourUsage)
+            if let weekly = data.weeklyUsage {
+                MetricRow(label: data.service.weeklyLabel, metric: weekly)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -172,9 +174,11 @@ struct MiniBarView: View {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(Color.gray.opacity(0.2))
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(data.service.lightColor)
-                    .frame(width: geo.size.width * data.weeklyUsage.percentage)
+                if let weekly = data.weeklyUsage, weekly.percentage > 0 {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(data.service.lightColor)
+                        .frame(width: geo.size.width * weekly.percentage)
+                }
                 RoundedRectangle(cornerRadius: 2)
                     .fill(data.service.darkColor)
                     .frame(width: geo.size.width * data.fiveHourUsage.percentage)

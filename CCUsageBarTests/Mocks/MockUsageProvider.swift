@@ -1,5 +1,5 @@
 import Foundation
-@testable import AgentBar
+@testable import CCUsageBar
 
 final class MockUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType

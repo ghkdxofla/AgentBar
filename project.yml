@@ -1,6 +1,6 @@
-name: AgentBar
+name: CCUsageBar
 options:
-  bundleIdPrefix: com.agentbar
+  bundleIdPrefix: com.ccusagebar
   deploymentTarget:
     macOS: "13.0"
   xcodeVersion: "26.2"
@@ -12,28 +12,28 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "13.0"
 
 targets:
-  AgentBar:
+  CCUsageBar:
     type: application
     platform: macOS
     sources:
-      - path: AgentBar
+      - path: CCUsageBar
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.agentbar.app
-        INFOPLIST_FILE: AgentBar/Info.plist
-        CODE_SIGN_ENTITLEMENTS: AgentBar/AgentBar.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.ccusagebar.app
+        INFOPLIST_FILE: CCUsageBar/Info.plist
+        CODE_SIGN_ENTITLEMENTS: CCUsageBar/CCUsageBar.entitlements
         ENABLE_HARDENED_RUNTIME: YES
         COMBINE_HIDPI_IMAGES: YES
         SWIFT_STRICT_CONCURRENCY: complete
 
-  AgentBarTests:
+  CCUsageBarTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: AgentBarTests
+      - path: CCUsageBarTests
     dependencies:
-      - target: AgentBar
+      - target: CCUsageBar
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.agentbar.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.ccusagebar.app.tests
         GENERATE_INFOPLIST_FILE: YES

@@ -28,23 +28,6 @@ struct ZaiUsageDetail: Decodable, Sendable {
     let usage: Int?
 }
 
-// MARK: - Z.ai Model Usage API Response
-
-struct ZaiModelUsageResponse: Decodable, Sendable {
-    let code: Int?
-    let data: ZaiModelUsageData?
-    let success: Bool?
-}
-
-struct ZaiModelUsageData: Decodable, Sendable {
-    let totalUsage: ZaiTotalUsage?
-}
-
-struct ZaiTotalUsage: Decodable, Sendable {
-    let totalModelCallCount: Int?
-    let totalTokensUsage: Int?
-}
-
 // MARK: - Provider
 
 final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
@@ -77,31 +60,23 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             throw APIError.noData
         }
 
-        // TIME_LIMIT is the active rate limit (requests per window)
+        // TIME_LIMIT is the active rate limit (requests per monthly window)
         let timeLimit = limits.first { $0.type == "TIME_LIMIT" }
-        let fiveHourUsed = timeLimit?.currentValue ?? 0
-        let fiveHourTotal = timeLimit?.usage ?? 0
+        let quotaUsed = timeLimit?.currentValue ?? 0
+        let quotaTotal = timeLimit?.usage ?? 0
         let nextReset: Date? = timeLimit?.nextResetTime.map {
             Date(timeIntervalSince1970: $0 / 1000)
         }
 
-        // Weekly: fetch model-usage for 7 days
-        let weeklyUsage = await fetchWeeklyUsage(apiKey: apiKey, now: now)
-
         return UsageData(
             service: .zai,
             fiveHourUsage: UsageMetric(
-                used: fiveHourUsed,
-                total: fiveHourTotal,
+                used: quotaUsed,
+                total: quotaTotal,
                 unit: .requests,
                 resetTime: nextReset
             ),
-            weeklyUsage: UsageMetric(
-                used: Double(weeklyUsage.calls),
-                total: fiveHourTotal,
-                unit: .requests,
-                resetTime: nil
-            ),
+            weeklyUsage: nil,
             lastUpdated: now,
             isAvailable: true
         )
@@ -134,26 +109,4 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         }
     }
 
-    private func fetchWeeklyUsage(apiKey: String, now: Date) async -> (calls: Int, tokens: Int) {
-        let sevenDaysAgo = now.addingTimeInterval(-7 * 24 * 3600)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let startTime = formatter.string(from: sevenDaysAgo)
-        let endTime = formatter.string(from: now)
-
-        // URL-encode the datetime strings
-        guard let startEncoded = startTime.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let endEncoded = endTime.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://api.z.ai/api/monitor/usage/model-usage?startTime=\(startEncoded)&endTime=\(endEncoded)") else {
-            return (0, 0)
-        }
-
-        do {
-            let response: ZaiModelUsageResponse = try await fetchWithAuthRetry(url: url, apiKey: apiKey)
-            let total = response.data?.totalUsage
-            return (total?.totalModelCallCount ?? 0, total?.totalTokensUsage ?? 0)
-        } catch {
-            return (0, 0)
-        }
-    }
 }
