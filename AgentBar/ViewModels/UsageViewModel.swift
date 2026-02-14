@@ -7,21 +7,27 @@ final class UsageViewModel: ObservableObject {
     @Published var lastError: String?
     @Published var isLoading: Bool = false
 
-    private let providers: [any UsageProviderProtocol]
+    private var providers: [any UsageProviderProtocol]
     private let refreshInterval: TimeInterval
     private var timerCancellable: AnyCancellable?
+    private var limitsCancellable: AnyCancellable?
     private var consecutiveFailures: [ServiceType: Int] = [:]
 
     init(
         providers: [any UsageProviderProtocol]? = nil,
         refreshInterval: TimeInterval = 60
     ) {
-        self.providers = providers ?? [
-            ClaudeUsageProvider(),
-            CodexUsageProvider(),
-            ZaiUsageProvider()
-        ]
         self.refreshInterval = refreshInterval
+        self.providers = providers ?? Self.buildProviders()
+
+        if providers == nil {
+            limitsCancellable = NotificationCenter.default
+                .publisher(for: .limitsChanged)
+                .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+                .sink { [weak self] _ in
+                    self?.rebuildProviders()
+                }
+        }
     }
 
     func startMonitoring() {
@@ -41,6 +47,11 @@ final class UsageViewModel: ObservableObject {
     func stopMonitoring() {
         timerCancellable?.cancel()
         timerCancellable = nil
+    }
+
+    func rebuildProviders() {
+        providers = Self.buildProviders()
+        Task { await fetchAllUsage() }
     }
 
     func fetchAllUsage() async {
@@ -76,5 +87,55 @@ final class UsageViewModel: ObservableObject {
 
         usageData = results
         lastError = results.isEmpty ? "No data available" : nil
+    }
+
+    // MARK: - Provider Factory
+
+    private static func buildProviders() -> [any UsageProviderProtocol] {
+        let defaults = UserDefaults.standard
+
+        // Claude limits from AppStorage
+        let claudePlanRaw = defaults.string(forKey: "claudePlan") ?? ClaudePlan.max5x.rawValue
+        let claudePlan = ClaudePlan(rawValue: claudePlanRaw) ?? .max5x
+        let claudeFiveHour: Double
+        let claudeWeekly: Double
+        if claudePlan == .custom {
+            claudeFiveHour = defaults.double(forKey: "claudeFiveHourLimit").nonZero ?? ClaudePlan.max5x.fiveHourTokenLimit
+            claudeWeekly = defaults.double(forKey: "claudeWeeklyLimit").nonZero ?? ClaudePlan.max5x.weeklyTokenLimit
+        } else {
+            claudeFiveHour = claudePlan.fiveHourTokenLimit
+            claudeWeekly = claudePlan.weeklyTokenLimit
+        }
+
+        // Codex limits from AppStorage
+        let codexPlanRaw = defaults.string(forKey: "codexPlan") ?? CodexPlan.pro.rawValue
+        let codexPlan = CodexPlan(rawValue: codexPlanRaw) ?? .pro
+        let codexFiveHour: Double
+        let codexWeekly: Double
+        if codexPlan == .custom {
+            codexFiveHour = defaults.double(forKey: "codexFiveHourLimit").nonZero ?? CodexPlan.pro.fiveHourTokenLimit
+            codexWeekly = defaults.double(forKey: "codexWeeklyLimit").nonZero ?? CodexPlan.pro.weeklyTokenLimit
+        } else {
+            codexFiveHour = codexPlan.fiveHourTokenLimit
+            codexWeekly = codexPlan.weeklyTokenLimit
+        }
+
+        return [
+            ClaudeUsageProvider(
+                fiveHourTokenLimit: claudeFiveHour,
+                weeklyTokenLimit: claudeWeekly
+            ),
+            CodexUsageProvider(
+                fiveHourTokenLimit: codexFiveHour,
+                weeklyTokenLimit: codexWeekly
+            ),
+            ZaiUsageProvider()
+        ]
+    }
+}
+
+private extension Double {
+    var nonZero: Double? {
+        self > 0 ? self : nil
     }
 }

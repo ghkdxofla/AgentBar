@@ -1,47 +1,48 @@
 import Foundation
 
-// MARK: - OpenAI Usage API Response Models
+// MARK: - Codex Session Record Models (matches actual ~/.codex/sessions/ JSONL)
 
-struct OpenAIUsageResponse: Decodable, Sendable {
-    let object: String?
-    let data: [OpenAIBucket]?
-    let has_more: Bool?
+struct CodexSessionRecord: Decodable, Sendable {
+    let timestamp: String?
+    let type: String?
+    let payload: CodexPayload?
 }
 
-struct OpenAIBucket: Decodable, Sendable {
-    let object: String?
-    let start_time: Int?
-    let end_time: Int?
-    let results: [OpenAIUsageResult]?
+struct CodexPayload: Decodable, Sendable {
+    let type: String?
+    let info: CodexTokenInfo?
+    let rate_limits: CodexRateLimits?
 }
 
-struct OpenAIUsageResult: Decodable, Sendable {
-    let object: String?
+struct CodexTokenInfo: Decodable, Sendable {
+    let total_token_usage: CodexTokenUsage?
+    let last_token_usage: CodexTokenUsage?
+}
+
+struct CodexTokenUsage: Decodable, Sendable {
     let input_tokens: Int?
     let output_tokens: Int?
-    let num_model_requests: Int?
-    let model: String?
+    let cached_input_tokens: Int?
+    let reasoning_output_tokens: Int?
+    let total_tokens: Int?
+
+    var totalTokens: Int {
+        (input_tokens ?? 0) +
+        (cached_input_tokens ?? 0) +
+        (output_tokens ?? 0) +
+        (reasoning_output_tokens ?? 0)
+    }
 }
 
-struct OpenAICostResponse: Decodable, Sendable {
-    let object: String?
-    let data: [OpenAICostBucket]?
+struct CodexRateLimits: Decodable, Sendable {
+    let primary: CodexRateWindow?
+    let secondary: CodexRateWindow?
 }
 
-struct OpenAICostBucket: Decodable, Sendable {
-    let start_time: Int?
-    let end_time: Int?
-    let results: [OpenAICostResult]?
-}
-
-struct OpenAICostResult: Decodable, Sendable {
-    let amount: OpenAICostAmount?
-    let line_item: String?
-}
-
-struct OpenAICostAmount: Decodable, Sendable {
-    let value: Double?
-    let currency: String?
+struct CodexRateWindow: Decodable, Sendable {
+    let used_percent: Double?
+    let window_minutes: Int?
+    let resets_at: Int?
 }
 
 // MARK: - Provider
@@ -49,154 +50,186 @@ struct OpenAICostAmount: Decodable, Sendable {
 final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .codex
 
-    private let apiClient: APIClient
     private let sessionsDir: URL
-    private let fiveHourDollarLimit: Double
-    private let weeklyDollarLimit: Double
+    private let fiveHourTokenLimit: Double
+    private let weeklyTokenLimit: Double
 
     init(
-        apiClient: APIClient = APIClient(),
         sessionsDir: URL? = nil,
-        fiveHourDollarLimit: Double = 5.0,
-        weeklyDollarLimit: Double = 50.0
+        fiveHourTokenLimit: Double = 10_000_000,
+        weeklyTokenLimit: Double = 100_000_000
     ) {
-        self.apiClient = apiClient
         let home = FileManager.default.homeDirectoryForCurrentUser
         self.sessionsDir = sessionsDir ?? home.appendingPathComponent(".codex/sessions")
-        self.fiveHourDollarLimit = fiveHourDollarLimit
-        self.weeklyDollarLimit = weeklyDollarLimit
+        self.fiveHourTokenLimit = fiveHourTokenLimit
+        self.weeklyTokenLimit = weeklyTokenLimit
     }
 
     func isConfigured() async -> Bool {
-        KeychainManager.load(account: ServiceType.codex.keychainAccount) != nil
-            || FileManager.default.fileExists(atPath: sessionsDir.path)
+        FileManager.default.fileExists(atPath: sessionsDir.path)
     }
 
     func fetchUsage() async throws -> UsageData {
         let now = Date()
-        var weeklyCost: Double = 0
-        var fiveHourCost: Double = 0
 
-        // Try API first
-        if let apiKey = KeychainManager.load(account: ServiceType.codex.keychainAccount) {
-            weeklyCost = await fetchWeeklyCostFromAPI(apiKey: apiKey, now: now)
-        }
+        // Find the most recent rate_limits from session files
+        let latestRateLimits = findLatestRateLimits(now: now)
 
-        // Local session files for 5-hour precision
-        let localFiveHour = parseLocalSessions(now: now, window: .fiveHour)
-        let localWeekly = parseLocalSessions(now: now, window: .weekly)
+        var fiveHourUsed: Double = 0
+        var weeklyUsed: Double = 0
+        var fiveHourResetTime: Date?
+        var weeklyResetTime: Date?
 
-        // Use local data for 5-hour (more precise), API or local for weekly
-        fiveHourCost = localFiveHour
-        if weeklyCost == 0 {
-            weeklyCost = localWeekly
+        if let rateLimits = latestRateLimits {
+            // Use rate_limits percentage, but check if the window has already reset
+            if let primary = rateLimits.primary {
+                if let resetsAt = primary.resets_at {
+                    let resetDate = Date(timeIntervalSince1970: TimeInterval(resetsAt))
+                    if resetDate > now {
+                        fiveHourUsed = fiveHourTokenLimit * (primary.used_percent ?? 0) / 100.0
+                        fiveHourResetTime = resetDate
+                    }
+                } else {
+                    fiveHourUsed = fiveHourTokenLimit * (primary.used_percent ?? 0) / 100.0
+                }
+            }
+
+            if let secondary = rateLimits.secondary {
+                if let resetsAt = secondary.resets_at {
+                    let resetDate = Date(timeIntervalSince1970: TimeInterval(resetsAt))
+                    if resetDate > now {
+                        weeklyUsed = weeklyTokenLimit * (secondary.used_percent ?? 0) / 100.0
+                        weeklyResetTime = resetDate
+                    }
+                } else {
+                    weeklyUsed = weeklyTokenLimit * (secondary.used_percent ?? 0) / 100.0
+                }
+            }
+        } else {
+            // Fallback: sum tokens from session files
+            let (fiveHour, weekly) = sumTokensFromSessions(now: now)
+            fiveHourUsed = Double(fiveHour)
+            weeklyUsed = Double(weekly)
         }
 
         return UsageData(
             service: .codex,
             fiveHourUsage: UsageMetric(
-                used: fiveHourCost,
-                total: fiveHourDollarLimit,
-                unit: .dollars,
-                resetTime: DateUtils.nextResetTime(
-                    from: DateUtils.fiveHourWindowStart(relativeTo: now),
-                    windowDuration: DateUtils.fiveHourInterval
-                )
+                used: fiveHourUsed,
+                total: fiveHourTokenLimit,
+                unit: .tokens,
+                resetTime: fiveHourResetTime
             ),
             weeklyUsage: UsageMetric(
-                used: weeklyCost,
-                total: weeklyDollarLimit,
-                unit: .dollars,
-                resetTime: nil
+                used: weeklyUsed,
+                total: weeklyTokenLimit,
+                unit: .tokens,
+                resetTime: weeklyResetTime
             ),
             lastUpdated: now,
             isAvailable: true
         )
     }
 
-    // MARK: - API
+    // MARK: - Rate Limits Extraction
 
-    private func fetchWeeklyCostFromAPI(apiKey: String, now: Date) async -> Double {
-        let sevenDaysAgo = Int(now.addingTimeInterval(-7 * 24 * 3600).timeIntervalSince1970)
-        guard let url = URL(string: "https://api.openai.com/v1/organization/costs?start_time=\(sevenDaysAgo)&bucket_width=1d&limit=7") else {
-            return 0
-        }
-
-        do {
-            let response: OpenAICostResponse = try await apiClient.get(
-                url: url,
-                headers: [
-                    "Authorization": "Bearer \(apiKey)",
-                    "Content-Type": "application/json"
-                ]
-            )
-            return response.data?
-                .flatMap { $0.results ?? [] }
-                .compactMap { $0.amount?.value }
-                .reduce(0, +) ?? 0
-        } catch {
-            return 0
-        }
-    }
-
-    // MARK: - Local Session Parsing
-
-    private enum Window {
-        case fiveHour, weekly
-    }
-
-    private func parseLocalSessions(now: Date, window: Window) -> Double {
+    private func findLatestRateLimits(now: Date) -> CodexRateLimits? {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: sessionsDir.path) else { return 0 }
+        guard fm.fileExists(atPath: sessionsDir.path) else { return nil }
 
-        let cutoff: Date
-        switch window {
-        case .fiveHour: cutoff = DateUtils.fiveHourWindowStart(relativeTo: now)
-        case .weekly: cutoff = DateUtils.weeklyWindowStart(relativeTo: now)
+        let recentFiles = findSessionFiles(within: 7 * 24 * 3600, relativeTo: now)
+        guard !recentFiles.isEmpty else { return nil }
+
+        // Check the most recent file first (sorted by path descending = most recent date first)
+        let sorted = recentFiles.sorted { $0.lastPathComponent > $1.lastPathComponent }
+
+        for file in sorted {
+            if let rateLimits = extractLatestRateLimits(from: file) {
+                return rateLimits
+            }
         }
 
-        guard let files = try? fm.contentsOfDirectory(
+        return nil
+    }
+
+    private func extractLatestRateLimits(from file: URL) -> CodexRateLimits? {
+        guard let records = try? JSONLParser.parseFile(file, as: CodexSessionRecord.self) else {
+            return nil
+        }
+
+        // Find the last event_msg with token_count type that has rate_limits
+        var latest: CodexRateLimits?
+        for record in records {
+            guard record.type == "event_msg",
+                  record.payload?.type == "token_count",
+                  record.payload?.rate_limits != nil else { continue }
+            latest = record.payload?.rate_limits
+        }
+        return latest
+    }
+
+    // MARK: - Token Summing Fallback
+
+    private func sumTokensFromSessions(now: Date) -> (fiveHour: Int, weekly: Int) {
+        let fiveHourCutoff = DateUtils.fiveHourWindowStart(relativeTo: now)
+        let weeklyCutoff = DateUtils.weeklyWindowStart(relativeTo: now)
+
+        let files = findSessionFiles(within: 7 * 24 * 3600, relativeTo: now)
+        var fiveHourTotal = 0
+        var weeklyTotal = 0
+
+        for file in files {
+            let records = (try? JSONLParser.parseFile(file, as: CodexSessionRecord.self)) ?? []
+            for record in records {
+                guard record.type == "event_msg",
+                      record.payload?.type == "token_count",
+                      let info = record.payload?.info,
+                      let lastUsage = info.last_token_usage,
+                      let ts = record.timestamp,
+                      let date = DateUtils.parseISO8601(ts) else { continue }
+
+                let tokens = lastUsage.totalTokens
+                if date >= fiveHourCutoff && date <= now {
+                    fiveHourTotal += tokens
+                }
+                if date >= weeklyCutoff && date <= now {
+                    weeklyTotal += tokens
+                }
+            }
+        }
+
+        return (fiveHourTotal, weeklyTotal)
+    }
+
+    // MARK: - Directory Traversal
+
+    private func findSessionFiles(within seconds: TimeInterval, relativeTo now: Date) -> [URL] {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: sessionsDir.path) else { return [] }
+
+        let cutoff = now.addingTimeInterval(-seconds)
+        var results: [URL] = []
+
+        // Recursively enumerate through YYYY/MM/DD/ subdirectories
+        guard let enumerator = fm.enumerator(
             at: sessionsDir,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
-        ) else { return 0 }
+        ) else { return [] }
 
-        var totalCost: Double = 0
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "jsonl" else { continue }
 
-        for file in files where file.pathExtension == "jsonl" {
-            if let attrs = try? fm.attributesOfItem(atPath: file.path),
+            // Skip files not modified recently
+            if let attrs = try? fm.attributesOfItem(atPath: fileURL.path),
                let modDate = attrs[.modificationDate] as? Date,
                modDate < cutoff {
                 continue
             }
 
-            let records = (try? JSONLParser.parseFile(file, as: CodexSessionRecord.self)) ?? []
-            for record in records {
-                guard let ts = record.timestamp,
-                      let date = DateUtils.parseISO8601(ts),
-                      date >= cutoff, date <= now else { continue }
-                totalCost += record.costUSD ?? 0
-            }
+            results.append(fileURL)
         }
 
-        return totalCost
-    }
-}
-
-// MARK: - Local Session Record
-
-struct CodexSessionRecord: Decodable, Sendable {
-    let type: String?
-    let timestamp: String?
-    let costUSD: Double?
-    let usage: CodexTokenUsage?
-}
-
-struct CodexTokenUsage: Decodable, Sendable {
-    let input_tokens: Int?
-    let output_tokens: Int?
-
-    var totalTokens: Int {
-        (input_tokens ?? 0) + (output_tokens ?? 0)
+        return results
     }
 }

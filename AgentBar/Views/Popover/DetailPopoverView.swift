@@ -57,7 +57,8 @@ struct DetailPopoverView: View {
     }
 
     private func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        PopoverController.shared.hide()
+        SettingsWindowController.shared.show()
     }
 
     private func relativeTimeString() -> String {

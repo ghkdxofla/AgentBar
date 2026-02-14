@@ -1,0 +1,205 @@
+import XCTest
+@testable import AgentBar
+
+final class CodexUsageProviderTests: XCTestCase {
+
+    var tempDir: URL!
+
+    override func setUp() {
+        super.setUp()
+        tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: tempDir)
+        super.tearDown()
+    }
+
+    // MARK: - Directory Traversal
+
+    func testFindsFilesInDateSubdirectories() async throws {
+        // Create YYYY/MM/DD/ structure
+        let dateDir = tempDir.appendingPathComponent("2026/02/13")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":1000,"output_tokens":500,"cached_input_tokens":200,"reasoning_output_tokens":100},"total_token_usage":{"input_tokens":1000,"output_tokens":500,"cached_input_tokens":200,"reasoning_output_tokens":100}},"rate_limits":{"primary":{"used_percent":5.0,"window_minutes":300,"resets_at":\(Int(Date().addingTimeInterval(3600).timeIntervalSince1970))},"secondary":{"used_percent":2.0,"window_minutes":10080,"resets_at":\(Int(Date().addingTimeInterval(7 * 24 * 3600).timeIntervalSince1970))}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-2026-02-13T00-00-00-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.service, .codex)
+        XCTAssertTrue(usage.isAvailable)
+        // 5% of 10M = 500,000
+        XCTAssertEqual(usage.fiveHourUsage.used, 500_000, accuracy: 1)
+        // 2% of 100M = 2,000,000
+        XCTAssertEqual(usage.weeklyUsage.used, 2_000_000, accuracy: 1)
+        XCTAssertEqual(usage.fiveHourUsage.unit, .tokens)
+    }
+
+    // MARK: - Rate Limits Parsing
+
+    func testUsesLatestRateLimitsFromMostRecentFile() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/13")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let futureReset = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let weeklyReset = Int(Date().addingTimeInterval(7 * 24 * 3600).timeIntervalSince1970)
+
+        // First event: 1%
+        // Second event: 3% (latest)
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"primary":{"used_percent":1.0,"window_minutes":300,"resets_at":\(futureReset)},"secondary":{"used_percent":0.5,"window_minutes":10080,"resets_at":\(weeklyReset)}}}}
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":500,"output_tokens":200},"total_token_usage":{"input_tokens":500,"output_tokens":200}},"rate_limits":{"primary":{"used_percent":3.0,"window_minutes":300,"resets_at":\(futureReset)},"secondary":{"used_percent":1.5,"window_minutes":10080,"resets_at":\(weeklyReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Should use the latest (3%)
+        XCTAssertEqual(usage.fiveHourUsage.used, 300_000, accuracy: 1)
+        XCTAssertEqual(usage.weeklyUsage.used, 1_500_000, accuracy: 1)
+    }
+
+    func testResetWindowMeansZeroUsage() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/13")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        // resets_at is in the past = window has already reset
+        let pastReset = Int(Date().addingTimeInterval(-3600).timeIntervalSince1970)
+
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"primary":{"used_percent":50.0,"window_minutes":300,"resets_at":\(pastReset)},"secondary":{"used_percent":25.0,"window_minutes":10080,"resets_at":\(pastReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Past resets_at means usage has reset to 0
+        XCTAssertEqual(usage.fiveHourUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage.used, 0)
+    }
+
+    // MARK: - Event Type Filtering
+
+    func testFiltersOnlyEventMsgTokenCount() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/14")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let futureReset = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+
+        let content = """
+        {"timestamp":"\(now)","type":"session_meta","payload":{"id":"test"}}
+        {"timestamp":"\(now)","type":"response_item","payload":{"type":"message"}}
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"user_message"}}
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"output_tokens":50},"total_token_usage":{"input_tokens":100,"output_tokens":50}},"rate_limits":{"primary":{"used_percent":1.0,"window_minutes":300,"resets_at":\(futureReset)},"secondary":{"used_percent":0.5,"window_minutes":10080,"resets_at":\(futureReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Only the token_count event_msg should be processed
+        XCTAssertEqual(usage.fiveHourUsage.used, 100_000, accuracy: 1)
+    }
+
+    // MARK: - Token Summing Fallback
+
+    func testFallsBackToTokenSummingWithoutRateLimits() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/14")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+
+        // event_msg with token_count but no rate_limits
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":1000,"output_tokens":500,"cached_input_tokens":200,"reasoning_output_tokens":100},"total_token_usage":{"input_tokens":1000,"output_tokens":500,"cached_input_tokens":200,"reasoning_output_tokens":100}}}}
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":2000,"output_tokens":800,"cached_input_tokens":300,"reasoning_output_tokens":150},"total_token_usage":{"input_tokens":3000,"output_tokens":1300,"cached_input_tokens":500,"reasoning_output_tokens":250}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Fallback: sum last_token_usage from both events
+        // Event 1: 1000+500+200+100 = 1800
+        // Event 2: 2000+800+300+150 = 3250
+        // Total: 5050
+        XCTAssertEqual(usage.fiveHourUsage.used, 5050)
+        XCTAssertEqual(usage.weeklyUsage.used, 5050)
+    }
+
+    // MARK: - Edge Cases
+
+    func testHandlesMissingDirectory() async {
+        let provider = CodexUsageProvider(
+            sessionsDir: URL(fileURLWithPath: "/nonexistent/path")
+        )
+        let isConfigured = await provider.isConfigured()
+        XCTAssertFalse(isConfigured)
+    }
+
+    func testHandlesEmptyDirectory() async throws {
+        let provider = CodexUsageProvider(sessionsDir: tempDir)
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.fiveHourUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage.used, 0)
+        XCTAssertTrue(usage.isAvailable)
+    }
+
+    func testResetTimeFromRateLimits() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/14")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let futureReset = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"primary":{"used_percent":1.0,"window_minutes":300,"resets_at":\(futureReset)},"secondary":{"used_percent":0.5,"window_minutes":10080,"resets_at":\(futureReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(sessionsDir: tempDir)
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertNotNil(usage.fiveHourUsage.resetTime)
+        XCTAssertNotNil(usage.weeklyUsage.resetTime)
+    }
+}
