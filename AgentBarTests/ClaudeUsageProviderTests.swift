@@ -24,8 +24,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
         let now = ISO8601DateFormatter().string(from: Date())
         let content = """
-        {"type":"assistant","timestamp":"\(now)","usage":{"input_tokens":1000,"output_tokens":500},"costUSD":0.05}
-        {"type":"assistant","timestamp":"\(now)","usage":{"input_tokens":2000,"output_tokens":800},"costUSD":0.08}
+        {"type":"assistant","timestamp":"\(now)","message":{"id":"msg_1","usage":{"input_tokens":1000,"output_tokens":500}}}
+        {"type":"assistant","timestamp":"\(now)","message":{"id":"msg_2","usage":{"input_tokens":2000,"output_tokens":800}}}
         """
         try content.write(to: sessionFile, atomically: true, encoding: .utf8)
 
@@ -34,8 +34,43 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         XCTAssertEqual(usage.service, .claude)
         XCTAssertTrue(usage.isAvailable)
-        // 1000+500+2000+800 = 4300
+        // rateLimitTokens: (1000+500) + (2000+800) = 4300
         XCTAssertEqual(usage.fiveHourUsage.used, 4300)
+    }
+
+    func testExcludesCacheReadTokens() async throws {
+        let projectDir = tempDir.appendingPathComponent("test-project")
+        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
+        let now = ISO8601DateFormatter().string(from: Date())
+        let content = """
+        {"type":"assistant","timestamp":"\(now)","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":50,"cache_read_input_tokens":50000,"cache_creation_input_tokens":3000}}}
+        """
+        try content.write(to: sessionFile, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeUsageProvider(projectsDir: tempDir)
+        let usage = try await provider.fetchUsage()
+
+        // Only input_tokens + output_tokens = 150 (cache_read excluded)
+        XCTAssertEqual(usage.fiveHourUsage.used, 150)
+    }
+
+    func testDeduplicatesStreamingRecords() async throws {
+        let projectDir = tempDir.appendingPathComponent("test-project")
+        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
+        let now = ISO8601DateFormatter().string(from: Date())
+        // Same message ID appears 3 times (streaming updates) — only last should count
+        let content = """
+        {"type":"assistant","timestamp":"\(now)","message":{"id":"msg_1","usage":{"input_tokens":10,"output_tokens":5}}}
+        {"type":"assistant","timestamp":"\(now)","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":50}}}
+        {"type":"assistant","timestamp":"\(now)","message":{"id":"msg_1","usage":{"input_tokens":1000,"output_tokens":500}}}
+        """
+        try content.write(to: sessionFile, atomically: true, encoding: .utf8)
+
+        let provider = ClaudeUsageProvider(projectsDir: tempDir)
+        let usage = try await provider.fetchUsage()
+
+        // Only last record counts: 1000 + 500 = 1500
+        XCTAssertEqual(usage.fiveHourUsage.used, 1500)
     }
 
     func testIgnoresOldFiles() async throws {
@@ -43,7 +78,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let oldFile = projectDir.appendingPathComponent("old_session.jsonl")
         let oldDate = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-8 * 24 * 3600))
         try """
-        {"type":"assistant","timestamp":"\(oldDate)","usage":{"input_tokens":5000,"output_tokens":1000}}
+        {"type":"assistant","timestamp":"\(oldDate)","message":{"id":"msg_1","usage":{"input_tokens":5000,"output_tokens":1000}}}
         """.write(to: oldFile, atomically: true, encoding: .utf8)
 
         // Set modification date to 8 days ago
@@ -77,19 +112,21 @@ final class ClaudeUsageProviderTests: XCTestCase {
         XCTAssertTrue(usage.isAvailable)
     }
 
-    func testSubAgentTokenCounting() async throws {
+    func testIgnoresNonAssistantRecords() async throws {
         let projectDir = tempDir.appendingPathComponent("test-project")
-        let sessionFile = projectDir.appendingPathComponent("session2.jsonl")
+        let sessionFile = projectDir.appendingPathComponent("session1.jsonl")
         let now = ISO8601DateFormatter().string(from: Date())
         let content = """
-        {"type":"assistant","timestamp":"\(now)","usage":{"input_tokens":100,"output_tokens":50},"message":{"usage":{"input_tokens":200,"output_tokens":100}}}
+        {"type":"user","timestamp":"\(now)","message":{"role":"user","content":"hello"}}
+        {"type":"file-history-snapshot"}
+        {"type":"assistant","timestamp":"\(now)","message":{"id":"msg_1","usage":{"input_tokens":100,"output_tokens":50}}}
         """
         try content.write(to: sessionFile, atomically: true, encoding: .utf8)
 
         let provider = ClaudeUsageProvider(projectsDir: tempDir)
         let usage = try await provider.fetchUsage()
 
-        // direct: 100+50=150, nested: 200+100=300, total: 450
-        XCTAssertEqual(usage.fiveHourUsage.used, 450)
+        // Only the assistant record: 100 + 50 = 150
+        XCTAssertEqual(usage.fiveHourUsage.used, 150)
     }
 }

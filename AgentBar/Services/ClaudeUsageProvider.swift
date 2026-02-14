@@ -12,6 +12,7 @@ struct ClaudeMessageRecord: Decodable, Sendable {
 }
 
 struct ClaudeNestedMessage: Decodable, Sendable {
+    let id: String?
     let usage: ClaudeTokenUsage?
 }
 
@@ -21,11 +22,9 @@ struct ClaudeTokenUsage: Decodable, Sendable {
     let cache_read_input_tokens: Int?
     let cache_creation_input_tokens: Int?
 
-    var totalTokens: Int {
-        (input_tokens ?? 0) +
-        (output_tokens ?? 0) +
-        (cache_read_input_tokens ?? 0) +
-        (cache_creation_input_tokens ?? 0)
+    /// Rate-limit relevant tokens only: input + output (cache reads are free)
+    var rateLimitTokens: Int {
+        (input_tokens ?? 0) + (output_tokens ?? 0)
     }
 }
 
@@ -66,12 +65,15 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let now = Date()
         let records = try scanRecentRecords(now: now)
 
-        let fiveHourRecords = records.filter { rec in
+        // Deduplicate by message ID — keep only the last record per ID
+        let deduplicated = deduplicateByMessageID(records)
+
+        let fiveHourRecords = deduplicated.filter { rec in
             guard let ts = rec.timestamp, let date = DateUtils.parseISO8601(ts) else { return false }
             return DateUtils.isWithinFiveHourWindow(date, relativeTo: now)
         }
 
-        let weeklyRecords = records.filter { rec in
+        let weeklyRecords = deduplicated.filter { rec in
             guard let ts = rec.timestamp, let date = DateUtils.parseISO8601(ts) else { return false }
             return DateUtils.isWithinWeeklyWindow(date, relativeTo: now)
         }
@@ -152,11 +154,28 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         return allRecords
     }
 
+    /// Streaming causes duplicate records with the same message ID.
+    /// Keep only the last occurrence of each message ID.
+    private func deduplicateByMessageID(_ records: [ClaudeMessageRecord]) -> [ClaudeMessageRecord] {
+        var lastByID: [String: ClaudeMessageRecord] = [:]
+        var noIDRecords: [ClaudeMessageRecord] = []
+
+        for record in records {
+            guard record.type == "assistant" else { continue }
+            if let msgID = record.message?.id {
+                lastByID[msgID] = record
+            } else {
+                noIDRecords.append(record)
+            }
+        }
+
+        return Array(lastByID.values) + noIDRecords
+    }
+
     private func totalTokens(from records: [ClaudeMessageRecord]) -> Int {
         records.reduce(0) { sum, record in
-            let direct = record.usage?.totalTokens ?? 0
-            let nested = record.message?.usage?.totalTokens ?? 0
-            return sum + direct + nested
+            let nested = record.message?.usage?.rateLimitTokens ?? 0
+            return sum + nested
         }
     }
 }
