@@ -107,7 +107,7 @@ struct MetricRow: View {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .leading)
+                .frame(width: 30, alignment: .leading)
             if metric.unit == .percent {
                 Text(formatValue(metric.used, unit: metric.unit))
                     .font(.caption.monospacedDigit())

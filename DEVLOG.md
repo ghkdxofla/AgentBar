@@ -172,3 +172,12 @@
 - **Settings cleanup**: Removed `geminiMinuteLimit` AppStorage and UI field. Only daily request limit remains configurable.
 - **Popover focus ring fix**: Added `.focusable(false)` to settings gear button to prevent blue focus ring on popover open.
 - All 41 tests passing
+
+## Iteration 22: Z.ai dual-window (5h prompts + monthly MCP)
+- **Z.ai dual rate windows**: API returns two limits — `TOKENS_LIMIT` (5h prompt window, percent-based) and `TIME_LIMIT` (monthly MCP allocation, request count). Previously only showed `TIME_LIMIT` as single "Qt" row.
+  - `TOKENS_LIMIT` → `fiveHourUsage` (percent unit, API provides `percentage` and `nextResetTime` only)
+  - `TIME_LIMIT` → `weeklyUsage` (requests unit, API provides `usage`/`currentValue`/`remaining`/`nextResetTime`)
+- **ServiceType labels**: Changed Z.ai `fiveHourLabel` from "Qt" to "5h", `weeklyLabel` from "7d" to "MCP"
+- **MetricRow label width**: Increased from 20px to 30px to accommodate "MCP" label without clipping
+- **Fact-checked Z.ai plan info**: API confirmed Max plan (`level: "max"`), MCP total=4000 matches published quota, 5h window exists for prompts
+- All 41 tests passing
