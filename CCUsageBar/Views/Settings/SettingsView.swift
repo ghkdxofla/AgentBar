@@ -2,7 +2,7 @@ import SwiftUI
 import ServiceManagement
 
 extension Notification.Name {
-    static let limitsChanged = Notification.Name("AgentBarLimitsChanged")
+    static let limitsChanged = Notification.Name("CCUsageBarLimitsChanged")
 }
 
 struct SettingsView: View {
@@ -144,7 +144,7 @@ struct SettingsView: View {
             }
 
             // Z.ai
-            Section("Z.ai GLM") {
+            Section("Z.ai Coding Plan") {
                 Toggle("Enabled", isOn: $zaiEnabled)
                 HStack {
                     Text("API Key:")

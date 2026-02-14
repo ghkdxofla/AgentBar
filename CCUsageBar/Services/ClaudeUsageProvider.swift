@@ -81,25 +81,25 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let fiveHourTokens = totalTokens(from: fiveHourRecords)
         let weeklyTokens = totalTokens(from: weeklyRecords)
 
+        // Rolling window: earliest record in window + window duration = when usage starts dropping
+        let fiveHourReset = earliestTimestamp(from: fiveHourRecords)
+            .map { $0.addingTimeInterval(DateUtils.fiveHourInterval) }
+        let weeklyReset = earliestTimestamp(from: weeklyRecords)
+            .map { $0.addingTimeInterval(DateUtils.weeklyInterval) }
+
         return UsageData(
             service: .claude,
             fiveHourUsage: UsageMetric(
                 used: Double(fiveHourTokens),
                 total: fiveHourTokenLimit,
                 unit: .tokens,
-                resetTime: DateUtils.nextResetTime(
-                    from: DateUtils.fiveHourWindowStart(relativeTo: now),
-                    windowDuration: DateUtils.fiveHourInterval
-                )
+                resetTime: fiveHourReset
             ),
             weeklyUsage: UsageMetric(
                 used: Double(weeklyTokens),
                 total: weeklyTokenLimit,
                 unit: .tokens,
-                resetTime: DateUtils.nextResetTime(
-                    from: DateUtils.weeklyWindowStart(relativeTo: now),
-                    windowDuration: DateUtils.weeklyInterval
-                )
+                resetTime: weeklyReset
             ),
             lastUpdated: now,
             isAvailable: true
@@ -170,6 +170,12 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         }
 
         return Array(lastByID.values) + noIDRecords
+    }
+
+    private func earliestTimestamp(from records: [ClaudeMessageRecord]) -> Date? {
+        records.compactMap { $0.timestamp }
+            .compactMap { DateUtils.parseISO8601($0) }
+            .min()
     }
 
     private func totalTokens(from records: [ClaudeMessageRecord]) -> Int {

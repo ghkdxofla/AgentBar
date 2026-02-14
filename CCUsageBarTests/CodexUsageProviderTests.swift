@@ -1,5 +1,5 @@
 import XCTest
-@testable import AgentBar
+@testable import CCUsageBar
 
 final class CodexUsageProviderTests: XCTestCase {
 
@@ -43,7 +43,7 @@ final class CodexUsageProviderTests: XCTestCase {
         // 5% of 10M = 500,000
         XCTAssertEqual(usage.fiveHourUsage.used, 500_000, accuracy: 1)
         // 2% of 100M = 2,000,000
-        XCTAssertEqual(usage.weeklyUsage.used, 2_000_000, accuracy: 1)
+        XCTAssertEqual(usage.weeklyUsage!.used, 2_000_000, accuracy: 1)
         XCTAssertEqual(usage.fiveHourUsage.unit, .tokens)
     }
 
@@ -75,7 +75,7 @@ final class CodexUsageProviderTests: XCTestCase {
 
         // Should use the latest (3%)
         XCTAssertEqual(usage.fiveHourUsage.used, 300_000, accuracy: 1)
-        XCTAssertEqual(usage.weeklyUsage.used, 1_500_000, accuracy: 1)
+        XCTAssertEqual(usage.weeklyUsage!.used, 1_500_000, accuracy: 1)
     }
 
     func testResetWindowMeansZeroUsage() async throws {
@@ -101,7 +101,7 @@ final class CodexUsageProviderTests: XCTestCase {
 
         // Past resets_at means usage has reset to 0
         XCTAssertEqual(usage.fiveHourUsage.used, 0)
-        XCTAssertEqual(usage.weeklyUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage!.used, 0)
     }
 
     // MARK: - Event Type Filtering
@@ -161,7 +161,7 @@ final class CodexUsageProviderTests: XCTestCase {
         // Event 2: 2000+800+300+150 = 3250
         // Total: 5050
         XCTAssertEqual(usage.fiveHourUsage.used, 5050)
-        XCTAssertEqual(usage.weeklyUsage.used, 5050)
+        XCTAssertEqual(usage.weeklyUsage!.used, 5050)
     }
 
     // MARK: - Edge Cases
@@ -179,7 +179,7 @@ final class CodexUsageProviderTests: XCTestCase {
         let usage = try await provider.fetchUsage()
 
         XCTAssertEqual(usage.fiveHourUsage.used, 0)
-        XCTAssertEqual(usage.weeklyUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage!.used, 0)
         XCTAssertTrue(usage.isAvailable)
     }
 
@@ -200,6 +200,6 @@ final class CodexUsageProviderTests: XCTestCase {
         let usage = try await provider.fetchUsage()
 
         XCTAssertNotNil(usage.fiveHourUsage.resetTime)
-        XCTAssertNotNil(usage.weeklyUsage.resetTime)
+        XCTAssertNotNil(usage.weeklyUsage?.resetTime)
     }
 }

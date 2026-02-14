@@ -1,5 +1,5 @@
 import XCTest
-@testable import AgentBar
+@testable import CCUsageBar
 
 final class ClaudeUsageProviderTests: XCTestCase {
 
@@ -92,7 +92,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
         let usage = try await provider.fetchUsage()
 
         XCTAssertEqual(usage.fiveHourUsage.used, 0)
-        XCTAssertEqual(usage.weeklyUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage?.used, 0)
     }
 
     func testHandlesMissingDirectory() async {

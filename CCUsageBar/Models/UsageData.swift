@@ -4,7 +4,7 @@ struct UsageData: Identifiable, Sendable {
     let id = UUID()
     let service: ServiceType
     let fiveHourUsage: UsageMetric
-    let weeklyUsage: UsageMetric
+    let weeklyUsage: UsageMetric?
     let lastUpdated: Date
     let isAvailable: Bool
 }

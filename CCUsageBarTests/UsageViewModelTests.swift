@@ -1,5 +1,5 @@
 import XCTest
-@testable import AgentBar
+@testable import CCUsageBar
 
 @MainActor
 final class UsageViewModelTests: XCTestCase {

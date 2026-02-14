@@ -68,10 +68,10 @@ struct SingleBarView: View {
                         .fill(usage.service.darkColor.opacity(0.15))
 
                     // Weekly usage (light color)
-                    if usage.weeklyUsage.percentage > 0 {
+                    if let weekly = usage.weeklyUsage, weekly.percentage > 0 {
                         RoundedRectangle(cornerRadius: 1.5)
                             .fill(usage.service.lightColor)
-                            .frame(width: max(2, geo.size.width * usage.weeklyUsage.percentage))
+                            .frame(width: max(2, geo.size.width * weekly.percentage))
                     }
 
                     // 5-hour usage (dark color, overlaps weekly)

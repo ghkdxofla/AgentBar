@@ -1,4 +1,4 @@
-# AgentBar Development Log
+# CCUsageBar Development Log (formerly AgentBar)
 
 ## Iteration 1: Project Scaffolding + Build Verification
 - Created `project.yml` for xcodegen (macOS 13.0, LSUIElement, entitlements)
@@ -113,3 +113,13 @@
 - Removed standalone reset text block from ServiceDetailRow, integrated into MetricRow
 - `ServiceType.shortName` added: CC (Claude Code), CX (Codex), Z (Z.ai)
 - Status bar width increased from 70 to 90px to accommodate labels
+
+## Iteration 16: Reset time fix + rename + Z.ai single window
+- **Claude reset time fix**: Rolling window reset computed from earliest record timestamp in window (`earliestTimestamp + windowDuration`) instead of broken `nextResetTime(from: windowStart)` which always equaled `now`
+- **Z.ai single rate window**: Z.ai only has one quota (monthly TIME_LIMIT), removed weekly API fetch and made `UsageData.weeklyUsage` optional. Z.ai now shows single "Quota" row instead of two rows
+- **Z.ai label fix**: `fiveHourLabel` returns "Quota" for Z.ai, "5h" for others; `weeklyLabel` returns "7d"
+- **Rename "Z.ai GLM" → "Z.ai Coding Plan"**
+- **Rename AgentBar → CCUsageBar**: project name, directories (`CCUsageBar/`, `CCUsageBarTests/`), bundle ID (`com.ccusagebar.app`), entitlements, `@main` struct, all imports, UI text, notification names
+- Removed unused `ZaiModelUsageResponse`, `ZaiModelUsageData`, `ZaiTotalUsage` models and `fetchWeeklyUsage()` method
+- Views updated to handle optional `weeklyUsage` (DetailPopoverView, StackedBarView, MiniBarView)
+- All 35 tests passing
