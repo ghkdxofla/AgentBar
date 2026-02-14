@@ -92,3 +92,15 @@
 - **Z.ai refresh on key save**: API key save in settings now posts `.limitsChanged` notification, triggering immediate provider rebuild + fetch instead of waiting for the next 60s timer tick
 - Tests updated: added `testExcludesCacheReadTokens`, `testDeduplicatesStreamingRecords`, `testIgnoresNonAssistantRecords`
 - All 35 tests passing
+
+## Iteration 14: Fix Z.ai API response model mismatch
+- **Root cause**: `ZaiQuotaResponse` model didn't match actual API response structure
+  - Response wraps in `{code, msg, data, success}` — model only expected `{data}`
+  - `ZaiLimit` fields: `used`/`total` don't exist — actual fields are `usage` (capacity), `currentValue` (used), `remaining`
+  - `TOKENS_LIMIT` has no usage data; `TIME_LIMIT` is the active rate limit (requests)
+  - `ZaiUsageDetail` used `tokens`/`calls` — actual fields are `modelCode`/`usage`
+- **Weekly API fix**: expected epoch ms timestamps, actual format is `yyyy-MM-dd HH:mm:ss`
+  - Response has `totalUsage.totalModelCallCount` / `totalTokensUsage`
+- Rewrote all Z.ai Decodable models to match verified API responses
+- Z.ai now displays request-based usage (TIME_LIMIT) with proper reset times
+- All 35 tests passing

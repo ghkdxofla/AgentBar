@@ -1,28 +1,48 @@
 import Foundation
 
-// MARK: - Z.ai API Response Models
+// MARK: - Z.ai Quota API Response (actual format)
 
 struct ZaiQuotaResponse: Decodable, Sendable {
+    let code: Int?
     let data: ZaiQuotaData?
+    let success: Bool?
 }
 
 struct ZaiQuotaData: Decodable, Sendable {
-    let planName: String?
     let limits: [ZaiLimit]?
-    let usageDetails: [ZaiUsageDetail]?
+    let level: String?
 }
 
 struct ZaiLimit: Decodable, Sendable {
     let type: String
-    let used: Double
-    let total: Double
-    let nextResetTime: Double? // epoch ms
+    let usage: Double?          // total capacity
+    let currentValue: Double?   // currently used
+    let remaining: Double?
+    let percentage: Double?
+    let nextResetTime: Double?  // epoch ms
+    let usageDetails: [ZaiUsageDetail]?
 }
 
 struct ZaiUsageDetail: Decodable, Sendable {
-    let model: String?
-    let tokens: Int?
-    let calls: Int?
+    let modelCode: String?
+    let usage: Int?
+}
+
+// MARK: - Z.ai Model Usage API Response
+
+struct ZaiModelUsageResponse: Decodable, Sendable {
+    let code: Int?
+    let data: ZaiModelUsageData?
+    let success: Bool?
+}
+
+struct ZaiModelUsageData: Decodable, Sendable {
+    let totalUsage: ZaiTotalUsage?
+}
+
+struct ZaiTotalUsage: Decodable, Sendable {
+    let totalModelCallCount: Int?
+    let totalTokensUsage: Int?
 }
 
 // MARK: - Provider
@@ -31,14 +51,9 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .zai
 
     private let apiClient: APIClient
-    private let weeklyTokenLimit: Double
 
-    init(
-        apiClient: APIClient = APIClient(),
-        weeklyTokenLimit: Double = 15_000_000
-    ) {
+    init(apiClient: APIClient = APIClient()) {
         self.apiClient = apiClient
-        self.weeklyTokenLimit = weeklyTokenLimit
     }
 
     func isConfigured() async -> Bool {
@@ -53,7 +68,6 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let quotaURL = URL(string: "https://api.z.ai/api/monitor/usage/quota/limit")!
         let now = Date()
 
-        // Try Bearer first, then raw key on 401
         let response: ZaiQuotaResponse = try await fetchWithAuthRetry(
             url: quotaURL,
             apiKey: apiKey
@@ -63,29 +77,29 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             throw APIError.noData
         }
 
-        // Extract token limit (5-hour window)
-        let tokenLimit = limits.first { $0.type == "TOKENS_LIMIT" }
-        let fiveHourUsed = tokenLimit?.used ?? 0
-        let fiveHourTotal = tokenLimit?.total ?? 0
-        let nextReset: Date? = tokenLimit?.nextResetTime.map {
+        // TIME_LIMIT is the active rate limit (requests per window)
+        let timeLimit = limits.first { $0.type == "TIME_LIMIT" }
+        let fiveHourUsed = timeLimit?.currentValue ?? 0
+        let fiveHourTotal = timeLimit?.usage ?? 0
+        let nextReset: Date? = timeLimit?.nextResetTime.map {
             Date(timeIntervalSince1970: $0 / 1000)
         }
 
         // Weekly: fetch model-usage for 7 days
-        let weeklyTokens = await fetchWeeklyTokens(apiKey: apiKey, now: now)
+        let weeklyUsage = await fetchWeeklyUsage(apiKey: apiKey, now: now)
 
         return UsageData(
             service: .zai,
             fiveHourUsage: UsageMetric(
                 used: fiveHourUsed,
                 total: fiveHourTotal,
-                unit: .tokens,
+                unit: .requests,
                 resetTime: nextReset
             ),
             weeklyUsage: UsageMetric(
-                used: Double(weeklyTokens),
-                total: weeklyTokenLimit,
-                unit: .tokens,
+                used: Double(weeklyUsage.calls),
+                total: fiveHourTotal,
+                unit: .requests,
                 resetTime: nil
             ),
             lastUpdated: now,
@@ -120,24 +134,26 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         }
     }
 
-    private func fetchWeeklyTokens(apiKey: String, now: Date) async -> Int {
+    private func fetchWeeklyUsage(apiKey: String, now: Date) async -> (calls: Int, tokens: Int) {
         let sevenDaysAgo = now.addingTimeInterval(-7 * 24 * 3600)
-        let startMs = Int(sevenDaysAgo.timeIntervalSince1970 * 1000)
-        let endMs = Int(now.timeIntervalSince1970 * 1000)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let startTime = formatter.string(from: sevenDaysAgo)
+        let endTime = formatter.string(from: now)
 
-        guard let url = URL(string: "https://api.z.ai/api/monitor/usage/model-usage?startTime=\(startMs)&endTime=\(endMs)") else {
-            return 0
-        }
-
-        struct ModelUsageResponse: Decodable {
-            let data: [ZaiUsageDetail]?
+        // URL-encode the datetime strings
+        guard let startEncoded = startTime.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let endEncoded = endTime.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://api.z.ai/api/monitor/usage/model-usage?startTime=\(startEncoded)&endTime=\(endEncoded)") else {
+            return (0, 0)
         }
 
         do {
-            let response: ModelUsageResponse = try await fetchWithAuthRetry(url: url, apiKey: apiKey)
-            return response.data?.compactMap(\.tokens).reduce(0, +) ?? 0
+            let response: ZaiModelUsageResponse = try await fetchWithAuthRetry(url: url, apiKey: apiKey)
+            let total = response.data?.totalUsage
+            return (total?.totalModelCallCount ?? 0, total?.totalTokensUsage ?? 0)
         } catch {
-            return 0
+            return (0, 0)
         }
     }
 }
