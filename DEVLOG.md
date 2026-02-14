@@ -69,3 +69,19 @@
 - Error state indicator in menu bar (warning triangle when no data)
 - `StatusBarController` observes both `usageData` and `lastError`
 - DEVLOG.md documentation complete
+
+## Iteration 12: Codex Provider Rewrite + Plan Presets
+- **CodexUsageProvider full rewrite**: actual `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` structure
+  - Recursive directory traversal through date-based subdirectories
+  - New data models: `CodexPayload`, `CodexTokenInfo`, `CodexRateLimits`, `CodexRateWindow`
+  - Uses `rate_limits.primary/secondary.used_percent` for accurate usage tracking
+  - Checks `resets_at` timestamp — zero usage if window already reset
+  - Fallback: sums `last_token_usage` tokens when `rate_limits` unavailable
+  - `CodexTokenUsage` now includes `cached_input_tokens`, `reasoning_output_tokens`
+  - Switched from `UsageUnit.dollars` to `UsageUnit.tokens`
+- **SubscriptionPlan.swift** (new): `ClaudePlan` (Max 5x/20x/Custom), `CodexPlan` (Pro/Custom)
+- **SettingsView**: plan Picker for Claude & Codex, auto-fill limits, disabled fields unless Custom
+- **UsageViewModel**: reads plan/limits from `UserDefaults`, `rebuildProviders()` on `.limitsChanged` notification (debounced 500ms)
+- **SettingsWindowController** (new): standalone NSWindow for settings — fixes LSUIElement app issue where `showSettingsWindow:` selector had no responder
+- **CodexUsageProviderTests** (new): 8 tests covering directory traversal, rate_limits parsing, reset detection, event filtering, token summing fallback
+- All 33 tests passing

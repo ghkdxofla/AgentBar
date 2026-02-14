@@ -1,17 +1,23 @@
 import SwiftUI
 import ServiceManagement
 
+extension Notification.Name {
+    static let limitsChanged = Notification.Name("AgentBarLimitsChanged")
+}
+
 struct SettingsView: View {
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("refreshInterval") private var refreshInterval: Double = 60
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
-    @AppStorage("claudeFiveHourLimit") private var claudeFiveHourLimit: Double = 500_000
-    @AppStorage("claudeWeeklyLimit") private var claudeWeeklyLimit: Double = 10_000_000
+    @AppStorage("claudePlan") private var claudePlan: String = ClaudePlan.max5x.rawValue
+    @AppStorage("claudeFiveHourLimit") private var claudeFiveHourLimit: Double = 2_500_000
+    @AppStorage("claudeWeeklyLimit") private var claudeWeeklyLimit: Double = 50_000_000
 
     @AppStorage("codexEnabled") private var codexEnabled = true
-    @AppStorage("codexFiveHourLimit") private var codexFiveHourLimit: Double = 5.0
-    @AppStorage("codexWeeklyLimit") private var codexWeeklyLimit: Double = 50.0
+    @AppStorage("codexPlan") private var codexPlan: String = CodexPlan.pro.rawValue
+    @AppStorage("codexFiveHourLimit") private var codexFiveHourLimit: Double = 10_000_000
+    @AppStorage("codexWeeklyLimit") private var codexWeeklyLimit: Double = 100_000_000
 
     @AppStorage("zaiEnabled") private var zaiEnabled = true
 
@@ -39,19 +45,46 @@ struct SettingsView: View {
             // Claude Code
             Section("Claude Code") {
                 Toggle("Enabled", isOn: $claudeEnabled)
+
+                Picker("Plan", selection: $claudePlan) {
+                    ForEach(ClaudePlan.allCases, id: \.rawValue) { plan in
+                        Text(plan.rawValue).tag(plan.rawValue)
+                    }
+                }
+                .onChange(of: claudePlan) { newValue in
+                    if let plan = ClaudePlan(rawValue: newValue), plan != .custom {
+                        claudeFiveHourLimit = plan.fiveHourTokenLimit
+                        claudeWeeklyLimit = plan.weeklyTokenLimit
+                    }
+                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                }
+
                 HStack {
                     Text("5h token limit:")
                     TextField("", value: $claudeFiveHourLimit, format: .number)
                         .frame(width: 120)
+                        .disabled(claudePlan != ClaudePlan.custom.rawValue)
                     Text("tokens")
                         .foregroundStyle(.secondary)
                 }
+                .onChange(of: claudeFiveHourLimit) { _ in
+                    if claudePlan == ClaudePlan.custom.rawValue {
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
+                }
+
                 HStack {
                     Text("Weekly token limit:")
                     TextField("", value: $claudeWeeklyLimit, format: .number)
                         .frame(width: 120)
+                        .disabled(claudePlan != ClaudePlan.custom.rawValue)
                     Text("tokens")
                         .foregroundStyle(.secondary)
+                }
+                .onChange(of: claudeWeeklyLimit) { _ in
+                    if claudePlan == ClaudePlan.custom.rawValue {
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
                 }
             }
 
@@ -66,15 +99,46 @@ struct SettingsView: View {
                         saveAPIKey(openaiAPIKey, account: ServiceType.codex.keychainAccount)
                     }
                 }
-                HStack {
-                    Text("5h cost limit:")
-                    TextField("", value: $codexFiveHourLimit, format: .currency(code: "USD"))
-                        .frame(width: 100)
+
+                Picker("Plan", selection: $codexPlan) {
+                    ForEach(CodexPlan.allCases, id: \.rawValue) { plan in
+                        Text(plan.rawValue).tag(plan.rawValue)
+                    }
                 }
+                .onChange(of: codexPlan) { newValue in
+                    if let plan = CodexPlan(rawValue: newValue), plan != .custom {
+                        codexFiveHourLimit = plan.fiveHourTokenLimit
+                        codexWeeklyLimit = plan.weeklyTokenLimit
+                    }
+                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                }
+
                 HStack {
-                    Text("Weekly cost limit:")
-                    TextField("", value: $codexWeeklyLimit, format: .currency(code: "USD"))
-                        .frame(width: 100)
+                    Text("5h token limit:")
+                    TextField("", value: $codexFiveHourLimit, format: .number)
+                        .frame(width: 120)
+                        .disabled(codexPlan != CodexPlan.custom.rawValue)
+                    Text("tokens")
+                        .foregroundStyle(.secondary)
+                }
+                .onChange(of: codexFiveHourLimit) { _ in
+                    if codexPlan == CodexPlan.custom.rawValue {
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
+                }
+
+                HStack {
+                    Text("Weekly token limit:")
+                    TextField("", value: $codexWeeklyLimit, format: .number)
+                        .frame(width: 120)
+                        .disabled(codexPlan != CodexPlan.custom.rawValue)
+                    Text("tokens")
+                        .foregroundStyle(.secondary)
+                }
+                .onChange(of: codexWeeklyLimit) { _ in
+                    if codexPlan == CodexPlan.custom.rawValue {
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
                 }
             }
 
@@ -95,7 +159,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 520)
+        .frame(width: 450, height: 580)
         .onAppear {
             loadAPIKeys()
         }
