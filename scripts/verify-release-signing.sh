@@ -46,7 +46,8 @@ parse_args() {
 
 is_pre_notarization_rejection() {
   local spctl_output="$1"
-  local lowered_output="${spctl_output,,}"
+  local lowered_output
+  lowered_output="$(printf '%s' "$spctl_output" | tr '[:upper:]' '[:lower:]')"
 
   [[ "$lowered_output" =~ source[[:space:]]*=[[:space:]]*unnotarized[[:space:]]+developer[[:space:]]+id ]] && return 0
   [[ "$lowered_output" =~ unnotarized[[:space:]]+developer[[:space:]]+id ]] && return 0
