@@ -36,6 +36,7 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     private static let securityCLITimeout: TimeInterval = 2
     nonisolated(unsafe) private static var cachedToken: String?
     nonisolated(unsafe) private static var tokenLastLookupAt: Date?
+    typealias SecurityCLIProcessRuntime = CLIProcessRuntime
     nonisolated(unsafe) static var securityCLIRunner: @Sendable (_ timeout: TimeInterval) -> String? = { timeout in
         runSecurityCLICommand(timeout: timeout)
     }
@@ -145,37 +146,14 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     /// which outputs the password data to stdout. The `security` binary is a
     /// system-trusted application so it bypasses per-app ACL prompts.
     private static func runSecurityCLICommand(timeout: TimeInterval) -> String? {
-        let process = Process()
-        let pipe = Pipe()
-        let terminationSignal = DispatchSemaphore(value: 0)
+        CLIProcessExecutor.executeCommand(
+            executableURL: URL(fileURLWithPath: "/usr/bin/security"),
+            arguments: ["find-generic-password", "-s", keychainService, "-w"],
+            timeout: timeout
+        )
+    }
 
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = ["find-generic-password", "-s", keychainService, "-w"]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        process.terminationHandler = { _ in
-            terminationSignal.signal()
-        }
-
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-
-        let waitResult = terminationSignal.wait(timeout: .now() + timeout)
-        if waitResult == .timedOut {
-            if process.isRunning {
-                process.terminate()
-                _ = terminationSignal.wait(timeout: .now() + 0.25)
-            }
-            return nil
-        }
-
-        guard process.terminationStatus == 0 else { return nil }
-
-        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return output?.isEmpty == true ? nil : output
+    static func executeSecurityCLICommand(timeout: TimeInterval, runtime: SecurityCLIProcessRuntime) -> String? {
+        CLIProcessExecutor.executeCommand(timeout: timeout, runtime: runtime)
     }
 }
