@@ -47,6 +47,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 - **Build + Run (fallback, no skill)**: `xcodebuild build -project CCUsageBar.xcodeproj -scheme CCUsageBar -configuration Debug -derivedDataPath build -quiet && (pkill -x CCUsageBar || true) && open build/Build/Products/Debug/CCUsageBar.app`
 - Build only: `xcodebuild build -project CCUsageBar.xcodeproj -scheme CCUsageBar -configuration Debug -derivedDataPath build -quiet`
 - Test: `xcodebuild test -project CCUsageBar.xcodeproj -scheme CCUsageBar -destination 'platform=macOS'`
+- Release signing verify: `./scripts/verify-release-signing.sh`
 - DMG: `hdiutil create -volname CCUsageBar -srcfolder build/Build/Products/Release/CCUsageBar.app -ov -format UDZO CCUsageBar.dmg`
 
 ## Architecture
