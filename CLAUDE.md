@@ -8,6 +8,9 @@ User communicates in Korean. Respond in Korean for conversation, English for cod
 
 ## Workflow Rules
 
+### Before starting any task:
+0. **Review check**: Run `/roborev-fix` to discover and fix all unaddressed review findings. Only proceed with the requested task after all findings are resolved. If there are no unaddressed findings, proceed immediately.
+
 ### Every change MUST follow this sequence:
 1. **Implement** the change
 2. **Build & test**: `xcodebuild test -project CCUsageBar.xcodeproj -scheme CCUsageBar -destination 'platform=macOS'` — all tests must pass
