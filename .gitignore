@@ -32,3 +32,10 @@ Package.resolved
 # Misc
 *.orig
 .idea/
+
+# Local tooling config
+.claude/settings.local.json
+
+# Local build artifacts
+*.dmg
+*.profraw
