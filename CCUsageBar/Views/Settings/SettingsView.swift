@@ -31,9 +31,7 @@ struct SettingsView: View {
     @State private var hasSavedCopilotPAT = false
     @State private var zaiAPIKey: String = ""
     @State private var hasSavedZaiAPIKey = false
-    @State private var showSavedAlert = false
-    @State private var showSaveErrorAlert = false
-    @State private var saveErrorMessage = ""
+    @State private var activeTokenSaveAlert: TokenSaveAlert?
     private let keychainSaveAction: @Sendable (String, String) throws -> Void
 
     init(
@@ -259,13 +257,20 @@ struct SettingsView: View {
             migrateLegacyCursorPlanIfNeeded()
             loadAPIKeys()
         }
-        .alert("Saved", isPresented: $showSavedAlert) {
-            Button("OK", role: .cancel) {}
-        }
-        .alert("Save Failed", isPresented: $showSaveErrorAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(saveErrorMessage)
+        .alert(item: $activeTokenSaveAlert) { alert in
+            switch alert {
+            case .saved:
+                return Alert(
+                    title: Text("Saved"),
+                    dismissButton: .cancel(Text("OK"))
+                )
+            case .saveFailed(let message):
+                return Alert(
+                    title: Text("Save Failed"),
+                    message: Text(message),
+                    dismissButton: .cancel(Text("OK"))
+                )
+            }
         }
     }
 
@@ -292,9 +297,13 @@ struct SettingsView: View {
             account: account,
             save: keychainSaveAction
         )
-        showSavedAlert = outcome.showSavedAlert
-        showSaveErrorAlert = outcome.showSaveErrorAlert
-        saveErrorMessage = outcome.saveErrorMessage
+        if outcome.showSavedAlert {
+            activeTokenSaveAlert = .saved
+        } else if outcome.showSaveErrorAlert {
+            activeTokenSaveAlert = .saveFailed(outcome.saveErrorMessage)
+        } else {
+            activeTokenSaveAlert = nil
+        }
         return outcome
     }
 
@@ -328,6 +337,20 @@ struct SettingsView: View {
         let showSavedAlert: Bool
         let showSaveErrorAlert: Bool
         let saveErrorMessage: String
+    }
+
+    enum TokenSaveAlert: Identifiable {
+        case saved
+        case saveFailed(String)
+
+        var id: String {
+            switch self {
+            case .saved:
+                return "saved"
+            case .saveFailed(let message):
+                return "saveFailed:\(message)"
+            }
+        }
     }
 
     static func copilotPATSaveOutcome(

@@ -1,4 +1,5 @@
 import XCTest
+import Security
 @testable import CCUsageBar
 
 @MainActor
@@ -236,6 +237,58 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(outcome.copilotPAT, "ghp_valid_token")
     }
 
+    func testKeychainLoadMigratesLegacyItemWhenDataProtectionSaveSucceeds() {
+        let account = "tests.migration.success"
+        let tokenData = Data("legacy-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
+
+        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
+
+        XCTAssertEqual(loaded, "legacy-token")
+        XCTAssertEqual(securityAPI.dataProtectionItems[account], tokenData)
+        XCTAssertNil(securityAPI.legacyItems[account])
+    }
+
+    func testKeychainLoadKeepsLegacyItemWhenMigrationSaveFails() {
+        let account = "tests.migration.failure"
+        let tokenData = Data("legacy-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
+        securityAPI.addStatusByStore[.dataProtection] = errSecInteractionNotAllowed
+
+        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
+
+        XCTAssertEqual(loaded, "legacy-token")
+        XCTAssertNil(securityAPI.dataProtectionItems[account])
+        XCTAssertEqual(securityAPI.legacyItems[account], tokenData)
+    }
+
+    func testKeychainDeleteRemovesDataProtectionAndLegacyItems() throws {
+        let account = "tests.delete.cleanup"
+        let tokenData = Data("token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(
+            dataProtectionItems: [account: tokenData],
+            legacyItems: [account: tokenData]
+        )
+
+        try KeychainManager.delete(account: account, securityAPI: securityAPI)
+
+        XCTAssertNil(securityAPI.dataProtectionItems[account])
+        XCTAssertNil(securityAPI.legacyItems[account])
+    }
+
+    func testKeychainDeleteThrowsForUnexpectedLegacyDeleteFailure() {
+        let account = "tests.delete.failure"
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: Data("token".utf8)])
+        securityAPI.deleteStatusByStore[.legacy] = errSecInteractionNotAllowed
+
+        XCTAssertThrowsError(try KeychainManager.delete(account: account, securityAPI: securityAPI)) { error in
+            guard case KeychainError.deleteFailed(let status) = error else {
+                return XCTFail("Expected KeychainError.deleteFailed")
+            }
+            XCTAssertEqual(status, errSecInteractionNotAllowed)
+        }
+    }
+
 }
 
 private enum StubSaveError: LocalizedError {
@@ -246,5 +299,132 @@ private enum StubSaveError: LocalizedError {
         case .keychainUnavailable:
             return "Keychain unavailable"
         }
+    }
+}
+
+private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
+    enum Store {
+        case dataProtection
+        case legacy
+    }
+
+    var dataProtectionItems: [String: Data]
+    var legacyItems: [String: Data]
+    var addStatusByStore: [Store: OSStatus] = [:]
+    var updateStatusByStore: [Store: OSStatus] = [:]
+    var copyStatusByStore: [Store: OSStatus] = [:]
+    var deleteStatusByStore: [Store: OSStatus] = [:]
+
+    init(
+        dataProtectionItems: [String: Data] = [:],
+        legacyItems: [String: Data] = [:]
+    ) {
+        self.dataProtectionItems = dataProtectionItems
+        self.legacyItems = legacyItems
+    }
+
+    func add(_ query: [String : Any]) -> OSStatus {
+        guard let (store, account) = parse(query) else {
+            return errSecParam
+        }
+        if let forced = addStatusByStore[store], forced != errSecSuccess {
+            return forced
+        }
+        guard let data = query[kSecValueData as String] as? Data else {
+            return errSecParam
+        }
+
+        switch store {
+        case .dataProtection:
+            if dataProtectionItems[account] != nil {
+                return errSecDuplicateItem
+            }
+            dataProtectionItems[account] = data
+        case .legacy:
+            if legacyItems[account] != nil {
+                return errSecDuplicateItem
+            }
+            legacyItems[account] = data
+        }
+        return errSecSuccess
+    }
+
+    func update(_ query: [String : Any], attributes: [String : Any]) -> OSStatus {
+        guard let (store, account) = parse(query) else {
+            return errSecParam
+        }
+        if let forced = updateStatusByStore[store], forced != errSecSuccess {
+            return forced
+        }
+        guard let data = attributes[kSecValueData as String] as? Data else {
+            return errSecParam
+        }
+
+        switch store {
+        case .dataProtection:
+            guard dataProtectionItems[account] != nil else {
+                return errSecItemNotFound
+            }
+            dataProtectionItems[account] = data
+        case .legacy:
+            guard legacyItems[account] != nil else {
+                return errSecItemNotFound
+            }
+            legacyItems[account] = data
+        }
+        return errSecSuccess
+    }
+
+    func copyMatching(_ query: [String : Any]) -> (status: OSStatus, data: Data?) {
+        guard let (store, account) = parse(query) else {
+            return (errSecParam, nil)
+        }
+        if let forced = copyStatusByStore[store], forced != errSecSuccess {
+            return (forced, nil)
+        }
+
+        switch store {
+        case .dataProtection:
+            guard let data = dataProtectionItems[account] else {
+                return (errSecItemNotFound, nil)
+            }
+            return (errSecSuccess, data)
+        case .legacy:
+            guard let data = legacyItems[account] else {
+                return (errSecItemNotFound, nil)
+            }
+            return (errSecSuccess, data)
+        }
+    }
+
+    func delete(_ query: [String : Any]) -> OSStatus {
+        guard let (store, account) = parse(query) else {
+            return errSecParam
+        }
+        if let forced = deleteStatusByStore[store], forced != errSecSuccess {
+            return forced
+        }
+
+        switch store {
+        case .dataProtection:
+            guard dataProtectionItems.removeValue(forKey: account) != nil else {
+                return errSecItemNotFound
+            }
+        case .legacy:
+            guard legacyItems.removeValue(forKey: account) != nil else {
+                return errSecItemNotFound
+            }
+        }
+        return errSecSuccess
+    }
+
+    private func parse(_ query: [String: Any]) -> (Store, String)? {
+        guard let account = query[kSecAttrAccount as String] as? String else {
+            return nil
+        }
+        if (query[kSecUseDataProtectionKeychain as String] as? Bool) == true {
+            return (.dataProtection, account)
+        }
+        return (.legacy, account)
     }
 }

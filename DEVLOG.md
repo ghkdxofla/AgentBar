@@ -217,3 +217,10 @@
 - **Final fix**: Reverted to legacy Keychain but added `SecAccessCreate` with `nil` trusted app list to create an open-access ACL. This removes per-app restriction so any build of CCUsageBar can read items without password prompts
 - **SettingsView compile fix**: Replaced `Result<Void, String>` (invalid — `String` doesn't conform to `Error`) with `SaveResult` enum
 - All 72 tests passing
+
+## Iteration 28: Safer keychain migration writes + unified save alert
+- **Keychain migration safety**: `KeychainManager` now uses add-or-update upsert for Data Protection/legacy stores and no longer deletes legacy entries before confirming a successful write. Legacy cleanup happens only after a confirmed Data Protection write, preventing token loss on migration failure.
+- **Fallback and delete semantics**: Save tolerates Data Protection entitlement failures by falling back to legacy storage; load still prioritizes Data Protection, then legacy with best-effort migration; delete now cleans both stores and only succeeds for expected statuses (`success`, `not found`, and Data Protection `missing entitlement`).
+- **Single SwiftUI alert path**: `SettingsView` replaced dual `.alert` modifiers with one enum-driven `.alert(item:)` to avoid alert presentation conflicts.
+- **Test coverage**: Added keychain behavior tests for legacy fallback + successful migration, failed migration preserving legacy item, and delete cleanup/error behavior using an injected mock security API.
+- All 76 tests passing
