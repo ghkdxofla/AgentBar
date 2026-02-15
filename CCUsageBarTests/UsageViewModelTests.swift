@@ -436,6 +436,38 @@ final class UsageViewModelTests: XCTestCase {
         }
     }
 
+    func testKeychainFallbackSaveWorksWithSystemSecurityAPI() throws {
+        let account = "tests.integration.legacy.\(UUID().uuidString)"
+        let token = "integration-token"
+        let securityAPI = DataProtectionUnavailableSystemSecurityAPI()
+
+        defer {
+            try? KeychainManager.delete(account: account, securityAPI: securityAPI)
+        }
+
+        do {
+            try KeychainManager.save(key: token, account: account, securityAPI: securityAPI)
+        } catch KeychainError.saveFailed(let status) where Self.isSkippableSystemKeychainStatus(status) {
+            throw XCTSkip("System keychain unavailable in this test environment (status: \(status))")
+        }
+
+        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
+        if loaded == nil {
+            let fallbackCopyStatus = securityAPI.copyMatching([
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "com.agentbar.apikeys",
+                kSecAttrAccount as String: account,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]).status
+            if Self.isSkippableSystemKeychainStatus(fallbackCopyStatus) {
+                throw XCTSkip("System keychain unavailable in this test environment (status: \(fallbackCopyStatus))")
+            }
+        }
+
+        XCTAssertEqual(loaded, token)
+    }
+
     func testMockKeychainSecurityAPIRejectsMalformedCopyQuery() {
         let securityAPI = MockKeychainSecurityAPI()
 
@@ -447,6 +479,19 @@ final class UsageViewModelTests: XCTestCase {
 
         XCTAssertEqual(result.status, errSecParam)
         XCTAssertNil(result.data)
+    }
+
+    private static func isSkippableSystemKeychainStatus(_ status: OSStatus) -> Bool {
+        switch status {
+        case errSecNotAvailable,
+             errSecInteractionNotAllowed,
+             errSecAuthFailed,
+             errSecMissingEntitlement,
+             errSecNoSuchKeychain:
+            true
+        default:
+            false
+        }
     }
 
 }
@@ -717,5 +762,28 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
             return false
         }
         return String(describing: value) == expected as String
+    }
+}
+
+private struct DataProtectionUnavailableSystemSecurityAPI: KeychainManager.SecurityAPI {
+    private let systemAPI = KeychainManager.SystemSecurityAPI()
+
+    func add(_ query: [String : Any]) -> OSStatus {
+        if (query[kSecUseDataProtectionKeychain as String] as? Bool) == true {
+            return errSecMissingEntitlement
+        }
+        return systemAPI.add(query)
+    }
+
+    func update(_ query: [String : Any], attributes: [String : Any]) -> OSStatus {
+        systemAPI.update(query, attributes: attributes)
+    }
+
+    func copyMatching(_ query: [String : Any]) -> (status: OSStatus, data: Data?) {
+        systemAPI.copyMatching(query)
+    }
+
+    func delete(_ query: [String : Any]) -> OSStatus {
+        systemAPI.delete(query)
     }
 }
