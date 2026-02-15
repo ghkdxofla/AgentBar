@@ -171,6 +171,22 @@ final class UsageViewModelTests: XCTestCase {
         }
     }
 
+    func testSaveAPIKeyResultReturnsFallbackFailureMessageWhenErrorDescriptionIsBlank() {
+        let result = SettingsView.saveAPIKeyResult("ghp_valid_token", account: "copilot-account") { _, _ in
+            throw NSError(
+                domain: "CCUsageBarTests",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "   \n\t"]
+            )
+        }
+
+        if case .failure(let message) = result {
+            XCTAssertEqual(message, "Failed to save token to Keychain.")
+        } else {
+            XCTFail("Expected fallback failure message when error description is blank")
+        }
+    }
+
     func testTokenSaveUIOutcomeOnSuccessMarksSavedAndShowsSuccessAlert() {
         var savedKey: String?
         var savedAccount: String?
@@ -234,6 +250,19 @@ final class UsageViewModelTests: XCTestCase {
 
         XCTAssertFalse(outcome.didSave)
         XCTAssertFalse(outcome.hasSavedCopilotPAT)
+        XCTAssertEqual(outcome.copilotPAT, "ghp_valid_token")
+    }
+
+    func testCopilotPATSaveOutcomeKeepsSavedStateOnFailureWhenAlreadySaved() {
+        let outcome = SettingsView.copilotPATSaveOutcome(
+            currentPAT: "ghp_valid_token",
+            hasSavedCopilotPAT: true
+        ) { _ in
+            false
+        }
+
+        XCTAssertFalse(outcome.didSave)
+        XCTAssertTrue(outcome.hasSavedCopilotPAT)
         XCTAssertEqual(outcome.copilotPAT, "ghp_valid_token")
     }
 
