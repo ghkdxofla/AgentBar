@@ -31,7 +31,9 @@ struct DetailPopoverView: View {
                             ServiceDetailRow(data: data)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity)
             }
 
             Spacer(minLength: 0)
