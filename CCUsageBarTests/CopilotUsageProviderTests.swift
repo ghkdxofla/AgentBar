@@ -95,6 +95,28 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.fiveHourUsage.total, 0)
     }
 
+    func testClampsUsedToZeroWhenRemainingExceedsEntitlement() async throws {
+        let json = """
+        {
+            "copilot_plan": "pro",
+            "quota_snapshots": [
+                {"quota_id": "premium_requests", "entitlement": 100, "remaining": 250, "unlimited": false}
+            ]
+        }
+        """
+        CopilotMockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+
+        let provider = CopilotUsageProvider(
+            session: CopilotMockURLProtocol.session(),
+            credentialProvider: { "ghp_test" }
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.fiveHourUsage.used, 0)
+        XCTAssertEqual(usage.fiveHourUsage.total, 100)
+    }
+
     func testHandlesMissingCredentials() async {
         let provider = CopilotUsageProvider(
             credentialProvider: { nil }

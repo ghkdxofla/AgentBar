@@ -104,6 +104,90 @@ final class CursorUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.fiveHourUsage.total, 500)
     }
 
+    func testEncodesReservedCharactersInUserAndCookieHeader() async throws {
+        let userId = "auth0|abc/def?x=1"
+        let jwt = makeTestJWT(sub: userId)
+        let dbPath = try createTempDB(jwt: jwt)
+
+        let json = """
+        {
+            "startOfMonth": "2026-02-01T00:00:00.000Z",
+            "gpt-4": {"numRequests": 1, "numRequestsTotal": 1, "maxRequestUsage": 500, "numTokens": 100}
+        }
+        """
+        CursorMockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+        CursorMockURLProtocol.onRequest = { request in
+            guard let url = request.url else {
+                XCTFail("Missing request URL")
+                return
+            }
+
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let queryUserId = components?.queryItems?.first(where: { $0.name == "user" })?.value
+            XCTAssertEqual(queryUserId, userId)
+            XCTAssertTrue(components?.percentEncodedQuery?.contains("%7C") == true)
+
+            let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+            let encodedUserId = userId.addingPercentEncoding(withAllowedCharacters: allowed) ?? userId
+            let encodedJWT = jwt.addingPercentEncoding(withAllowedCharacters: allowed) ?? jwt
+            let expectedCookie = "WorkosCursorSessionToken=\(encodedUserId)%3A%3A\(encodedJWT)"
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), expectedCookie)
+        }
+
+        let provider = CursorUsageProvider(
+            session: CursorMockURLProtocol.session(),
+            dbPathProvider: { dbPath }
+        )
+
+        _ = try await provider.fetchUsage()
+    }
+
+    func testIncludesUnknownModelBucketsInTotals() async throws {
+        let dbPath = try createTempDB(jwt: makeTestJWT(sub: "user_dynamic"))
+
+        let json = """
+        {
+            "startOfMonth": "2026-02-01T00:00:00.000Z",
+            "gpt-4": {"numRequests": 11, "numRequestsTotal": 11, "maxRequestUsage": null, "numTokens": 1000},
+            "gpt-4.1-mini": {"numRequests": 7, "numRequestsTotal": 7, "maxRequestUsage": null, "numTokens": 700}
+        }
+        """
+        CursorMockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+
+        let provider = CursorUsageProvider(
+            monthlyRequestLimit: 500,
+            session: CursorMockURLProtocol.session(),
+            dbPathProvider: { dbPath }
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.fiveHourUsage.used, 18)
+    }
+
+    func testUsesMaximumMaxRequestUsageAcrossBuckets() async throws {
+        let dbPath = try createTempDB(jwt: makeTestJWT(sub: "user_limits"))
+
+        let json = """
+        {
+            "startOfMonth": "2026-02-01T00:00:00.000Z",
+            "gpt-4": {"numRequests": 10, "numRequestsTotal": 10, "maxRequestUsage": 200, "numTokens": 1000},
+            "claude-3.5-sonnet": {"numRequests": 2, "numRequestsTotal": 2, "maxRequestUsage": 800, "numTokens": 500}
+        }
+        """
+        CursorMockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+
+        let provider = CursorUsageProvider(
+            monthlyRequestLimit: 500,
+            session: CursorMockURLProtocol.session(),
+            dbPathProvider: { dbPath }
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.fiveHourUsage.total, 800)
+    }
+
     func testJWTDecoding() throws {
         let jwt = makeTestJWT(sub: "user_12345")
         let userId = try CursorUsageProvider.decodeUserIdFromJWT(jwt)

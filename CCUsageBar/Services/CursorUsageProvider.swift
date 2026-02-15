@@ -5,23 +5,39 @@ import SQLite3
 
 struct CursorUsageResponse: Decodable, Sendable {
     let startOfMonth: String?
+    let modelUsages: [String: CursorModelUsage]
 
-    // Model usage buckets — keys use hyphens/dots in JSON
-    let gpt4: CursorModelUsage?
-    let gpt35Turbo: CursorModelUsage?
-    let cursorSmall: CursorModelUsage?
-    let claude35Sonnet: CursorModelUsage?
+    private struct DynamicCodingKey: CodingKey {
+        var stringValue: String
+        var intValue: Int?
 
-    enum CodingKeys: String, CodingKey {
-        case startOfMonth
-        case gpt4 = "gpt-4"
-        case gpt35Turbo = "gpt-3.5-turbo"
-        case cursorSmall = "cursor-small"
-        case claude35Sonnet = "claude-3.5-sonnet"
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+            self.intValue = nil
+        }
+
+        init?(intValue: Int) {
+            self.stringValue = String(intValue)
+            self.intValue = intValue
+        }
     }
 
-    var allModelUsages: [CursorModelUsage?] {
-        [gpt4, gpt35Turbo, cursorSmall, claude35Sonnet]
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        let startOfMonthKey = DynamicCodingKey(stringValue: "startOfMonth")!
+        startOfMonth = try container.decodeIfPresent(String.self, forKey: startOfMonthKey)
+
+        var decodedModelUsages: [String: CursorModelUsage] = [:]
+        for key in container.allKeys where key.stringValue != "startOfMonth" {
+            if let usage = try? container.decode(CursorModelUsage.self, forKey: key) {
+                decodedModelUsages[key.stringValue] = usage
+            }
+        }
+        modelUsages = decodedModelUsages
+    }
+
+    var allModelUsages: [CursorModelUsage] {
+        Array(modelUsages.values)
     }
 }
 
@@ -71,11 +87,15 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let userId = try decodeUserIdFromJWT(jwt)
 
         // 3. Call Cursor usage API
-        guard let url = URL(string: "\(Self.apiBaseURL)?user=\(userId)") else {
+        var components = URLComponents(string: Self.apiBaseURL)
+        components?.queryItems = [URLQueryItem(name: "user", value: userId)]
+        guard let url = components?.url else {
             throw APIError.invalidResponse
         }
 
-        let cookie = "\(userId)%3A%3A\(jwt)"
+        let encodedUserId = Self.percentEncodeCookieComponent(userId)
+        let encodedJWT = Self.percentEncodeCookieComponent(jwt)
+        let cookie = "\(encodedUserId)%3A%3A\(encodedJWT)"
 
         var request = URLRequest(url: url, timeoutInterval: 10)
         request.httpMethod = "GET"
@@ -99,10 +119,10 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let usageResponse = try JSONDecoder().decode(CursorUsageResponse.self, from: data)
 
         // 4. Sum requests across all model buckets
-        let totalRequests = usageResponse.allModelUsages.compactMap { $0?.numRequests }.reduce(0, +)
+        let totalRequests = usageResponse.allModelUsages.compactMap(\.numRequests).reduce(0, +)
 
         // 5. Determine total from maxRequestUsage or plan limit
-        let apiLimit = usageResponse.allModelUsages.compactMap { $0?.maxRequestUsage }.first
+        let apiLimit = usageResponse.allModelUsages.compactMap(\.maxRequestUsage).max()
         let total = Double(apiLimit ?? Int(monthlyRequestLimit))
 
         // 6. Compute reset time from startOfMonth + 1 month
@@ -191,6 +211,11 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             base64.append(String(repeating: "=", count: 4 - remainder))
         }
         return Data(base64Encoded: base64)
+    }
+
+    static func percentEncodeCookieComponent(_ string: String) -> String {
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        return string.addingPercentEncoding(withAllowedCharacters: allowed) ?? string
     }
 
     static func parseStartOfMonthReset(_ startOfMonth: String) -> Date? {

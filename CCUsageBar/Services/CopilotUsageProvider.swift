@@ -84,7 +84,8 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             } else {
                 let entitlement = Double(snapshot.entitlement ?? 0)
                 let remaining = Double(snapshot.remaining ?? 0)
-                used = entitlement - remaining
+                let rawUsed = entitlement - remaining
+                used = max(0, min(entitlement, rawUsed))
                 total = entitlement
             }
         } else {
