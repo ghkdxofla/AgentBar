@@ -86,8 +86,8 @@ final class UsageViewModel: ObservableObject {
             }
         }
 
-        // Sort by service order: claude, codex, gemini, zai
-        let order: [ServiceType] = [.claude, .codex, .gemini, .zai]
+        // Sort by service order: claude, codex, gemini, copilot, cursor, zai
+        let order: [ServiceType] = [.claude, .codex, .gemini, .copilot, .cursor, .zai]
         results.sort { a, b in
             (order.firstIndex(of: a.service) ?? 0) < (order.firstIndex(of: b.service) ?? 0)
         }
@@ -138,6 +138,24 @@ final class UsageViewModel: ObservableObject {
             providers.append(GeminiUsageProvider(
                 dailyRequestLimit: geminiDailyLimit
             ))
+        }
+
+        let copilotEnabled = defaults.bool(forKey: "copilotEnabled", defaultValue: true)
+        if copilotEnabled {
+            providers.append(CopilotUsageProvider())
+        }
+
+        let cursorEnabled = defaults.bool(forKey: "cursorEnabled", defaultValue: true)
+        if cursorEnabled {
+            let cursorPlanRaw = defaults.string(forKey: "cursorPlan") ?? CursorPlan.pro.rawValue
+            let cursorPlan = CursorPlan(rawValue: cursorPlanRaw) ?? .pro
+            let cursorLimit: Double
+            if cursorPlan == .custom {
+                cursorLimit = defaults.double(forKey: "cursorMonthlyLimit").nonZero ?? CursorPlan.pro.monthlyRequestLimit
+            } else {
+                cursorLimit = cursorPlan.monthlyRequestLimit
+            }
+            providers.append(CursorUsageProvider(monthlyRequestLimit: cursorLimit))
         }
 
         if zaiEnabled {

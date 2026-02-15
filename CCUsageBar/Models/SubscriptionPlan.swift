@@ -18,3 +18,39 @@ enum CodexPlan: String, CaseIterable, Codable, Sendable {
         }
     }
 }
+
+enum CopilotPlan: String, CaseIterable, Codable, Sendable {
+    case free = "Free"
+    case pro = "Pro"
+    case proPlus = "Pro+"
+    case business = "Business"
+    case enterprise = "Enterprise"
+    case custom = "Custom"
+
+    var monthlyPremiumRequests: Double {
+        switch self {
+        case .free: return 50
+        case .pro: return 300
+        case .proPlus: return 1500
+        case .business: return 300
+        case .enterprise: return 1000
+        case .custom: return 0
+        }
+    }
+}
+
+enum CursorPlan: String, CaseIterable, Codable, Sendable {
+    case free = "Free"
+    case pro = "Pro"
+    case business = "Business"
+    case custom = "Custom"
+
+    var monthlyRequestLimit: Double {
+        switch self {
+        case .free: return 50
+        case .pro: return 500
+        case .business: return 500
+        case .custom: return 0
+        }
+    }
+}
