@@ -226,6 +226,7 @@
 - All 76 tests passing
 
 ## Iteration 29: Read Claude Code credentials via security CLI
+- **Implementation provenance**: Source and test changes for this iteration landed in commit `126806a` (`ClaudeUsageProvider.swift`, `ClaudeUsageProviderTests.swift`). Commit `6c80cdf` updated this devlog entry only.
 - **Problem**: `ClaudeUsageProvider` used `SecItemCopyMatching` to read `"Claude Code-credentials"` from Keychain. This item is owned by Claude Code CLI with a per-app ACL, so macOS prompts "CCUsageBar wants to use your confidential information" on every access. Ad-hoc code signing means "Always Allow" resets each build
 - **Fix**: Replaced direct Keychain API with `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w` via `Process`. The `security` binary is a system-trusted app that bypasses per-app ACL prompts. Same pattern as Copilot's `gh auth token`
 - **Caching**: Added NSLock-guarded token cache with TTL matching the app's refresh interval, preventing repeated CLI invocations within the same polling cycle
