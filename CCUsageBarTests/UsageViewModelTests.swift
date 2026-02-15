@@ -451,6 +451,17 @@ final class UsageViewModelTests: XCTestCase {
             throw XCTSkip("System keychain unavailable in this test environment (status: \(status))")
         }
 
+        XCTAssertEqual(
+            securityAPI.dataProtectionAddRejectionCount,
+            1,
+            "Expected the Data Protection write path to be attempted and rejected once before fallback"
+        )
+        XCTAssertGreaterThan(
+            securityAPI.legacyWriteAttemptCount,
+            0,
+            "Expected fallback write to the legacy keychain store"
+        )
+
         let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
         if loaded == nil {
             let fallbackCopyStatus = securityAPI.copyMatching([
@@ -537,7 +548,6 @@ final class UsageViewModelTests: XCTestCase {
         case errSecNotAvailable,
              errSecInteractionNotAllowed,
              errSecAuthFailed,
-             errSecMissingEntitlement,
              errSecNoSuchKeychain:
             true
         default:
@@ -816,18 +826,30 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
     }
 }
 
-private struct DataProtectionUnavailableSystemSecurityAPI: KeychainManager.SecurityAPI {
+private final class DataProtectionUnavailableSystemSecurityAPI: KeychainManager.SecurityAPI {
     private let systemAPI = KeychainManager.SystemSecurityAPI()
+    private(set) var dataProtectionAddRejectionCount = 0
+    private(set) var legacyAddAttemptCount = 0
+    private(set) var legacyUpdateAttemptCount = 0
+
+    var legacyWriteAttemptCount: Int {
+        legacyAddAttemptCount + legacyUpdateAttemptCount
+    }
 
     func add(_ query: [String : Any]) -> OSStatus {
         if (query[kSecUseDataProtectionKeychain as String] as? Bool) == true {
+            dataProtectionAddRejectionCount += 1
             return errSecMissingEntitlement
         }
+        legacyAddAttemptCount += 1
         return systemAPI.add(query)
     }
 
     func update(_ query: [String : Any], attributes: [String : Any]) -> OSStatus {
-        systemAPI.update(query, attributes: attributes)
+        if (query[kSecUseDataProtectionKeychain as String] as? Bool) != true {
+            legacyUpdateAttemptCount += 1
+        }
+        return systemAPI.update(query, attributes: attributes)
     }
 
     func copyMatching(_ query: [String : Any]) -> (status: OSStatus, data: Data?) {
