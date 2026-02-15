@@ -447,7 +447,11 @@ final class UsageViewModelTests: XCTestCase {
 
         do {
             try KeychainManager.save(key: token, account: account, securityAPI: securityAPI)
-        } catch KeychainError.saveFailed(let status) where Self.isSkippableSystemKeychainStatus(status) {
+        } catch KeychainError.saveFailed(let status)
+            where Self.isSkippableSystemKeychainStatus(
+                status,
+                didAttemptLegacyFallback: securityAPI.legacyWriteAttemptCount > 0
+            ) {
             throw XCTSkip("System keychain unavailable in this test environment (status: \(status))")
         }
 
@@ -456,10 +460,15 @@ final class UsageViewModelTests: XCTestCase {
             1,
             "Expected the Data Protection write path to be attempted and rejected once before fallback"
         )
-        XCTAssertGreaterThan(
-            securityAPI.legacyWriteAttemptCount,
+        XCTAssertEqual(
+            securityAPI.legacyAddAttemptCount,
+            1,
+            "Expected exactly one legacy add attempt for a new account"
+        )
+        XCTAssertEqual(
+            securityAPI.legacyUpdateAttemptCount,
             0,
-            "Expected fallback write to the legacy keychain store"
+            "Expected no legacy update attempt for a new account"
         )
 
         let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
@@ -471,7 +480,10 @@ final class UsageViewModelTests: XCTestCase {
                 kSecReturnData as String: true,
                 kSecMatchLimit as String: kSecMatchLimitOne,
             ]).status
-            if Self.isSkippableSystemKeychainStatus(fallbackCopyStatus) {
+            if Self.isSkippableSystemKeychainStatus(
+                fallbackCopyStatus,
+                didAttemptLegacyFallback: securityAPI.legacyWriteAttemptCount > 0
+            ) {
                 throw XCTSkip("System keychain unavailable in this test environment (status: \(fallbackCopyStatus))")
             }
         }
@@ -543,13 +555,18 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(securityAPI.legacyItems[account], existingData)
     }
 
-    private static func isSkippableSystemKeychainStatus(_ status: OSStatus) -> Bool {
+    private static func isSkippableSystemKeychainStatus(
+        _ status: OSStatus,
+        didAttemptLegacyFallback: Bool = false
+    ) -> Bool {
         switch status {
         case errSecNotAvailable,
              errSecInteractionNotAllowed,
              errSecAuthFailed,
              errSecNoSuchKeychain:
             true
+        case errSecMissingEntitlement:
+            didAttemptLegacyFallback
         default:
             false
         }
