@@ -199,3 +199,8 @@
 - **CopilotUsageProviderTests** (new): 6 tests — premium request parsing, reset time calculation, unlimited quota, missing credentials, 401 handling, header verification
 - **CursorUsageProviderTests** (new): 5 tests — API usage parsing with temp SQLite DB, startOfMonth reset, missing database, null maxRequestUsage fallback, JWT decoding
 - All 52 tests passing
+
+## Iteration 25: Fix popover clipping + CLAUDE.md regression rules
+- **Popover height fix**: Increased `DetailPopoverView` frame height from 350 to 480 to accommodate 6 services. Wrapped service `ForEach` in `ScrollView` so future service additions won't clip the footer (gear icon, "Last updated", Quit button)
+- **CLAUDE.md updated**: Added "Visual smoke test" step (step 3) to workflow — must build+launch and verify popover UI after every change. Added "Regression prevention" section: check container sizes when adding items, never change fixed frames without verification, use ScrollView for growable lists. Updated provider list and service order to include Copilot/Cursor
+- All 52 tests passing
