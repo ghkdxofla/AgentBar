@@ -3,18 +3,21 @@ import XCTest
 
 final class CopilotUsageProviderTests: XCTestCase {
     private var originalGHCLICommandRunner: (@Sendable (TimeInterval) -> String?)!
+    private var originalGHCLICommandConfiguration: GHCLICommandConfiguration!
 
     override func setUp() {
         super.setUp()
         CopilotMockURLProtocol.reset()
         CopilotUsageProvider.resetGHCLITokenCache()
         originalGHCLICommandRunner = CopilotUsageProvider.ghCLICommandRunner
+        originalGHCLICommandConfiguration = CopilotUsageProvider.ghCLICommandConfiguration
     }
 
     override func tearDown() {
         CopilotMockURLProtocol.reset()
         CopilotUsageProvider.resetGHCLITokenCache()
         CopilotUsageProvider.ghCLICommandRunner = originalGHCLICommandRunner
+        CopilotUsageProvider.ghCLICommandConfiguration = originalGHCLICommandConfiguration
         super.tearDown()
     }
 
@@ -218,6 +221,30 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertEqual(counter.value, 1)
     }
 
+    func testExecuteGHCLICommandTimeoutTerminatesRunningProcess() {
+        var terminateCallCount = 0
+        var waitTimeouts: [TimeInterval] = []
+        let runtime = CopilotUsageProvider.GHCLIProcessRuntime(
+            run: {},
+            waitForTermination: { timeout in
+                waitTimeouts.append(timeout)
+                return .timedOut
+            },
+            isRunning: { true },
+            terminate: { terminateCallCount += 1 },
+            terminationStatus: { 0 },
+            readOutput: { Data() }
+        )
+
+        let result = CopilotUsageProvider.executeGHCLICommand(timeout: 0.05, runtime: runtime)
+
+        XCTAssertNil(result)
+        XCTAssertEqual(terminateCallCount, 1)
+        XCTAssertEqual(waitTimeouts.count, 2)
+        XCTAssertEqual(waitTimeouts[0], 0.05, accuracy: 0.0001)
+        XCTAssertEqual(waitTimeouts[1], 0.25, accuracy: 0.0001)
+    }
+
     func testSendsCorrectHeaders() async throws {
         let json = """
         {"copilot_plan": "free", "quota_snapshots": [{"quota_id": "premium_requests", "entitlement": 50, "remaining": 50, "unlimited": false}]}
@@ -237,6 +264,7 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         _ = try await provider.fetchUsage()
     }
+
 }
 
 // MARK: - Mock URL Protocol

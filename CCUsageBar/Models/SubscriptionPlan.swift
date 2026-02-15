@@ -89,6 +89,11 @@ enum CursorPlan: String, CaseIterable, Codable, Sendable {
             defaults.set(migratedRawValue, forKey: "cursorPlan")
         }
 
-        return CursorPlan(rawValue: migratedRawValue) ?? .pro
+        if let resolvedPlan = CursorPlan(rawValue: migratedRawValue) {
+            return resolvedPlan
+        }
+
+        defaults.set(CursorPlan.pro.rawValue, forKey: "cursorPlan")
+        return .pro
     }
 }

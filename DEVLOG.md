@@ -212,8 +212,8 @@
 - All 52 tests passing
 
 ## Iteration 27: Fix Keychain password prompt on every launch
-- **Root cause**: `KeychainManager` used legacy Keychain (login.keychain) which enforces per-app ACL. Debug builds have ad-hoc code signing that changes each build, so macOS treats each build as a "new" app → prompts for login password every time, even after "Always Allow"
-- **Fix**: Added `kSecUseDataProtectionKeychain: true` and `kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked` to all Keychain operations. Data Protection Keychain has no per-app ACL — items are accessible when Mac is unlocked, without prompts
-- **Migration**: `load()` falls back to legacy keychain if item not found in Data Protection keychain, then auto-migrates the item. `save()` and `delete()` also clean up legacy items
+- **Root cause**: `KeychainManager` used legacy Keychain (login.keychain) without explicit ACL. Debug builds have ad-hoc code signing that changes each build, so macOS treats each build as a "new" app → prompts for login password every time, even after "Always Allow"
+- **Attempted fix 1**: `kSecUseDataProtectionKeychain: true` — caused `-34018 errSecMissingEntitlement` because Data Protection Keychain requires proper code signing entitlements not available for ad-hoc Debug builds
+- **Final fix**: Reverted to legacy Keychain but added `SecAccessCreate` with `nil` trusted app list to create an open-access ACL. This removes per-app restriction so any build of CCUsageBar can read items without password prompts
 - **SettingsView compile fix**: Replaced `Result<Void, String>` (invalid — `String` doesn't conform to `Error`) with `SaveResult` enum
-- All 68 tests passing
+- All 72 tests passing
