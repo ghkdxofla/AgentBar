@@ -71,4 +71,24 @@ enum CursorPlan: String, CaseIterable, Codable, Sendable {
         case .custom: return 0
         }
     }
+
+    static func migrateLegacyRawValue(_ rawValue: String) -> String {
+        switch rawValue {
+        case "Business":
+            return CursorPlan.teams.rawValue
+        default:
+            return rawValue
+        }
+    }
+
+    static func resolveAndMigrateStoredPlan(in defaults: UserDefaults = .standard) -> CursorPlan {
+        let storedRawValue = defaults.string(forKey: "cursorPlan") ?? CursorPlan.pro.rawValue
+        let migratedRawValue = migrateLegacyRawValue(storedRawValue)
+
+        if migratedRawValue != storedRawValue {
+            defaults.set(migratedRawValue, forKey: "cursorPlan")
+        }
+
+        return CursorPlan(rawValue: migratedRawValue) ?? .pro
+    }
 }

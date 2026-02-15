@@ -30,6 +30,7 @@ struct SettingsView: View {
     @State private var copilotPAT: String = ""
     @State private var hasSavedCopilotPAT = false
     @State private var zaiAPIKey: String = ""
+    @State private var hasSavedZaiAPIKey = false
     @State private var showSavedAlert = false
 
     var body: some View {
@@ -156,10 +157,11 @@ struct SettingsView: View {
                         SecureField("ghp_...", text: $copilotPAT)
                             .frame(width: 200)
                         Button("Save") {
-                            saveCopilotPAT()
-                            NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                            if saveCopilotPAT() {
+                                NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                            }
                         }
-                        .disabled(copilotPAT.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(!Self.canSaveToken(copilotPAT))
                     }
                     Text("Only needed if gh CLI is not installed")
                         .font(.caption)
@@ -212,14 +214,23 @@ struct SettingsView: View {
                     .onChange(of: zaiEnabled) { _ in
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
+                if hasSavedZaiAPIKey {
+                    Text("An API key is already saved in Keychain")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 HStack {
                     Text("API Key:")
                     SecureField("API key", text: $zaiAPIKey)
                         .frame(width: 200)
                     Button("Save") {
-                        saveAPIKey(zaiAPIKey, account: ServiceType.zai.keychainAccount)
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        if saveAPIKey(zaiAPIKey, account: ServiceType.zai.keychainAccount) {
+                            hasSavedZaiAPIKey = true
+                            zaiAPIKey = ""
+                            NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        }
                     }
+                    .disabled(!Self.canSaveToken(zaiAPIKey))
                 }
                 Text("Limits are fetched automatically from Z.ai API")
                     .font(.caption)
@@ -229,6 +240,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 450, height: 800)
         .onAppear {
+            migrateLegacyCursorPlanIfNeeded()
             loadAPIKeys()
         }
         .alert("Saved", isPresented: $showSavedAlert) {
@@ -236,25 +248,54 @@ struct SettingsView: View {
         }
     }
 
-    private func saveAPIKey(_ key: String, account: String) {
-        guard !key.isEmpty else { return }
-        try? KeychainManager.save(key: key, account: account)
+    @discardableResult
+    private func saveAPIKey(_ key: String, account: String) -> Bool {
+        guard let sanitizedKey = Self.sanitizedTokenForSaving(key) else { return false }
+        do {
+            try KeychainManager.save(key: sanitizedKey, account: account)
+        } catch {
+            return false
+        }
         showSavedAlert = true
+        return true
     }
 
-    private func saveCopilotPAT() {
-        let trimmedPAT = copilotPAT.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedPAT.isEmpty else { return }
+    @discardableResult
+    private func saveCopilotPAT() -> Bool {
+        if saveAPIKey(copilotPAT, account: ServiceType.copilot.keychainAccount) {
+            hasSavedCopilotPAT = true
+            copilotPAT = ""
+            return true
+        }
+        return false
+    }
 
-        saveAPIKey(trimmedPAT, account: ServiceType.copilot.keychainAccount)
-        hasSavedCopilotPAT = true
-        copilotPAT = ""
+    private func migrateLegacyCursorPlanIfNeeded() {
+        let migratedPlanRawValue = CursorPlan.migrateLegacyRawValue(cursorPlan)
+        guard migratedPlanRawValue != cursorPlan else { return }
+
+        cursorPlan = migratedPlanRawValue
+        if let migratedPlan = CursorPlan(rawValue: migratedPlanRawValue), migratedPlan != .custom {
+            cursorMonthlyLimit = migratedPlan.monthlyRequestEstimate
+        }
     }
 
     private func loadAPIKeys() {
         hasSavedCopilotPAT = KeychainManager.load(account: ServiceType.copilot.keychainAccount) != nil
-        if let key = KeychainManager.load(account: ServiceType.zai.keychainAccount) {
-            zaiAPIKey = String(repeating: "*", count: min(key.count, 12))
-        }
+        hasSavedZaiAPIKey = KeychainManager.load(account: ServiceType.zai.keychainAccount) != nil
+        copilotPAT = ""
+        zaiAPIKey = ""
+    }
+
+    static func sanitizedTokenForSaving(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canSaveToken(trimmed) else { return nil }
+        return trimmed
+    }
+
+    static func canSaveToken(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        return !trimmed.allSatisfy { $0 == "*" }
     }
 }

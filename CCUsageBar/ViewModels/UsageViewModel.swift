@@ -147,8 +147,7 @@ final class UsageViewModel: ObservableObject {
 
         let cursorEnabled = defaults.bool(forKey: "cursorEnabled", defaultValue: true)
         if cursorEnabled {
-            let cursorPlanRaw = defaults.string(forKey: "cursorPlan") ?? CursorPlan.pro.rawValue
-            let cursorPlan = CursorPlan(rawValue: cursorPlanRaw) ?? .pro
+            let cursorPlan = CursorPlan.resolveAndMigrateStoredPlan(in: defaults)
             let cursorLimit: Double
             if cursorPlan == .custom {
                 cursorLimit = defaults.double(forKey: "cursorMonthlyLimit").nonZero ?? CursorPlan.pro.monthlyRequestEstimate

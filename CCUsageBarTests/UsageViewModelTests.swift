@@ -87,4 +87,27 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(vm.usageData[3].service, .zai)
     }
 
+    func testLegacyCursorPlanBusinessMigratesToTeams() {
+        let suiteName = "CCUsageBarTests.CursorPlanMigration"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set("Business", forKey: "cursorPlan")
+
+        let resolvedPlan = CursorPlan.resolveAndMigrateStoredPlan(in: defaults)
+
+        XCTAssertEqual(resolvedPlan, .teams)
+        XCTAssertEqual(defaults.string(forKey: "cursorPlan"), CursorPlan.teams.rawValue)
+    }
+
+    func testSanitizedTokenForSavingRejectsMaskedPlaceholder() {
+        XCTAssertNil(SettingsView.sanitizedTokenForSaving("*****"))
+        XCTAssertNil(SettingsView.sanitizedTokenForSaving("   ******   "))
+        XCTAssertEqual(SettingsView.sanitizedTokenForSaving("  ghp_valid_token  "), "ghp_valid_token")
+    }
+
 }
