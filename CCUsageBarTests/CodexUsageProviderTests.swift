@@ -203,6 +203,38 @@ final class CodexUsageProviderTests: XCTestCase {
         )
     }
 
+    func testMergedLimitIDsKeepActiveUsageWhenOnePrimaryWindowIsStale() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/15")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let staleReset = Int(Date().addingTimeInterval(-3600).timeIntervalSince1970)
+        let activeReset = Int(Date().addingTimeInterval(7200).timeIntervalSince1970)
+
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex","primary":{"used_percent":12.0,"window_minutes":300,"resets_at":\(staleReset)}}}}
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex_bengalfox","primary":{"used_percent":3.0,"window_minutes":300,"resets_at":\(activeReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Stale window should resolve to 0, while active window is still counted.
+        XCTAssertEqual(usage.fiveHourUsage.used, 300_000, accuracy: 1)
+        XCTAssertNotNil(usage.fiveHourUsage.resetTime)
+        XCTAssertEqual(
+            usage.fiveHourUsage.resetTime!.timeIntervalSince1970,
+            Double(activeReset),
+            accuracy: 1
+        )
+    }
+
     func testSingleLimitIDNotAffectedByMerge() async throws {
         let dateDir = tempDir.appendingPathComponent("2026/02/15")
         try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)

@@ -82,21 +82,21 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         var weeklyResetTime: Date?
 
         if let rateLimits = latestRateLimits {
-            if let primary = rateLimits.primary {
-                let (used, reset) = resolveWindow(
-                    window: primary, tokenLimit: fiveHourTokenLimit, now: now
-                )
-                fiveHourUsed = used
-                fiveHourResetTime = reset
-            }
+            let (primaryUsed, primaryReset) = resolveAggregatedWindow(
+                windows: rateLimits.compactMap(\.primary),
+                tokenLimit: fiveHourTokenLimit,
+                now: now
+            )
+            fiveHourUsed = primaryUsed
+            fiveHourResetTime = primaryReset
 
-            if let secondary = rateLimits.secondary {
-                let (used, reset) = resolveWindow(
-                    window: secondary, tokenLimit: weeklyTokenLimit, now: now
-                )
-                weeklyUsed = used
-                weeklyResetTime = reset
-            }
+            let (secondaryUsed, secondaryReset) = resolveAggregatedWindow(
+                windows: rateLimits.compactMap(\.secondary),
+                tokenLimit: weeklyTokenLimit,
+                now: now
+            )
+            weeklyUsed = secondaryUsed
+            weeklyResetTime = secondaryReset
         } else {
             // Fallback: sum tokens from session files
             let (fiveHour, weekly) = sumTokensFromSessions(now: now)
@@ -156,9 +156,43 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         return (0, nil)
     }
 
+    /// Resolve multiple windows independently and aggregate active usage.
+    private func resolveAggregatedWindow(
+        windows: [CodexRateWindow], tokenLimit: Double, now: Date
+    ) -> (used: Double, resetTime: Date?) {
+        guard !windows.isEmpty else { return (0, nil) }
+
+        var totalUsed: Double = 0
+        var earliestActiveReset: Date?
+        var earliestAnyReset: Date?
+
+        for window in windows {
+            let (used, resetTime) = resolveWindow(window: window, tokenLimit: tokenLimit, now: now)
+            totalUsed += used
+
+            if let resetTime {
+                if let current = earliestAnyReset {
+                    earliestAnyReset = min(current, resetTime)
+                } else {
+                    earliestAnyReset = resetTime
+                }
+
+                if used > 0 {
+                    if let current = earliestActiveReset {
+                        earliestActiveReset = min(current, resetTime)
+                    } else {
+                        earliestActiveReset = resetTime
+                    }
+                }
+            }
+        }
+
+        return (totalUsed, earliestActiveReset ?? earliestAnyReset)
+    }
+
     // MARK: - Rate Limits Extraction
 
-    private func findLatestRateLimits(now: Date) -> CodexRateLimits? {
+    private func findLatestRateLimits(now: Date) -> [CodexRateLimits]? {
         let fm = FileManager.default
         guard fm.fileExists(atPath: sessionsDir.path) else { return nil }
 
@@ -177,7 +211,7 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         return nil
     }
 
-    private func extractLatestRateLimits(from file: URL) -> CodexRateLimits? {
+    private func extractLatestRateLimits(from file: URL) -> [CodexRateLimits]? {
         guard let records = try? JSONLParser.parseFile(file, as: CodexSessionRecord.self) else {
             return nil
         }
@@ -197,51 +231,7 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         }
 
         guard !latestByLimitID.isEmpty else { return nil }
-
-        // If only one limit_id, return it directly
-        if latestByLimitID.count == 1 {
-            return latestByLimitID.values.first
-        }
-
-        // Merge: sum used_percent, keep the earliest resets_at (most
-        // conservative) and the window_minutes from any entry that has it.
-        var totalPrimaryPercent: Double = 0
-        var totalSecondaryPercent: Double = 0
-        var primaryResetAt: Int?
-        var secondaryResetAt: Int?
-        var primaryWindowMinutes: Int?
-        var secondaryWindowMinutes: Int?
-
-        for rl in latestByLimitID.values {
-            if let p = rl.primary {
-                totalPrimaryPercent += p.used_percent ?? 0
-                if let r = p.resets_at {
-                    primaryResetAt = min(primaryResetAt ?? Int.max, r)
-                }
-                if primaryWindowMinutes == nil { primaryWindowMinutes = p.window_minutes }
-            }
-            if let s = rl.secondary {
-                totalSecondaryPercent += s.used_percent ?? 0
-                if let r = s.resets_at {
-                    secondaryResetAt = min(secondaryResetAt ?? Int.max, r)
-                }
-                if secondaryWindowMinutes == nil { secondaryWindowMinutes = s.window_minutes }
-            }
-        }
-
-        return CodexRateLimits(
-            limit_id: nil,
-            primary: CodexRateWindow(
-                used_percent: totalPrimaryPercent,
-                window_minutes: primaryWindowMinutes,
-                resets_at: primaryResetAt
-            ),
-            secondary: CodexRateWindow(
-                used_percent: totalSecondaryPercent,
-                window_minutes: secondaryWindowMinutes,
-                resets_at: secondaryResetAt
-            )
-        )
+        return Array(latestByLimitID.values)
     }
 
     // MARK: - Token Summing Fallback
