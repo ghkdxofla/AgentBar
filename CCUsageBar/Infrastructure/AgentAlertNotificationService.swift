@@ -1,0 +1,71 @@
+import Foundation
+import UserNotifications
+
+actor AgentAlertNotificationService {
+    private let center: UNUserNotificationCenter
+    private var didCheckAuthorization = false
+
+    init(center: UNUserNotificationCenter = .current()) {
+        self.center = center
+    }
+
+    nonisolated static func requestAuthorizationPrompt() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    func requestAuthorizationIfNeeded() async {
+        guard !didCheckAuthorization else { return }
+        didCheckAuthorization = true
+
+        let statusRawValue = await authorizationStatusRawValue()
+        guard statusRawValue == UNAuthorizationStatus.notDetermined.rawValue else { return }
+        _ = await requestAuthorization()
+    }
+
+    func post(event: AgentAlertEvent) async {
+        let content = UNMutableNotificationContent()
+        content.title = event.type.notificationTitle
+        content.body = "[\(event.service.rawValue)] \(event.notificationBody)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "ccusagebar-agent-alert-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+
+        do {
+            try await add(request)
+        } catch {
+            // Ignore posting failures so monitoring loop can continue.
+        }
+    }
+
+    private func authorizationStatusRawValue() async -> Int {
+        await withCheckedContinuation { continuation in
+            center.getNotificationSettings { settings in
+                continuation.resume(returning: settings.authorizationStatus.rawValue)
+            }
+        }
+    }
+
+    private func requestAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                continuation.resume(returning: granted)
+            }
+        }
+    }
+
+    private func add(_ request: UNNotificationRequest) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            center.add(request) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: ())
+                }
+            }
+        }
+    }
+}

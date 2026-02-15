@@ -3,11 +3,17 @@ import ServiceManagement
 
 extension Notification.Name {
     static let limitsChanged = Notification.Name("CCUsageBarLimitsChanged")
+    static let alertsSettingsChanged = Notification.Name("CCUsageBarAlertsSettingsChanged")
 }
 
 struct SettingsView: View {
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("refreshInterval") private var refreshInterval: Double = 60
+    @AppStorage("alertsEnabled") private var alertsEnabled = false
+    @AppStorage("alertTaskCompletedEnabled") private var alertTaskCompletedEnabled = true
+    @AppStorage("alertPermissionRequiredEnabled") private var alertPermissionRequiredEnabled = true
+    @AppStorage("alertDecisionRequiredEnabled") private var alertDecisionRequiredEnabled = true
+    @AppStorage("alertPollingSeconds") private var alertPollingSeconds: Double = 5
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
 
@@ -57,6 +63,50 @@ struct SettingsView: View {
                     Text("120s").tag(120.0)
                     Text("300s").tag(300.0)
                 }
+            }
+
+            Section("Agent Alerts (Beta)") {
+                Toggle("Enable alerts", isOn: $alertsEnabled)
+                    .onChange(of: alertsEnabled) { _ in
+                        notifyAlertSettingsChanged()
+                    }
+
+                Toggle("Task completed", isOn: $alertTaskCompletedEnabled)
+                    .disabled(!alertsEnabled)
+                    .onChange(of: alertTaskCompletedEnabled) { _ in
+                        notifyAlertSettingsChanged()
+                    }
+
+                Toggle("Permission required", isOn: $alertPermissionRequiredEnabled)
+                    .disabled(!alertsEnabled)
+                    .onChange(of: alertPermissionRequiredEnabled) { _ in
+                        notifyAlertSettingsChanged()
+                    }
+
+                Toggle("Decision required", isOn: $alertDecisionRequiredEnabled)
+                    .disabled(!alertsEnabled)
+                    .onChange(of: alertDecisionRequiredEnabled) { _ in
+                        notifyAlertSettingsChanged()
+                    }
+
+                Picker("Polling interval", selection: $alertPollingSeconds) {
+                    Text("3s").tag(3.0)
+                    Text("5s").tag(5.0)
+                    Text("10s").tag(10.0)
+                }
+                .disabled(!alertsEnabled)
+                .onChange(of: alertPollingSeconds) { _ in
+                    notifyAlertSettingsChanged()
+                }
+
+                Button("Request Notification Permission") {
+                    AgentAlertNotificationService.requestAuthorizationPrompt()
+                }
+                .disabled(!alertsEnabled)
+
+                Text("Codex session events are monitored locally for task completion, permission requests, and decision prompts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // Claude Code
@@ -322,6 +372,10 @@ struct SettingsView: View {
         hasSavedZaiAPIKey = KeychainManager.load(account: ServiceType.zai.keychainAccount) != nil
         copilotPAT = ""
         zaiAPIKey = ""
+    }
+
+    private func notifyAlertSettingsChanged() {
+        NotificationCenter.default.post(name: .alertsSettingsChanged, object: nil)
     }
 
     struct CopilotPATSaveOutcome: Equatable {

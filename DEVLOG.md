@@ -251,3 +251,12 @@
 - **Test target portability fix**: Removed hard-pinned team/certificate from `CCUsageBarTests` and switched to automatic signing so tests can run across contributor and CI environments without a specific Apple team setup.
 - **Release verification automation**: Added `scripts/verify-release-signing.sh` to archive a Release build and verify signing with `codesign --verify` and `spctl --assess`. Added the command to `CLAUDE.md` Build & Run section.
 - All 103 tests passing
+
+## Iteration 33: Add Phase 1 agent attention alerts (local notifications)
+- **Roadmap documentation**: Added `docs/AGENT_ALERTING_ROADMAP.md` with detailed Phase 1/2/3 design, including event model, architecture, security posture, and test strategy.
+- **Phase 1 alert pipeline**: Added normalized alert event model (`AgentAlertEvent`, `AgentAlertEventType`), detector protocol, Codex JSONL detector, monitor coordinator, and local notification service (`UserNotifications`) for real-time agent attention signals.
+- **Codex event mapping**: Implemented Codex session parsing for `task_complete` (task done), escalation-required `function_call` (permission required), and question/decision-like `agent_message` prompts (decision required), with watermark-based incremental scanning.
+- **Spam prevention and control**: Added per-event toggles, global enable switch, polling interval setting, and cooldown dedupe in `AgentAlertMonitor` to avoid repeated notifications from the same session/event key.
+- **App integration and settings UI**: Wired monitor lifecycle into `AppDelegate` and added a new "Agent Alerts (Beta)" section in `SettingsView`, including notification permission request action.
+- **Tests**: Added `CodexAlertEventDetectorTests` for task completion, escalation detection, decision prompt detection, and watermark filtering.
+- All 111 tests passing

@@ -1,0 +1,177 @@
+# Agent Alerting Roadmap (Phase 1-3)
+
+## 1. Product Goal
+
+CCUsageBar currently visualizes usage quotas. This roadmap extends the app into an "agent attention utility" that notifies the user when an agent run requires attention.
+
+Primary outcomes:
+- Reduce idle time after agent completion
+- Surface blocked runs quickly (permission or decision waiting)
+- Allow optional mobile delivery in later phases
+
+## 2. Scope and Principles
+
+### Scope
+- Phase 1: Local macOS Notification Center alerts (Codex-first integration)
+- Phase 2: iPhone push delivery through external/mobile channels
+- Phase 3: Two-way remote prompt submission
+
+### Principles
+- Codex-first, provider-agnostic architecture (new detectors can be added later)
+- No silent data exfiltration; explicit user opt-in for any outbound channel
+- Duplicate suppression and cooldown are mandatory
+- Deterministic event mapping where possible, heuristic mapping only when necessary
+
+## 3. Phase 1 (Local Notification Center MVP)
+
+### 3.1 User Stories
+- As a user, I receive a local alert when a Codex task completes.
+- As a user, I receive a local alert when Codex requests elevated permission.
+- As a user, I receive a local alert when Codex asks for user decision/input.
+- As a user, I can enable/disable each alert type from Settings.
+
+### 3.2 Functional Requirements
+- Event source: `~/.codex/sessions/**/*.jsonl`
+- Event types:
+  - `taskCompleted`
+  - `permissionRequired`
+  - `decisionRequired`
+- Polling interval default: 5s
+- Duplicate suppression:
+  - Ignore events older than persisted watermark
+  - Cooldown by `(service, eventType, sessionID)` key (default 90s)
+- Local notification delivery via `UNUserNotificationCenter`
+- Settings toggles:
+  - Global on/off
+  - Per-event on/off
+- Notification permission request button in Settings
+
+### 3.3 Non-Functional Requirements
+- Lightweight scanning (only recent files and incremental watermark checks)
+- Safe failure behavior (parsing errors must not crash app)
+- Privacy: no network transmission in Phase 1
+- Testability: detector logic and monitor filtering must be unit-testable
+
+### 3.4 Event Mapping (Codex JSONL)
+
+| JSONL signal | Mapped event | Confidence |
+|---|---|---|
+| `event_msg.payload.type == task_complete` | `taskCompleted` | High |
+| `response_item.payload.type == function_call` with `sandbox_permissions=require_escalated` in arguments | `permissionRequired` | High |
+| `event_msg.payload.type == agent_message` where text appears to ask a user decision/question | `decisionRequired` | Medium (heuristic) |
+
+Heuristic note:
+- Decision detection is text-based in Phase 1 and should be upgraded to explicit protocol signals in later phases where possible.
+
+### 3.5 Architecture
+
+Components:
+- `AgentAlertEvent`: normalized event model (service, type, message, timestamp, dedupe key)
+- `AgentAlertEventDetectorProtocol`: pluggable detector interface
+- `CodexAlertEventDetector`: Codex JSONL parser + mapper
+- `AgentAlertMonitor`: polling coordinator, watermark/cooldown, settings filter
+- `AgentAlertNotificationService`: local notification delivery
+
+Data flow:
+1. Monitor tick
+2. Detector returns new normalized events after watermark
+3. Monitor applies settings + cooldown
+4. Notification service posts local notifications
+5. Watermark is advanced
+
+### 3.6 Settings and Persistence
+
+UserDefaults keys:
+- `alertsEnabled` (Bool)
+- `alertTaskCompletedEnabled` (Bool)
+- `alertPermissionRequiredEnabled` (Bool)
+- `alertDecisionRequiredEnabled` (Bool)
+- `alertPollingSeconds` (Double, default 5)
+- `alertLastSeenCodexTimestamp` (Double seconds since epoch)
+
+### 3.7 Reliability and Error Handling
+
+- Parsing errors in a file line should skip the line, not fail the cycle.
+- File access errors should be logged and ignored for that cycle.
+- Notification post failures should not block watermark advancement for already-processed events.
+
+### 3.8 Test Plan
+
+Unit tests:
+- Detector maps task completion events correctly
+- Detector maps permission-required function calls correctly
+- Detector maps decision-required messages correctly
+- Monitor suppresses duplicates using cooldown/watermark
+- Settings filter blocks disabled event types
+
+Manual checks:
+- Enable alerts, run a sample Codex task, confirm notification appears
+- Trigger an escalation-required command, confirm permission notification
+- Confirm no repeated spam for the same event
+
+## 4. Phase 2 (iPhone Delivery)
+
+### 4.1 Goal
+Deliver the same attention events to iPhone with low latency and clear action context.
+
+### 4.2 Channel Strategy
+- Primary: push via APNs-backed companion app (recommended)
+- Alternative: user-configured webhook relay (Slack/Telegram/Pushover/etc.)
+
+### 4.3 Architecture Additions
+- `RemoteAlertDispatcher` interface
+- Outbound event queue with retry/backoff
+- Signed payloads with per-device tokens
+- Delivery status telemetry (success/failure counters)
+
+### 4.4 Security
+- Explicit opt-in and token setup in Settings
+- Encrypt sensitive payload fields at rest in Keychain
+- Minimal payload by default (service, type, summary, timestamp)
+
+### 4.5 Operational Requirements
+- Backoff and jitter for transient failures
+- Circuit-breaker behavior for repeated failures
+- "Send test push" action in Settings
+
+## 5. Phase 3 (Two-Way Remote Prompting)
+
+### 5.1 Goal
+Allow remote reply to route new prompt instructions back to the Mac-hosted agent workflow.
+
+### 5.2 Recommended Approach
+- iOS companion app quick-reply actions mapped to structured commands
+- Mac-side local receiver validates auth/session and forwards prompt into selected agent path
+
+### 5.3 Command Model
+- `reply_text`
+- `approve_permission`
+- `defer`
+- `run_followup_prompt`
+
+Each command carries:
+- device identity
+- signed nonce/timestamp
+- target service/session context
+
+### 5.4 Safety Controls
+- Require explicit pairing between iPhone and Mac
+- Replay protection with nonce cache
+- Optional "confirm before execute" mode for destructive commands
+
+### 5.5 Why Not iMessage as Primary Two-Way Channel
+- macOS Messages scripting supports send, but reliable structured inbound reading is restricted/fragile
+- Database scraping (`chat.db`) is permission-heavy and brittle across OS changes
+- Not suitable as a stable core product path
+
+## 6. Milestones and Exit Criteria
+
+Phase 1 exit:
+- Event detection + local notifications + settings toggles + passing tests
+
+Phase 2 exit:
+- At least one iPhone channel in production with retry and observability
+
+Phase 3 exit:
+- Verified secure remote reply loop with command validation and audit trail
+
