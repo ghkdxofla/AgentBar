@@ -204,3 +204,9 @@
 - **Popover height fix**: Increased `DetailPopoverView` frame height from 350 to 480 to accommodate 6 services. Wrapped service `ForEach` in `ScrollView` so future service additions won't clip the footer (gear icon, "Last updated", Quit button)
 - **CLAUDE.md updated**: Added "Visual smoke test" step (step 3) to workflow — must build+launch and verify popover UI after every change. Added "Regression prevention" section: check container sizes when adding items, never change fixed frames without verification, use ScrollView for growable lists. Updated provider list and service order to include Copilot/Cursor
 - All 52 tests passing
+
+## Iteration 26: Remove unnecessary API key fields + Copilot gh CLI + Cursor credit-based plans
+- **Codex API key removed**: `CodexUsageProvider` reads only local JSONL files (`~/.codex/sessions/`) — API key was never used. Removed SecureField + Save button from Settings, removed `openaiAPIKey` state variable. Added caption "Usage is derived from local session logs"
+- **Copilot gh CLI auto-read**: `CopilotUsageProvider` now tries `gh auth token` (via `Process`) first, falls back to manual PAT in Keychain. `readGHCLIToken()` runs `/usr/bin/env gh auth token` and captures stdout. Settings updated: primary note says "Token is auto-read from gh CLI", manual PAT moved to `DisclosureGroup` as optional fallback
+- **Cursor credit-based plans**: Updated `CursorPlan` to reflect June 2025 pricing overhaul — Free/$0, Pro/$20, Pro+/$60, Ultra/$200, Teams/$40, Custom. Added `monthlyCreditDollars` and `monthlyRequestEstimate` (approximate, varies by model: ~225 for Claude Sonnet, ~500 for GPT-5 per $20). Renamed `monthlyRequestLimit` → `monthlyRequestEstimate` across provider, ViewModel, and Settings. Settings label changed to "Est. monthly requests" with explanatory caption
+- All 52 tests passing

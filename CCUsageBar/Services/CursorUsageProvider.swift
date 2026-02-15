@@ -48,7 +48,7 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }()
 
     init(
-        monthlyRequestLimit: Double = CursorPlan.pro.monthlyRequestLimit,
+        monthlyRequestLimit: Double = CursorPlan.pro.monthlyRequestEstimate,
         session: URLSession = .shared,
         dbPathProvider: (@Sendable () -> String)? = nil
     ) {
