@@ -224,3 +224,11 @@
 - **Single SwiftUI alert path**: `SettingsView` replaced dual `.alert` modifiers with one enum-driven `.alert(item:)` to avoid alert presentation conflicts.
 - **Test coverage**: Added keychain behavior tests for legacy fallback + successful migration, failed migration preserving legacy item, and delete cleanup/error behavior using an injected mock security API.
 - All 76 tests passing
+
+## Iteration 29: Read Claude Code credentials via security CLI
+- **Problem**: `ClaudeUsageProvider` used `SecItemCopyMatching` to read `"Claude Code-credentials"` from Keychain. This item is owned by Claude Code CLI with a per-app ACL, so macOS prompts "CCUsageBar wants to use your confidential information" on every access. Ad-hoc code signing means "Always Allow" resets each build
+- **Fix**: Replaced direct Keychain API with `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w` via `Process`. The `security` binary is a system-trusted app that bypasses per-app ACL prompts. Same pattern as Copilot's `gh auth token`
+- **Caching**: Added NSLock-guarded token cache with TTL matching the app's refresh interval, preventing repeated CLI invocations within the same polling cycle
+- **`import Security` removed**: No longer needed since all Keychain access goes through the CLI
+- **Test coverage**: Added 4 tests — CLI cache within TTL, cache nil on failure, valid JSON parsing, invalid JSON rejection
+- All 85 tests passing
