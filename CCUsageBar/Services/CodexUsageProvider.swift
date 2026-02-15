@@ -216,11 +216,10 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             return nil
         }
 
-        // Track the latest rate_limits per limit_id, then merge.
+        // Track the latest rate_limits per limit_id.
         // Codex sessions may interleave multiple limit_ids (e.g. "codex",
-        // "codex_bengalfox") with independent usage counters.  We keep each
-        // limit_id's last entry and sum their used_percent values so the bar
-        // reflects total usage across all model buckets.
+        // "codex_bengalfox") with independent usage counters, so we keep each
+        // limit_id's latest entry and resolve/aggregate windows afterward.
         var latestByLimitID: [String: CodexRateLimits] = [:]
         for record in records {
             guard record.type == "event_msg",
