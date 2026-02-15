@@ -22,7 +22,7 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(vm.usageData[1].service, .codex)
     }
 
-    func testProviderFailureDoesNotAffectOthers() async {
+    func testProviderFailureReturnsZeroUsage() async {
         let failProvider = MockUsageProvider(
             serviceType: .codex,
             result: .failure(APIError.unauthorized)
@@ -35,11 +35,14 @@ final class UsageViewModelTests: XCTestCase {
         let vm = UsageViewModel(providers: [failProvider, successProvider])
         await vm.fetchAllUsage()
 
-        XCTAssertEqual(vm.usageData.count, 1)
-        XCTAssertEqual(vm.usageData.first?.service, .claude)
+        // Both show: successful provider + zero-usage fallback for failed provider
+        XCTAssertEqual(vm.usageData.count, 2)
+        let codexData = vm.usageData.first { $0.service == .codex }
+        XCTAssertNotNil(codexData)
+        XCTAssertEqual(codexData!.fiveHourUsage.used, 0)
     }
 
-    func testEmptyResultsSetsError() async {
+    func testAllFailuresStillShowBars() async {
         let failProvider = MockUsageProvider(
             serviceType: .claude,
             result: .failure(APIError.noData)
@@ -48,8 +51,10 @@ final class UsageViewModelTests: XCTestCase {
         let vm = UsageViewModel(providers: [failProvider])
         await vm.fetchAllUsage()
 
-        XCTAssertTrue(vm.usageData.isEmpty)
-        XCTAssertNotNil(vm.lastError)
+        // Failed provider still returns a zero-usage entry
+        XCTAssertEqual(vm.usageData.count, 1)
+        XCTAssertEqual(vm.usageData.first?.fiveHourUsage.used, 0)
+        XCTAssertNil(vm.lastError)
     }
 
     func testSuccessfulResultsClearsError() async {

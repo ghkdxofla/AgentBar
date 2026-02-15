@@ -67,7 +67,14 @@ final class UsageViewModel: ObservableObject {
                     do {
                         return try await provider.fetchUsage()
                     } catch {
-                        return nil
+                        // Return zero usage so the bar stays visible
+                        return UsageData(
+                            service: provider.serviceType,
+                            fiveHourUsage: UsageMetric(used: 0, total: 100, unit: .percent, resetTime: nil),
+                            weeklyUsage: nil,
+                            lastUpdated: Date(),
+                            isAvailable: true
+                        )
                     }
                 }
             }

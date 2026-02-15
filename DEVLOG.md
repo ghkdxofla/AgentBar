@@ -181,3 +181,9 @@
 - **MetricRow label width**: Increased from 20px to 30px to accommodate "MCP" label without clipping
 - **Fact-checked Z.ai plan info**: API confirmed Max plan (`level: "max"`), MCP total=4000 matches published quota, 5h window exists for prompts
 - All 41 tests passing
+
+## Iteration 23: Keep bars visible on fetch failure + CX 5h reset time fix
+- **Bars persist on error**: `UsageViewModel.fetchAllUsage()` now returns zero-usage `UsageData` (instead of nil) when a configured provider throws. Previously, any API error or parsing failure removed the service bar entirely from the menu bar.
+- **CX 5h reset time fix**: Codex `resets_at` in session JSONL is set once per session and becomes stale after the 5h window rolls over. Added `resolveWindow()` helper that advances a stale `resets_at` by `window_minutes` intervals until it's in the future. When the window has rolled over, usage is correctly zeroed but the next reset time is still shown.
+- **Tests updated**: `testProviderFailureDoesNotAffectOthers` → `testProviderFailureReturnsZeroUsage`, `testEmptyResultsSetsError` → `testAllFailuresStillShowBars` — both now expect zero-usage entries instead of nil
+- All 41 tests passing
