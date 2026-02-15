@@ -19,9 +19,16 @@ struct SettingsView: View {
     @AppStorage("geminiEnabled") private var geminiEnabled = true
     @AppStorage("geminiDailyLimit") private var geminiDailyLimit: Double = 1_000
 
+    @AppStorage("copilotEnabled") private var copilotEnabled = true
+
+    @AppStorage("cursorEnabled") private var cursorEnabled = true
+    @AppStorage("cursorPlan") private var cursorPlan: String = CursorPlan.pro.rawValue
+    @AppStorage("cursorMonthlyLimit") private var cursorMonthlyLimit: Double = 500
+
     @AppStorage("zaiEnabled") private var zaiEnabled = true
 
     @State private var openaiAPIKey: String = ""
+    @State private var copilotPAT: String = ""
     @State private var zaiAPIKey: String = ""
     @State private var showSavedAlert = false
 
@@ -134,6 +141,64 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // GitHub Copilot
+            Section("GitHub Copilot") {
+                Toggle("Enabled", isOn: $copilotEnabled)
+                    .onChange(of: copilotEnabled) { _ in
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
+                HStack {
+                    Text("GitHub PAT:")
+                    SecureField("ghp_...", text: $copilotPAT)
+                        .frame(width: 200)
+                    Button("Save") {
+                        saveAPIKey(copilotPAT, account: ServiceType.copilot.keychainAccount)
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
+                }
+                Text("Requires a GitHub Personal Access Token with Copilot access")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Cursor
+            Section("Cursor") {
+                Toggle("Enabled", isOn: $cursorEnabled)
+                    .onChange(of: cursorEnabled) { _ in
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
+
+                Picker("Plan", selection: $cursorPlan) {
+                    ForEach(CursorPlan.allCases, id: \.rawValue) { plan in
+                        Text(plan.rawValue).tag(plan.rawValue)
+                    }
+                }
+                .onChange(of: cursorPlan) { newValue in
+                    if let plan = CursorPlan(rawValue: newValue), plan != .custom {
+                        cursorMonthlyLimit = plan.monthlyRequestLimit
+                    }
+                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                }
+
+                HStack {
+                    Text("Monthly request limit:")
+                    TextField("", value: $cursorMonthlyLimit, format: .number)
+                        .frame(width: 120)
+                        .disabled(cursorPlan != CursorPlan.custom.rawValue)
+                    Text("requests")
+                        .foregroundStyle(.secondary)
+                }
+                .onChange(of: cursorMonthlyLimit) { _ in
+                    if cursorPlan == CursorPlan.custom.rawValue {
+                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    }
+                }
+
+                Text("Token is auto-read from Cursor's local database")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // Z.ai
             Section("Z.ai Coding Plan") {
                 Toggle("Enabled", isOn: $zaiEnabled)
@@ -155,7 +220,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 640)
+        .frame(width: 450, height: 800)
         .onAppear {
             loadAPIKeys()
         }
@@ -173,6 +238,9 @@ struct SettingsView: View {
     private func loadAPIKeys() {
         if let key = KeychainManager.load(account: ServiceType.codex.keychainAccount) {
             openaiAPIKey = String(repeating: "*", count: min(key.count, 12))
+        }
+        if let key = KeychainManager.load(account: ServiceType.copilot.keychainAccount) {
+            copilotPAT = String(repeating: "*", count: min(key.count, 12))
         }
         if let key = KeychainManager.load(account: ServiceType.zai.keychainAccount) {
             zaiAPIKey = String(repeating: "*", count: min(key.count, 12))
