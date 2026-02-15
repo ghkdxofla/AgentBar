@@ -266,6 +266,60 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(outcome.copilotPAT, "ghp_valid_token")
     }
 
+    func testKeychainSaveStoresInDataProtectionAndCleansLegacyOnSuccess() throws {
+        let account = "tests.save.primary"
+        let securityAPI = MockKeychainSecurityAPI(
+            legacyItems: [account: Data("legacy-token".utf8)]
+        )
+
+        try KeychainManager.save(
+            key: "new-token",
+            account: account,
+            securityAPI: securityAPI
+        )
+
+        XCTAssertEqual(securityAPI.dataProtectionItems[account], Data("new-token".utf8))
+        XCTAssertNil(securityAPI.legacyItems[account])
+    }
+
+    func testKeychainSaveFallsBackToLegacyWhenDataProtectionMissingEntitlement() throws {
+        let account = "tests.save.fallback"
+        let securityAPI = MockKeychainSecurityAPI()
+        securityAPI.addStatusByStore[.dataProtection] = errSecMissingEntitlement
+
+        try KeychainManager.save(
+            key: "fallback-token",
+            account: account,
+            securityAPI: securityAPI
+        )
+
+        XCTAssertNil(securityAPI.dataProtectionItems[account])
+        XCTAssertEqual(securityAPI.legacyItems[account], Data("fallback-token".utf8))
+    }
+
+    func testKeychainSavePreservesExistingDataProtectionItemWhenUpdateFails() {
+        let account = "tests.save.non_destructive"
+        let original = Data("original-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(
+            dataProtectionItems: [account: original]
+        )
+        securityAPI.updateStatusByStore[.dataProtection] = errSecInteractionNotAllowed
+
+        XCTAssertThrowsError(
+            try KeychainManager.save(
+                key: "replacement-token",
+                account: account,
+                securityAPI: securityAPI
+            )
+        ) { error in
+            guard case KeychainError.saveFailed(let status) = error else {
+                return XCTFail("Expected KeychainError.saveFailed")
+            }
+            XCTAssertEqual(status, errSecInteractionNotAllowed)
+        }
+        XCTAssertEqual(securityAPI.dataProtectionItems[account], original)
+    }
+
     func testKeychainLoadMigratesLegacyItemWhenDataProtectionSaveSucceeds() {
         let account = "tests.migration.success"
         let tokenData = Data("legacy-token".utf8)

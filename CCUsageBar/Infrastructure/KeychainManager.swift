@@ -144,11 +144,8 @@ enum KeychainManager {
         let query = itemQuery(account: account, store: store)
         var addQuery = query
         addQuery[kSecValueData as String] = data
-        if store == .dataProtection {
-            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
-        } else if let access = createOpenLegacyAccess() {
-            addQuery[kSecAttrAccess as String] = access
-        }
+        // Use standard app-scoped keychain access; do not weaken ACLs for secrets.
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
 
         let addStatus = securityAPI.add(addQuery)
         if addStatus == errSecSuccess {
@@ -191,15 +188,6 @@ enum KeychainManager {
             query[kSecUseDataProtectionKeychain as String] = true
         }
         return query
-    }
-
-    private static func createOpenLegacyAccess() -> SecAccess? {
-        var access: SecAccess?
-        let status = SecAccessCreate("CCUsageBar API Key" as CFString, nil, &access)
-        guard status == errSecSuccess else {
-            return nil
-        }
-        return access
     }
 
     private static func isAllowedDeleteStatus(_ status: OSStatus, for store: Store) -> Bool {
