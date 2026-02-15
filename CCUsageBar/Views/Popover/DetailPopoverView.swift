@@ -25,12 +25,16 @@ struct DetailPopoverView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
             } else {
-                ForEach(viewModel.usageData) { data in
-                    ServiceDetailRow(data: data)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(viewModel.usageData) { data in
+                            ServiceDetailRow(data: data)
+                        }
+                    }
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             // Footer
             Divider()
@@ -54,7 +58,7 @@ struct DetailPopoverView: View {
             }
         }
         .padding()
-        .frame(width: 320, height: 350)
+        .frame(width: 320, height: 480)
     }
 
     private func openSettings() {
