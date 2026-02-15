@@ -81,29 +81,20 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         var weeklyResetTime: Date?
 
         if let rateLimits = latestRateLimits {
-            // Use rate_limits percentage, but check if the window has already reset
             if let primary = rateLimits.primary {
-                if let resetsAt = primary.resets_at {
-                    let resetDate = Date(timeIntervalSince1970: TimeInterval(resetsAt))
-                    if resetDate > now {
-                        fiveHourUsed = fiveHourTokenLimit * (primary.used_percent ?? 0) / 100.0
-                        fiveHourResetTime = resetDate
-                    }
-                } else {
-                    fiveHourUsed = fiveHourTokenLimit * (primary.used_percent ?? 0) / 100.0
-                }
+                let (used, reset) = resolveWindow(
+                    window: primary, tokenLimit: fiveHourTokenLimit, now: now
+                )
+                fiveHourUsed = used
+                fiveHourResetTime = reset
             }
 
             if let secondary = rateLimits.secondary {
-                if let resetsAt = secondary.resets_at {
-                    let resetDate = Date(timeIntervalSince1970: TimeInterval(resetsAt))
-                    if resetDate > now {
-                        weeklyUsed = weeklyTokenLimit * (secondary.used_percent ?? 0) / 100.0
-                        weeklyResetTime = resetDate
-                    }
-                } else {
-                    weeklyUsed = weeklyTokenLimit * (secondary.used_percent ?? 0) / 100.0
-                }
+                let (used, reset) = resolveWindow(
+                    window: secondary, tokenLimit: weeklyTokenLimit, now: now
+                )
+                weeklyUsed = used
+                weeklyResetTime = reset
             }
         } else {
             // Fallback: sum tokens from session files
@@ -129,6 +120,39 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             lastUpdated: now,
             isAvailable: true
         )
+    }
+
+    // MARK: - Window Resolution
+
+    /// Resolve a rate window: advance stale resets_at by window_minutes until future.
+    private func resolveWindow(
+        window: CodexRateWindow, tokenLimit: Double, now: Date
+    ) -> (used: Double, resetTime: Date?) {
+        let usedPercent = window.used_percent ?? 0
+        let used = tokenLimit * usedPercent / 100.0
+
+        guard let resetsAt = window.resets_at else {
+            return (used, nil)
+        }
+
+        var resetDate = Date(timeIntervalSince1970: TimeInterval(resetsAt))
+
+        if resetDate > now {
+            return (used, resetDate)
+        }
+
+        // resets_at is stale — advance by window intervals to find next reset
+        if let windowMinutes = window.window_minutes, windowMinutes > 0 {
+            let windowSeconds = TimeInterval(windowMinutes) * 60
+            while resetDate <= now {
+                resetDate = resetDate.addingTimeInterval(windowSeconds)
+            }
+            // Window has rolled over; usage from the old window is stale
+            return (0, resetDate)
+        }
+
+        // No window_minutes to advance with — window has reset
+        return (0, nil)
     }
 
     // MARK: - Rate Limits Extraction
