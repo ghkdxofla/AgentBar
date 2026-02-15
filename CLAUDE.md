@@ -11,7 +11,7 @@ User communicates in Korean. Respond in Korean for conversation, English for cod
 ### Every change MUST follow this sequence:
 1. **Implement** the change
 2. **Build & test**: `xcodebuild test -project CCUsageBar.xcodeproj -scheme CCUsageBar -destination 'platform=macOS'` — all tests must pass
-3. **Visual smoke test**: Run `/build-run` skill to build and relaunch the app. Verify that the popover opens correctly, all existing UI elements (header with gear icon, service rows, footer with "Last updated" and Quit button) are visible and not clipped.
+3. **Visual smoke test**: Run `/build-run` skill (if installed) to build and relaunch the app. If `/build-run` is unavailable, use: `xcodebuild build -project CCUsageBar.xcodeproj -scheme CCUsageBar -configuration Debug -derivedDataPath build -quiet && (pkill -x CCUsageBar || true) && open build/Build/Products/Debug/CCUsageBar.app`. Verify that the popover opens correctly, all existing UI elements (header with gear icon, service rows, footer with "Last updated" and Quit button) are visible and not clipped.
 4. **Update DEVLOG.md**: Add a new `## Iteration N:` entry describing what changed and why. Include "All N tests passing" at the end.
 5. **Commit**: Use conventional commit style (`feat:`, `fix:`, `refactor:`, etc.). Never skip commit or doc update unless explicitly told to.
 
@@ -39,7 +39,9 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 
 ## Build & Run
 
-- **Build + Run**: `/build-run` skill (builds Debug, kills existing process, launches new build)
+- **Build + Run (preferred)**: `/build-run` skill (builds Debug, kills existing process, launches new build)
+- Skill setup: `/build-run` is an external Codex skill from `$CODEX_HOME/skills` (not defined in this repository)
+- **Build + Run (fallback, no skill)**: `xcodebuild build -project CCUsageBar.xcodeproj -scheme CCUsageBar -configuration Debug -derivedDataPath build -quiet && (pkill -x CCUsageBar || true) && open build/Build/Products/Debug/CCUsageBar.app`
 - Build only: `xcodebuild build -project CCUsageBar.xcodeproj -scheme CCUsageBar -configuration Debug -derivedDataPath build -quiet`
 - Test: `xcodebuild test -project CCUsageBar.xcodeproj -scheme CCUsageBar -destination 'platform=macOS'`
 - DMG: `hdiutil create -volname CCUsageBar -srcfolder build/Build/Products/Release/CCUsageBar.app -ov -format UDZO CCUsageBar.dmg`
