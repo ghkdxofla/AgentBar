@@ -2,7 +2,7 @@
 
 ## 1. Product Goal
 
-CCUsageBar currently visualizes usage quotas. This roadmap extends the app into an "agent attention utility" that notifies the user when an agent run requires attention.
+AgentBar currently visualizes usage quotas. This roadmap extends the app into an "agent attention utility" that notifies the user when an agent run requires attention.
 
 Primary outcomes:
 - Reduce idle time after agent completion
@@ -117,7 +117,7 @@ Goal:
 
 Additions:
 - New detector: `ClaudeHookAlertEventDetector`
-- Hook bridge path: `~/.claude/ccusagebar/hook-events.jsonl`
+- Hook bridge path: `~/.claude/agentbar/hook-events.jsonl`
 - Source toggles in Settings:
   - Codex session polling source (`alertCodexEventsEnabled`)
   - Claude hook source (`alertClaudeHookEventsEnabled`)

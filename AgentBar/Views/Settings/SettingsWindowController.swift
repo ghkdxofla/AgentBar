@@ -20,7 +20,7 @@ final class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "CCUsageBar Settings"
+        window.title = "AgentBar Settings"
         window.styleMask = [.titled, .closable]
         window.center()
         window.isReleasedWhenClosed = false

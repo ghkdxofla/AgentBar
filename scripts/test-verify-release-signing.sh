@@ -74,12 +74,12 @@ run_verify_gatekeeper() {
   rm -f "$stdout_file" "$stderr_file"
 }
 
-assert_matches_pre_notarized $'CCUsageBar.app: rejected\nsource=Unnotarized Developer ID' "source=Unnotarized Developer ID"
+assert_matches_pre_notarized $'AgentBar.app: rejected\nsource=Unnotarized Developer ID' "source=Unnotarized Developer ID"
 assert_matches_pre_notarized "Unnotarized Developer ID" "plain unnotarized phrase"
 assert_matches_pre_notarized "Gatekeeper blocked launch because the app is not notarized." "not notarized phrase"
 assert_matches_pre_notarized "notarization required for this software" "notarization required phrase"
 
-assert_does_not_match_pre_notarized $'CCUsageBar.app: rejected\nsource=no usable signature' "missing usable signature"
+assert_does_not_match_pre_notarized $'AgentBar.app: rejected\nsource=no usable signature' "missing usable signature"
 assert_does_not_match_pre_notarized "CSSMERR_TP_NOT_TRUSTED" "certificate trust failure"
 
 DEFAULT_ARCHIVE_PATH="$ARCHIVE_PATH"
@@ -140,16 +140,16 @@ assert_equals "0" "$VERIFY_STATUS" "successful Gatekeeper check should pass"
 assert_contains "$VERIFY_STDOUT" "accepted" "successful Gatekeeper stdout"
 assert_equals "" "$VERIFY_STDERR" "successful Gatekeeper should not print stderr"
 
-run_verify_gatekeeper 0 1 $'CCUsageBar.app: rejected\nsource=Unnotarized Developer ID'
+run_verify_gatekeeper 0 1 $'AgentBar.app: rejected\nsource=Unnotarized Developer ID'
 assert_equals "0" "$VERIFY_STATUS" "pre-notarization rejection should be tolerated by default"
 assert_contains "$VERIFY_STDOUT" "source=Unnotarized Developer ID" "pre-notarization stdout"
 assert_contains "$VERIFY_STDERR" "expected to fail before notarization" "pre-notarization stderr note"
 
-run_verify_gatekeeper 0 1 $'CCUsageBar.app: rejected\nsource=no usable signature'
+run_verify_gatekeeper 0 1 $'AgentBar.app: rejected\nsource=no usable signature'
 assert_equals "1" "$VERIFY_STATUS" "non-notarization Gatekeeper rejection should fail"
 assert_contains "$VERIFY_STDERR" "source=no usable signature" "non-notarization failure stderr"
 
-run_verify_gatekeeper 1 1 $'CCUsageBar.app: rejected\nsource=Unnotarized Developer ID'
+run_verify_gatekeeper 1 1 $'AgentBar.app: rejected\nsource=Unnotarized Developer ID'
 assert_equals "1" "$VERIFY_STATUS" "require-notarized should fail on pre-notarization rejection"
 assert_contains "$VERIFY_STDERR" "source=Unnotarized Developer ID" "require-notarized stderr"
 

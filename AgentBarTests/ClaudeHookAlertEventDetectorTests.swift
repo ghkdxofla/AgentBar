@@ -1,5 +1,5 @@
 import XCTest
-@testable import CCUsageBar
+@testable import AgentBar
 
 final class ClaudeHookAlertEventDetectorTests: XCTestCase {
     private var tempDir: URL!

@@ -1,6 +1,6 @@
 import XCTest
 import SQLite3
-@testable import CCUsageBar
+@testable import AgentBar
 
 final class CursorUsageProviderTests: XCTestCase {
 

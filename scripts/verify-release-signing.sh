@@ -2,11 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_PATH="$ROOT_DIR/CCUsageBar.xcodeproj"
-SCHEME="CCUsageBar"
+PROJECT_PATH="$ROOT_DIR/AgentBar.xcodeproj"
+SCHEME="AgentBar"
 TEAM_ID="${DEVELOPMENT_TEAM:-<TEAM_ID>}"
 SIGNING_IDENTITY="${CODE_SIGN_IDENTITY:-Developer ID Application}"
-ARCHIVE_PATH="$ROOT_DIR/build/CCUsageBar.xcarchive"
+ARCHIVE_PATH="$ROOT_DIR/build/AgentBar.xcarchive"
 REQUIRE_NOTARIZED=0
 
 usage() {
@@ -118,7 +118,7 @@ main() {
   parse_args "$@"
   archive_release_app
 
-  app_path="$ARCHIVE_PATH/Products/Applications/CCUsageBar.app"
+  app_path="$ARCHIVE_PATH/Products/Applications/AgentBar.app"
   if [[ ! -d "$app_path" ]]; then
     echo "Archive succeeded but app bundle was not found at: $app_path" >&2
     exit 1

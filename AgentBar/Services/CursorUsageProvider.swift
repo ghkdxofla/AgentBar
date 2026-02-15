@@ -101,7 +101,7 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         request.httpMethod = "GET"
         request.setValue("WorkosCursorSessionToken=\(cookie)", forHTTPHeaderField: "Cookie")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("CCUsageBar", forHTTPHeaderField: "User-Agent")
+        request.setValue("AgentBar", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await session.data(for: request)
 

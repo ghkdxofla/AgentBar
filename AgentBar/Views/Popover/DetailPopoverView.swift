@@ -7,7 +7,7 @@ struct DetailPopoverView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack {
-                Text("CCUsageBar")
+                Text("AgentBar")
                     .font(.headline)
                 Spacer()
                 Button(action: openSettings) {

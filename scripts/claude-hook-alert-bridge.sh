@@ -1,8 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
-# Override output path with CCUSAGEBAR_CLAUDE_HOOK_LOG when needed.
-output_path="${CCUSAGEBAR_CLAUDE_HOOK_LOG:-$HOME/.claude/ccusagebar/hook-events.jsonl}"
+# Override output path with AGENTBAR_CLAUDE_HOOK_LOG when needed.
+output_path="${AGENTBAR_CLAUDE_HOOK_LOG:-$HOME/.claude/agentbar/hook-events.jsonl}"
 output_dir="${output_path:h}"
 
 mkdir -p "$output_dir"

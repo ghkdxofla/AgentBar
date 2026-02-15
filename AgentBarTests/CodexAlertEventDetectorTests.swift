@@ -1,5 +1,5 @@
 import XCTest
-@testable import CCUsageBar
+@testable import AgentBar
 
 final class CodexAlertEventDetectorTests: XCTestCase {
     private var tempDir: URL!
@@ -133,7 +133,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
 @MainActor
 final class AgentAlertMonitorTests: XCTestCase {
     func testProcessesNewEventWithSameTimestampAcrossPollingCycles() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertMonitor.SameTimestamp.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertMonitor.SameTimestamp.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -185,7 +185,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testDisabledEventStillAdvancesWatermarkAndAvoidsFutureDuplicateNotification() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertMonitor.DisabledSetting.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertMonitor.DisabledSetting.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -227,7 +227,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testLegacyWatermarkWithoutEventIDsDoesNotReplayBoundaryEvents() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertMonitor.LegacyWatermarkMigration.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertMonitor.LegacyWatermarkMigration.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -283,7 +283,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testLegacyCursorIDsDoNotReplayBoundaryEventsAfterUpgrade() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertMonitor.LegacyCursorMigration.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertMonitor.LegacyCursorMigration.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -336,7 +336,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testCooldownSuppressesRepeatedNotificationsForSameDedupeKey() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertMonitor.Cooldown.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertMonitor.Cooldown.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -388,7 +388,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testSkipsDetectorWhenSourceToggleDisabled() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertMonitor.SourceToggle.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertMonitor.SourceToggle.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -531,7 +531,7 @@ private actor TestAgentAlertNotificationService: AgentAlertNotificationServicePr
 
 final class AgentAlertNotificationServiceTests: XCTestCase {
     func testPostUsesRedactedBodyWhenMessagePreviewDisabled() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertNotificationService.Redacted.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertNotificationService.Redacted.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -560,7 +560,7 @@ final class AgentAlertNotificationServiceTests: XCTestCase {
     }
 
     func testPostUsesMessagePreviewWhenEnabled() async throws {
-        let suiteName = "CCUsageBarTests.AgentAlertNotificationService.Preview.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentAlertNotificationService.Preview.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return

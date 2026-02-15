@@ -1,6 +1,6 @@
 import XCTest
 import Security
-@testable import CCUsageBar
+@testable import AgentBar
 
 @MainActor
 final class UsageViewModelTests: XCTestCase {
@@ -89,7 +89,7 @@ final class UsageViewModelTests: XCTestCase {
     }
 
     func testLegacyCursorPlanBusinessMigratesToTeams() {
-        let suiteName = "CCUsageBarTests.CursorPlanMigration"
+        let suiteName = "AgentBarTests.CursorPlanMigration"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create isolated UserDefaults suite")
             return
@@ -106,7 +106,7 @@ final class UsageViewModelTests: XCTestCase {
     }
 
     func testUnknownCursorPlanRawValueFallsBackToProAndPersists() {
-        let suiteName = "CCUsageBarTests.CursorPlanUnknownValueMigration"
+        let suiteName = "AgentBarTests.CursorPlanUnknownValueMigration"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create isolated UserDefaults suite")
             return
@@ -174,7 +174,7 @@ final class UsageViewModelTests: XCTestCase {
     func testSaveAPIKeyResultReturnsFallbackFailureMessageWhenErrorDescriptionIsBlank() {
         let result = SettingsView.saveAPIKeyResult("ghp_valid_token", account: "copilot-account") { _, _ in
             throw NSError(
-                domain: "CCUsageBarTests",
+                domain: "AgentBarTests",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "   \n\t"]
             )

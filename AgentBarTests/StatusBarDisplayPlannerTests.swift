@@ -1,5 +1,5 @@
 import XCTest
-@testable import CCUsageBar
+@testable import AgentBar
 
 final class StatusBarDisplayPlannerTests: XCTestCase {
     func testRanksServicesByHighestUsageScoreDescending() {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import CCUsageBar
+@testable import AgentBar
 
 final class ClaudeUsageProviderTests: XCTestCase {
     private var originalSecurityCLIRunner: (@Sendable (TimeInterval) -> String?)!
@@ -19,7 +19,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
     }
 
     private func makeDefaultsSuite() -> UserDefaults {
-        let suiteName = "CCUsageBarTests.ClaudeUsageProvider.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.ClaudeUsageProvider.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
         return defaults

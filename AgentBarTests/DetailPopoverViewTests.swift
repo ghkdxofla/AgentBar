@@ -1,7 +1,7 @@
 import XCTest
 import AppKit
 import SwiftUI
-@testable import CCUsageBar
+@testable import AgentBar
 
 @MainActor
 final class DetailPopoverViewTests: XCTestCase {
