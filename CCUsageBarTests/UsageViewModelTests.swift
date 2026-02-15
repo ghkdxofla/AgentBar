@@ -110,4 +110,84 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(SettingsView.sanitizedTokenForSaving("  ghp_valid_token  "), "ghp_valid_token")
     }
 
+    func testSaveAPIKeyResultRejectsWhitespaceAndSkipsSave() {
+        var didAttemptSave = false
+
+        let result = SettingsView.saveAPIKeyResult("   ", account: "copilot-account") { _, _ in
+            didAttemptSave = true
+        }
+
+        XCTAssertFalse(didAttemptSave)
+        if case .failure(let message) = result {
+            XCTAssertEqual(message, "Please enter a valid token before saving.")
+        } else {
+            XCTFail("Expected failure for whitespace token")
+        }
+    }
+
+    func testSaveAPIKeyResultSavesTrimmedToken() {
+        var savedKey: String?
+        var savedAccount: String?
+
+        let result = SettingsView.saveAPIKeyResult("  ghp_valid_token  ", account: "copilot-account") { key, account in
+            savedKey = key
+            savedAccount = account
+        }
+
+        if case .failure(let message) = result {
+            XCTFail("Expected success, got failure: \(message)")
+        }
+        XCTAssertEqual(savedKey, "ghp_valid_token")
+        XCTAssertEqual(savedAccount, "copilot-account")
+    }
+
+    func testSaveAPIKeyResultReturnsFailureWhenSaveThrows() {
+        let result = SettingsView.saveAPIKeyResult("ghp_valid_token", account: "copilot-account") { _, _ in
+            throw StubSaveError.keychainUnavailable
+        }
+
+        if case .failure(let message) = result {
+            XCTAssertEqual(message, "Keychain unavailable")
+        } else {
+            XCTFail("Expected failure when keychain save throws")
+        }
+    }
+
+    func testCopilotPATSaveOutcomeMarksSavedAndClearsInputOnSuccess() {
+        let outcome = SettingsView.copilotPATSaveOutcome(
+            currentPAT: "ghp_valid_token",
+            hasSavedCopilotPAT: false
+        ) { _ in
+            true
+        }
+
+        XCTAssertTrue(outcome.didSave)
+        XCTAssertTrue(outcome.hasSavedCopilotPAT)
+        XCTAssertEqual(outcome.copilotPAT, "")
+    }
+
+    func testCopilotPATSaveOutcomePreservesStateOnFailure() {
+        let outcome = SettingsView.copilotPATSaveOutcome(
+            currentPAT: "ghp_valid_token",
+            hasSavedCopilotPAT: false
+        ) { _ in
+            false
+        }
+
+        XCTAssertFalse(outcome.didSave)
+        XCTAssertFalse(outcome.hasSavedCopilotPAT)
+        XCTAssertEqual(outcome.copilotPAT, "ghp_valid_token")
+    }
+
+}
+
+private enum StubSaveError: LocalizedError {
+    case keychainUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .keychainUnavailable:
+            return "Keychain unavailable"
+        }
+    }
 }
