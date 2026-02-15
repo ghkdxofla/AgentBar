@@ -59,8 +59,17 @@ struct AgentAlertEvent: Sendable, Equatable {
     }
 
     var cursorID: String {
+        hashedCursorID(includeSourceRecordID: true)
+    }
+
+    var legacyCursorID: String {
+        hashedCursorID(includeSourceRecordID: false)
+    }
+
+    private func hashedCursorID(includeSourceRecordID: Bool) -> String {
         let timestampToken = String(format: "%.6f", timestamp.timeIntervalSince1970)
-        let raw = "\(service.rawValue)|\(type.rawValue)|\(timestampToken)|\(sessionID ?? "")|\(message ?? "")|\(sourceRecordID ?? "")"
+        let base = "\(service.rawValue)|\(type.rawValue)|\(timestampToken)|\(sessionID ?? "")|\(message ?? "")"
+        let raw = includeSourceRecordID ? "\(base)|\(sourceRecordID ?? "")" : base
         let digest = SHA256.hash(data: Data(raw.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }

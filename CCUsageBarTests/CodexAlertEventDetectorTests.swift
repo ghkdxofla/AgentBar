@@ -282,6 +282,59 @@ final class AgentAlertMonitorTests: XCTestCase {
         XCTAssertEqual(includeBoundaryCalls, [false, true])
     }
 
+    func testLegacyCursorIDsDoNotReplayBoundaryEventsAfterUpgrade() async throws {
+        let suiteName = "CCUsageBarTests.AgentAlertMonitor.LegacyCursorMigration.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: "alertsEnabled")
+
+        guard let watermarkTimestamp = DateUtils.parseISO8601("2026-02-15T14:00:00Z") else {
+            XCTFail("Failed to create watermark timestamp")
+            return
+        }
+
+        let boundaryEvent = AgentAlertEvent(
+            service: .codex,
+            type: .permissionRequired,
+            timestamp: watermarkTimestamp,
+            message: "Codex requested elevated command permissions.",
+            sessionID: "legacy-session",
+            sourceRecordID: "legacy-session#42"
+        )
+        XCTAssertNotEqual(boundaryEvent.cursorID, boundaryEvent.legacyCursorID)
+
+        defaults.set(watermarkTimestamp.timeIntervalSince1970, forKey: watermarkKey(for: .codex))
+        defaults.set([boundaryEvent.legacyCursorID], forKey: watermarkEventIDsKey(for: .codex))
+        defaults.set(1, forKey: watermarkSchemaVersionKey(for: .codex))
+
+        let detector = BoundaryAwareTestAgentAlertDetector(events: [boundaryEvent])
+        let notificationService = TestAgentAlertNotificationService()
+        let monitor = AgentAlertMonitor(
+            detectors: [detector],
+            notificationService: notificationService,
+            defaults: defaults,
+            cooldown: 0
+        )
+
+        await monitor.processTick()
+        await monitor.processTick()
+
+        let postedEvents = await notificationService.postedEvents()
+        XCTAssertTrue(postedEvents.isEmpty)
+
+        let includeBoundaryCalls = await detector.includeBoundaryCalls()
+        XCTAssertEqual(includeBoundaryCalls, [true, true])
+
+        let storedIDs = defaults.stringArray(forKey: watermarkEventIDsKey(for: .codex)) ?? []
+        XCTAssertTrue(storedIDs.contains(boundaryEvent.cursorID))
+        XCTAssertEqual(defaults.integer(forKey: watermarkSchemaVersionKey(for: .codex)), 2)
+    }
+
     func testCooldownSuppressesRepeatedNotificationsForSameDedupeKey() async throws {
         let suiteName = "CCUsageBarTests.AgentAlertMonitor.Cooldown.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
@@ -343,6 +396,10 @@ final class AgentAlertMonitorTests: XCTestCase {
 
     private func watermarkEventIDsKey(for service: ServiceType) -> String {
         "\(watermarkKey(for: service))_eventIDs"
+    }
+
+    private func watermarkSchemaVersionKey(for service: ServiceType) -> String {
+        "\(watermarkKey(for: service))_cursorSchemaVersion"
     }
 }
 
