@@ -13,6 +13,8 @@ struct SettingsView: View {
     @AppStorage("alertTaskCompletedEnabled") private var alertTaskCompletedEnabled = true
     @AppStorage("alertPermissionRequiredEnabled") private var alertPermissionRequiredEnabled = true
     @AppStorage("alertDecisionRequiredEnabled") private var alertDecisionRequiredEnabled = true
+    @AppStorage("alertCodexEventsEnabled") private var alertCodexEventsEnabled = true
+    @AppStorage("alertClaudeHookEventsEnabled") private var alertClaudeHookEventsEnabled = true
     @AppStorage("alertShowMessagePreview") private var alertShowMessagePreview = false
     @AppStorage("alertPollingSeconds") private var alertPollingSeconds: Double = 5
 
@@ -90,6 +92,18 @@ struct SettingsView: View {
                         notifyAlertSettingsChanged()
                     }
 
+                Toggle("Codex session polling source", isOn: $alertCodexEventsEnabled)
+                    .disabled(!alertsEnabled)
+                    .onChange(of: alertCodexEventsEnabled) { _ in
+                        notifyAlertSettingsChanged()
+                    }
+
+                Toggle("Claude hook source", isOn: $alertClaudeHookEventsEnabled)
+                    .disabled(!alertsEnabled)
+                    .onChange(of: alertClaudeHookEventsEnabled) { _ in
+                        notifyAlertSettingsChanged()
+                    }
+
                 Toggle("Show message preview in notifications", isOn: $alertShowMessagePreview)
                     .disabled(!alertsEnabled)
                     .onChange(of: alertShowMessagePreview) { _ in
@@ -111,7 +125,15 @@ struct SettingsView: View {
                 }
                 .disabled(!alertsEnabled)
 
-                Text("Codex session events are monitored locally for task completion, permission requests, and decision prompts.")
+                Text("Codex alerts are derived from local session polling in ~/.codex/sessions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("Claude alerts read hook bridge events from ~/.claude/ccusagebar/hook-events.jsonl.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("Register Claude Notification/Stop/SubagentStop hooks with scripts/claude-hook-alert-bridge.sh.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -309,7 +331,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 800)
+        .frame(width: 450, height: 860)
         .onAppear {
             migrateLegacyCursorPlanIfNeeded()
             loadAPIKeys()
