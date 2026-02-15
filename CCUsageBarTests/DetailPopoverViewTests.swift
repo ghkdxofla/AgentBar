@@ -11,17 +11,27 @@ final class DetailPopoverViewTests: XCTestCase {
         viewModel.usageData = makeUsageRows(count: 36)
 
         let rendered = renderPopover(viewModel: viewModel)
-        let scrollView = findFirstScrollView(in: rendered.hostingView)
+        let scrollView = waitForScrollViewLayout(in: rendered.hostingView)
 
         XCTAssertNotNil(scrollView, "Expected a scroll view when usage data is present.")
         guard let scrollView else { return }
 
         let viewportHeight = scrollView.contentView.bounds.height
         let documentHeight = scrollView.documentView?.bounds.height ?? 0
+        let viewportWidth = scrollView.contentView.bounds.width
+        let documentWidth = scrollView.documentView?.bounds.width ?? 0
+
         XCTAssertGreaterThan(
             documentHeight,
             viewportHeight,
             "Expected overflow rows to exceed the viewport so content is scrollable."
+        )
+        XCTAssertGreaterThan(viewportWidth, 0, "Expected a non-zero scroll viewport width.")
+        XCTAssertEqual(
+            documentWidth,
+            viewportWidth,
+            accuracy: 2.0,
+            "Expected usage rows to expand to the full scroll viewport width."
         )
 
         withExtendedLifetime(rendered.window) {}
@@ -32,7 +42,7 @@ final class DetailPopoverViewTests: XCTestCase {
         viewModel.usageData = makeUsageRows(count: 36)
 
         let rendered = renderPopover(viewModel: viewModel)
-        let scrollView = findFirstScrollView(in: rendered.hostingView)
+        let scrollView = waitForScrollViewLayout(in: rendered.hostingView)
 
         XCTAssertNotNil(scrollView, "Expected a scroll view when usage data is present.")
         guard let scrollView else { return }
@@ -70,9 +80,42 @@ final class DetailPopoverViewTests: XCTestCase {
         window.contentView = hostingView
         window.layoutIfNeeded()
         hostingView.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
 
         return (window, hostingView)
+    }
+
+    private func waitForScrollViewLayout(
+        in hostingView: NSView,
+        timeout: TimeInterval = 1.0
+    ) -> NSScrollView? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var previousSizes: (viewport: CGSize, document: CGSize)?
+
+        while Date() < deadline {
+            hostingView.layoutSubtreeIfNeeded()
+
+            if let scrollView = findFirstScrollView(in: hostingView),
+               let documentView = scrollView.documentView {
+                let viewportSize = scrollView.contentView.bounds.size
+                let documentSize = documentView.bounds.size
+
+                if viewportSize.width > 0, viewportSize.height > 0,
+                   documentSize.width > 0, documentSize.height > 0 {
+                    if let previousSizes,
+                       abs(previousSizes.viewport.width - viewportSize.width) < 0.5,
+                       abs(previousSizes.viewport.height - viewportSize.height) < 0.5,
+                       abs(previousSizes.document.width - documentSize.width) < 0.5,
+                       abs(previousSizes.document.height - documentSize.height) < 0.5 {
+                        return scrollView
+                    }
+                    previousSizes = (viewportSize, documentSize)
+                }
+            }
+
+            _ = RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+
+        return findFirstScrollView(in: hostingView)
     }
 
     private func findFirstScrollView(in view: NSView) -> NSScrollView? {
