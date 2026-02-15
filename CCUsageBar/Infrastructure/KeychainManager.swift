@@ -95,8 +95,14 @@ enum KeychainManager {
 
     static func load(account: String, securityAPI: any SecurityAPI) -> String? {
         let dataProtectionValue = copyValue(account: account, store: .dataProtection, securityAPI: securityAPI)
-        if dataProtectionValue.status == errSecSuccess, let data = dataProtectionValue.data {
+        if dataProtectionValue.status == errSecSuccess {
+            guard let data = dataProtectionValue.data else {
+                return nil
+            }
             return String(data: data, encoding: .utf8)
+        }
+        guard shouldFallbackToLegacyLoad(for: dataProtectionValue.status) else {
+            return nil
         }
 
         let legacyValue = copyValue(account: account, store: .legacy, securityAPI: securityAPI)
@@ -198,5 +204,9 @@ enum KeychainManager {
             return true
         }
         return false
+    }
+
+    private static func shouldFallbackToLegacyLoad(for dataProtectionStatus: OSStatus) -> Bool {
+        dataProtectionStatus == errSecItemNotFound || dataProtectionStatus == errSecMissingEntitlement
     }
 }
