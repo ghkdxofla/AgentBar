@@ -28,6 +28,7 @@ struct SettingsView: View {
     @AppStorage("zaiEnabled") private var zaiEnabled = true
 
     @State private var copilotPAT: String = ""
+    @State private var hasSavedCopilotPAT = false
     @State private var zaiAPIKey: String = ""
     @State private var showSavedAlert = false
 
@@ -146,13 +147,19 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 DisclosureGroup("Manual PAT (optional fallback)") {
+                    if hasSavedCopilotPAT {
+                        Text("A manual PAT is already saved in Keychain")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     HStack {
                         SecureField("ghp_...", text: $copilotPAT)
                             .frame(width: 200)
                         Button("Save") {
-                            saveAPIKey(copilotPAT, account: ServiceType.copilot.keychainAccount)
+                            saveCopilotPAT()
                             NotificationCenter.default.post(name: .limitsChanged, object: nil)
                         }
+                        .disabled(copilotPAT.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     Text("Only needed if gh CLI is not installed")
                         .font(.caption)
@@ -235,10 +242,17 @@ struct SettingsView: View {
         showSavedAlert = true
     }
 
+    private func saveCopilotPAT() {
+        let trimmedPAT = copilotPAT.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPAT.isEmpty else { return }
+
+        saveAPIKey(trimmedPAT, account: ServiceType.copilot.keychainAccount)
+        hasSavedCopilotPAT = true
+        copilotPAT = ""
+    }
+
     private func loadAPIKeys() {
-        if let key = KeychainManager.load(account: ServiceType.copilot.keychainAccount) {
-            copilotPAT = String(repeating: "*", count: min(key.count, 12))
-        }
+        hasSavedCopilotPAT = KeychainManager.load(account: ServiceType.copilot.keychainAccount) != nil
         if let key = KeychainManager.load(account: ServiceType.zai.keychainAccount) {
             zaiAPIKey = String(repeating: "*", count: min(key.count, 12))
         }
