@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 protocol UsageProviderProtocol: Sendable {
     var serviceType: ServiceType { get }
@@ -11,8 +12,33 @@ struct CLIProcessRuntime {
     let waitForTermination: (TimeInterval) -> DispatchTimeoutResult
     let isRunning: () -> Bool
     let terminate: () -> Void
+    let forceTerminate: () -> Void
     let terminationStatus: () -> Int32
     let readOutput: () -> Data
+    let cleanupAfterRunFailure: () -> Void
+    let cleanupAfterTimeout: () -> Void
+
+    init(
+        run: @escaping () throws -> Void,
+        waitForTermination: @escaping (TimeInterval) -> DispatchTimeoutResult,
+        isRunning: @escaping () -> Bool,
+        terminate: @escaping () -> Void,
+        forceTerminate: @escaping () -> Void = {},
+        terminationStatus: @escaping () -> Int32,
+        readOutput: @escaping () -> Data,
+        cleanupAfterRunFailure: @escaping () -> Void = {},
+        cleanupAfterTimeout: @escaping () -> Void = {}
+    ) {
+        self.run = run
+        self.waitForTermination = waitForTermination
+        self.isRunning = isRunning
+        self.terminate = terminate
+        self.forceTerminate = forceTerminate
+        self.terminationStatus = terminationStatus
+        self.readOutput = readOutput
+        self.cleanupAfterRunFailure = cleanupAfterRunFailure
+        self.cleanupAfterTimeout = cleanupAfterTimeout
+    }
 }
 
 enum CLIProcessExecutor {
@@ -54,24 +80,41 @@ enum CLIProcessExecutor {
             terminationSignal.signal()
         }
 
-        // Drain stdout while the process is running to avoid pipe backpressure deadlocks.
-        DispatchQueue.global(qos: .utility).async {
-            let data = outputHandle.readDataToEndOfFile()
-            outputData.set(data)
-            outputReadSignal.signal()
-        }
-
         let runtime = CLIProcessRuntime(
-            run: { try process.run() },
+            run: {
+                try process.run()
+                // Close the parent write-end so EOF is observed when the child exits.
+                pipe.fileHandleForWriting.closeFile()
+
+                // Drain stdout while the process is running to avoid pipe backpressure deadlocks.
+                DispatchQueue.global(qos: .utility).async {
+                    let data = outputHandle.readDataToEndOfFile()
+                    outputData.set(data)
+                    outputReadSignal.signal()
+                }
+            },
             waitForTermination: { waitTimeout in
                 terminationSignal.wait(timeout: .now() + waitTimeout)
             },
             isRunning: { process.isRunning },
             terminate: { process.terminate() },
+            forceTerminate: {
+                if process.processIdentifier > 0 {
+                    _ = kill(process.processIdentifier, SIGKILL)
+                }
+            },
             terminationStatus: { process.terminationStatus },
             readOutput: {
                 _ = outputReadSignal.wait(timeout: .distantFuture)
                 return outputData.get()
+            },
+            cleanupAfterRunFailure: {
+                pipe.fileHandleForWriting.closeFile()
+                outputHandle.closeFile()
+            },
+            cleanupAfterTimeout: {
+                outputHandle.closeFile()
+                _ = outputReadSignal.wait(timeout: .now() + terminateGracePeriod)
             }
         )
 
@@ -82,6 +125,7 @@ enum CLIProcessExecutor {
         do {
             try runtime.run()
         } catch {
+            runtime.cleanupAfterRunFailure()
             return nil
         }
 
@@ -90,7 +134,12 @@ enum CLIProcessExecutor {
             if runtime.isRunning() {
                 runtime.terminate()
                 _ = runtime.waitForTermination(terminateGracePeriod)
+                if runtime.isRunning() {
+                    runtime.forceTerminate()
+                    _ = runtime.waitForTermination(terminateGracePeriod)
+                }
             }
+            runtime.cleanupAfterTimeout()
             return nil
         }
 

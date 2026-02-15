@@ -1,4 +1,5 @@
 import XCTest
+import Darwin
 @testable import CCUsageBar
 
 final class CopilotUsageProviderTests: XCTestCase {
@@ -221,8 +222,9 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertEqual(counter.value, 1)
     }
 
-    func testExecuteGHCLICommandTimeoutTerminatesRunningProcess() {
+    func testExecuteGHCLICommandTimeoutForceKillsIfStillRunning() {
         var terminateCallCount = 0
+        var forceTerminateCallCount = 0
         var waitTimeouts: [TimeInterval] = []
         let runtime = CopilotUsageProvider.GHCLIProcessRuntime(
             run: {},
@@ -232,6 +234,7 @@ final class CopilotUsageProviderTests: XCTestCase {
             },
             isRunning: { true },
             terminate: { terminateCallCount += 1 },
+            forceTerminate: { forceTerminateCallCount += 1 },
             terminationStatus: { 0 },
             readOutput: { Data() }
         )
@@ -240,9 +243,11 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         XCTAssertNil(result)
         XCTAssertEqual(terminateCallCount, 1)
-        XCTAssertEqual(waitTimeouts.count, 2)
+        XCTAssertEqual(forceTerminateCallCount, 1)
+        XCTAssertEqual(waitTimeouts.count, 3)
         XCTAssertEqual(waitTimeouts[0], 0.05, accuracy: 0.0001)
         XCTAssertEqual(waitTimeouts[1], 0.25, accuracy: 0.0001)
+        XCTAssertEqual(waitTimeouts[2], 0.25, accuracy: 0.0001)
     }
 
     func testExecuteGHCLICommandReturnsNilForNonZeroExitStatus() {
@@ -284,6 +289,64 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.count, 200_000)
+    }
+
+    func testCLIProcessExecutorReturnsNilQuicklyWhenExecutableIsMissing() {
+        let executablePath = "/tmp/ccusagebar-missing-\(UUID().uuidString)"
+        let start = Date()
+
+        let result = CLIProcessExecutor.executeCommand(
+            executableURL: URL(fileURLWithPath: executablePath),
+            arguments: [],
+            timeout: 1
+        )
+
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertNil(result)
+        XCTAssertLessThan(elapsed, 0.5)
+    }
+
+    func testCLIProcessExecutorTimeoutForceKillsTermResistantProcess() throws {
+        let pidFilePath = "/tmp/ccusagebar-timeout-\(UUID().uuidString).pid"
+        defer { try? FileManager.default.removeItem(atPath: pidFilePath) }
+
+        let result = CLIProcessExecutor.executeCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "echo $$ > \(pidFilePath); trap '' TERM; while :; do sleep 0.05; done"],
+            timeout: 0.1
+        )
+
+        XCTAssertNil(result)
+
+        let fileDeadline = Date().addingTimeInterval(1)
+        while !FileManager.default.fileExists(atPath: pidFilePath) && Date() < fileDeadline {
+            usleep(10_000)
+        }
+
+        guard let pidString = try? String(contentsOfFile: pidFilePath, encoding: .utf8),
+              let pid = Int32(pidString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            XCTFail("Expected PID file to be written")
+            return
+        }
+
+        defer {
+            if kill(pid, 0) == 0 {
+                _ = kill(pid, SIGKILL)
+            }
+        }
+
+        let killDeadline = Date().addingTimeInterval(1)
+        var processStillRunning = true
+        while Date() < killDeadline {
+            let probe = kill(pid, 0)
+            if probe == -1 && errno == ESRCH {
+                processStillRunning = false
+                break
+            }
+            usleep(10_000)
+        }
+
+        XCTAssertFalse(processStillRunning, "Expected TERM-resistant process to be force-killed")
     }
 
     func testSendsCorrectHeaders() async throws {

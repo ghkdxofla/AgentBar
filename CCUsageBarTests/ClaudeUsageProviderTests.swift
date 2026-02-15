@@ -192,8 +192,9 @@ final class ClaudeUsageProviderTests: XCTestCase {
         XCTAssertEqual(counter.value, 1)
     }
 
-    func testExecuteSecurityCLICommandTimeoutTerminatesRunningProcess() {
+    func testExecuteSecurityCLICommandTimeoutForceKillsIfStillRunning() {
         var terminateCallCount = 0
+        var forceTerminateCallCount = 0
         var waitTimeouts: [TimeInterval] = []
         let runtime = ClaudeUsageProvider.SecurityCLIProcessRuntime(
             run: {},
@@ -203,6 +204,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
             },
             isRunning: { true },
             terminate: { terminateCallCount += 1 },
+            forceTerminate: { forceTerminateCallCount += 1 },
             terminationStatus: { 0 },
             readOutput: { Data() }
         )
@@ -211,9 +213,11 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         XCTAssertNil(result)
         XCTAssertEqual(terminateCallCount, 1)
-        XCTAssertEqual(waitTimeouts.count, 2)
+        XCTAssertEqual(forceTerminateCallCount, 1)
+        XCTAssertEqual(waitTimeouts.count, 3)
         XCTAssertEqual(waitTimeouts[0], 0.05, accuracy: 0.0001)
         XCTAssertEqual(waitTimeouts[1], 0.25, accuracy: 0.0001)
+        XCTAssertEqual(waitTimeouts[2], 0.25, accuracy: 0.0001)
     }
 
     func testExecuteSecurityCLICommandReturnsNilForNonZeroExitStatus() {
