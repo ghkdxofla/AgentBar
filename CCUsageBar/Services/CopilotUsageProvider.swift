@@ -45,15 +45,7 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
     nonisolated(unsafe) private static var cachedGHCLIToken: String?
     nonisolated(unsafe) private static var ghTokenLastLookupAt: Date?
-
-    struct GHCLIProcessRuntime {
-        let run: () throws -> Void
-        let waitForTermination: (TimeInterval) -> DispatchTimeoutResult
-        let isRunning: () -> Bool
-        let terminate: () -> Void
-        let terminationStatus: () -> Int32
-        let readOutput: () -> Data
-    }
+    typealias GHCLIProcessRuntime = CLIProcessRuntime
 
     init(
         session: URLSession = .shared,
@@ -188,53 +180,16 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
 
     private static func runGHCLICommand(timeout: TimeInterval) -> String? {
-        let process = Process()
-        let pipe = Pipe()
-        let terminationSignal = DispatchSemaphore(value: 0)
         let commandConfiguration = ghCLICommandConfiguration
-
-        process.executableURL = commandConfiguration.executableURL
-        process.arguments = commandConfiguration.arguments
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        process.terminationHandler = { _ in
-            terminationSignal.signal()
-        }
-
-        let runtime = GHCLIProcessRuntime(
-            run: { try process.run() },
-            waitForTermination: { waitTimeout in
-                terminationSignal.wait(timeout: .now() + waitTimeout)
-            },
-            isRunning: { process.isRunning },
-            terminate: { process.terminate() },
-            terminationStatus: { process.terminationStatus },
-            readOutput: { pipe.fileHandleForReading.readDataToEndOfFile() }
+        return CLIProcessExecutor.executeCommand(
+            executableURL: commandConfiguration.executableURL,
+            arguments: commandConfiguration.arguments,
+            timeout: timeout
         )
-        return executeGHCLICommand(timeout: timeout, runtime: runtime)
     }
 
     static func executeGHCLICommand(timeout: TimeInterval, runtime: GHCLIProcessRuntime) -> String? {
-        do {
-            try runtime.run()
-        } catch {
-            return nil
-        }
-
-        let waitResult = runtime.waitForTermination(timeout)
-        if waitResult == .timedOut {
-            if runtime.isRunning() {
-                runtime.terminate()
-                _ = runtime.waitForTermination(0.25)
-            }
-            return nil
-        }
-
-        guard runtime.terminationStatus() == 0 else { return nil }
-
-        let token = String(data: runtime.readOutput(), encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return token?.isEmpty == true ? nil : token
+        CLIProcessExecutor.executeCommand(timeout: timeout, runtime: runtime)
     }
 
     // MARK: - Helpers

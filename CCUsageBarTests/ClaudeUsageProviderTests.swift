@@ -192,6 +192,60 @@ final class ClaudeUsageProviderTests: XCTestCase {
         XCTAssertEqual(counter.value, 1)
     }
 
+    func testExecuteSecurityCLICommandTimeoutTerminatesRunningProcess() {
+        var terminateCallCount = 0
+        var waitTimeouts: [TimeInterval] = []
+        let runtime = ClaudeUsageProvider.SecurityCLIProcessRuntime(
+            run: {},
+            waitForTermination: { timeout in
+                waitTimeouts.append(timeout)
+                return .timedOut
+            },
+            isRunning: { true },
+            terminate: { terminateCallCount += 1 },
+            terminationStatus: { 0 },
+            readOutput: { Data() }
+        )
+
+        let result = ClaudeUsageProvider.executeSecurityCLICommand(timeout: 0.05, runtime: runtime)
+
+        XCTAssertNil(result)
+        XCTAssertEqual(terminateCallCount, 1)
+        XCTAssertEqual(waitTimeouts.count, 2)
+        XCTAssertEqual(waitTimeouts[0], 0.05, accuracy: 0.0001)
+        XCTAssertEqual(waitTimeouts[1], 0.25, accuracy: 0.0001)
+    }
+
+    func testExecuteSecurityCLICommandReturnsNilForNonZeroExitStatus() {
+        let runtime = ClaudeUsageProvider.SecurityCLIProcessRuntime(
+            run: {},
+            waitForTermination: { _ in .success },
+            isRunning: { false },
+            terminate: {},
+            terminationStatus: { 1 },
+            readOutput: { Data("token".utf8) }
+        )
+
+        let result = ClaudeUsageProvider.executeSecurityCLICommand(timeout: 0.05, runtime: runtime)
+
+        XCTAssertNil(result)
+    }
+
+    func testExecuteSecurityCLICommandReturnsNilForEmptyOutput() {
+        let runtime = ClaudeUsageProvider.SecurityCLIProcessRuntime(
+            run: {},
+            waitForTermination: { _ in .success },
+            isRunning: { false },
+            terminate: {},
+            terminationStatus: { 0 },
+            readOutput: { Data("   \n\t".utf8) }
+        )
+
+        let result = ClaudeUsageProvider.executeSecurityCLICommand(timeout: 0.05, runtime: runtime)
+
+        XCTAssertNil(result)
+    }
+
     func testParseAccessTokenFromValidJSON() {
         let json = """
         {"claudeAiOauth":{"accessToken":"sk-ant-oauth-test-123"}}
