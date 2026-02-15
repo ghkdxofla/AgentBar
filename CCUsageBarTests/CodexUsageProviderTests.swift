@@ -164,6 +164,71 @@ final class CodexUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.weeklyUsage!.used, 5050)
     }
 
+    // MARK: - Multiple limit_id Merging
+
+    func testMergesMultipleLimitIDs() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/15")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let futureReset1 = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let futureReset2 = Int(Date().addingTimeInterval(7200).timeIntervalSince1970)
+        let weeklyReset = Int(Date().addingTimeInterval(7 * 24 * 3600).timeIntervalSince1970)
+
+        // Two different limit_ids interleaved in the same session
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex","primary":{"used_percent":12.0,"window_minutes":300,"resets_at":\(futureReset1)},"secondary":{"used_percent":6.0,"window_minutes":10080,"resets_at":\(weeklyReset)}}}}
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex_bengalfox","primary":{"used_percent":3.0,"window_minutes":300,"resets_at":\(futureReset2)},"secondary":{"used_percent":1.0,"window_minutes":10080,"resets_at":\(weeklyReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Should sum: 12% + 3% = 15% of 10M = 1,500,000
+        XCTAssertEqual(usage.fiveHourUsage.used, 1_500_000, accuracy: 1)
+        // Should sum: 6% + 1% = 7% of 100M = 7,000,000
+        XCTAssertEqual(usage.weeklyUsage!.used, 7_000_000, accuracy: 1)
+        // Reset time should be the earliest (most conservative)
+        XCTAssertNotNil(usage.fiveHourUsage.resetTime)
+        XCTAssertEqual(
+            usage.fiveHourUsage.resetTime!.timeIntervalSince1970,
+            Double(futureReset1),
+            accuracy: 1
+        )
+    }
+
+    func testSingleLimitIDNotAffectedByMerge() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/15")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let futureReset = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let weeklyReset = Int(Date().addingTimeInterval(7 * 24 * 3600).timeIntervalSince1970)
+
+        let content = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"limit_id":"codex","primary":{"used_percent":10.0,"window_minutes":300,"resets_at":\(futureReset)},"secondary":{"used_percent":4.0,"window_minutes":10080,"resets_at":\(weeklyReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try content.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Single limit_id: 10% of 10M = 1,000,000
+        XCTAssertEqual(usage.fiveHourUsage.used, 1_000_000, accuracy: 1)
+        XCTAssertEqual(usage.weeklyUsage!.used, 4_000_000, accuracy: 1)
+    }
+
     // MARK: - Edge Cases
 
     func testHandlesMissingDirectory() async {
