@@ -387,6 +387,47 @@ final class AgentAlertMonitorTests: XCTestCase {
         XCTAssertEqual(watermark, secondTime.timeIntervalSince1970, accuracy: 0.000_001)
     }
 
+    func testSkipsDetectorWhenSourceToggleDisabled() async throws {
+        let suiteName = "CCUsageBarTests.AgentAlertMonitor.SourceToggle.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: "alertsEnabled")
+        defaults.set(false, forKey: "alertClaudeHookEventsEnabled")
+
+        let event = AgentAlertEvent(
+            service: .claude,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 1_739_616_000),
+            message: "Task completed.",
+            sessionID: "session-4"
+        )
+
+        let detector = ToggleAwareTestAgentAlertDetector(
+            serviceType: .claude,
+            settingsEnabledKey: "alertClaudeHookEventsEnabled",
+            batches: [[event]]
+        )
+        let notificationService = TestAgentAlertNotificationService()
+        let monitor = AgentAlertMonitor(
+            detectors: [detector],
+            notificationService: notificationService,
+            defaults: defaults,
+            cooldown: 0
+        )
+
+        await monitor.processTick()
+
+        let postedEvents = await notificationService.postedEvents()
+        let detectCount = await detector.detectCallCount()
+        XCTAssertTrue(postedEvents.isEmpty)
+        XCTAssertEqual(detectCount, 0)
+    }
+
     private func watermarkKey(for service: ServiceType) -> String {
         let normalized = service.rawValue
             .lowercased()
@@ -443,6 +484,34 @@ private actor BoundaryAwareTestAgentAlertDetector: AgentAlertEventDetectorProtoc
 
     func includeBoundaryCalls() -> [Bool] {
         includeBoundaryHistory
+    }
+}
+
+private actor ToggleAwareTestAgentAlertDetector: AgentAlertEventDetectorProtocol {
+    nonisolated let serviceType: ServiceType
+    nonisolated let settingsEnabledKey: String?
+
+    private var batches: [[AgentAlertEvent]]
+    private var calls: Int = 0
+
+    init(
+        serviceType: ServiceType,
+        settingsEnabledKey: String?,
+        batches: [[AgentAlertEvent]]
+    ) {
+        self.serviceType = serviceType
+        self.settingsEnabledKey = settingsEnabledKey
+        self.batches = batches
+    }
+
+    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentAlertEvent] {
+        calls += 1
+        guard !batches.isEmpty else { return [] }
+        return batches.removeFirst()
+    }
+
+    func detectCallCount() -> Int {
+        calls
     }
 }
 

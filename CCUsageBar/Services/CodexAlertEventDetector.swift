@@ -14,6 +14,7 @@ private struct CodexAlertPayload: Decodable, Sendable {
 
 final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .codex
+    let settingsEnabledKey: String? = "alertCodexEventsEnabled"
 
     private let sessionsDir: URL
     private let fileManager: FileManager

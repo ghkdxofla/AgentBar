@@ -24,7 +24,7 @@ final class AgentAlertMonitor {
         defaults: UserDefaults = .standard,
         cooldown: TimeInterval = 90
     ) {
-        self.detectors = detectors ?? [CodexAlertEventDetector()]
+        self.detectors = detectors ?? [CodexAlertEventDetector(), ClaudeHookAlertEventDetector()]
         self.notificationService = notificationService
         self.defaults = defaults
         self.cooldown = cooldown
@@ -116,6 +116,8 @@ final class AgentAlertMonitor {
         ensureInitialWatermarks()
 
         for detector in detectors {
+            guard isDetectorEnabled(detector) else { continue }
+
             let serviceType = detector.serviceType
             let watermark = watermarkCursor(for: serviceType)
             // Legacy installs may have a timestamp but no ID set; stay boundary-exclusive until the cursor advances.
@@ -159,6 +161,11 @@ final class AgentAlertMonitor {
 
     private func isEventEnabled(_ type: AgentAlertEventType) -> Bool {
         defaults.bool(forKey: type.settingsKey, defaultValue: true)
+    }
+
+    private func isDetectorEnabled(_ detector: any AgentAlertEventDetectorProtocol) -> Bool {
+        guard let key = detector.settingsEnabledKey else { return true }
+        return defaults.bool(forKey: key, defaultValue: true)
     }
 
     private func watermarkKey(for service: ServiceType) -> String {

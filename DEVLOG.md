@@ -260,3 +260,12 @@
 - **App integration and settings UI**: Wired monitor lifecycle into `AppDelegate` and added a new "Agent Alerts (Beta)" section in `SettingsView`, including notification permission request action.
 - **Tests**: Added `CodexAlertEventDetectorTests` for task completion, escalation detection, decision prompt detection, and watermark filtering.
 - All 111 tests passing
+
+## Iteration 34: Phase 1.5 Claude hook ingestion + source toggles
+- **Roadmap extended to Phase 1.5**: Updated `docs/AGENT_ALERTING_ROADMAP.md` with a new addendum for Claude Code hook ingestion (`Notification`/`Stop`/`SubagentStop`) and clarified the hybrid model (event-driven source + polling fallback).
+- **Claude hook detector**: Added `ClaudeHookAlertEventDetector` to parse bridge JSONL records from `~/.claude/ccusagebar/hook-events.jsonl`, decode base64 payloads, and map them into normalized alert events (`taskCompleted`, `permissionRequired`, `decisionRequired`).
+- **Monitor source toggles**: Extended `AgentAlertEventDetectorProtocol` with optional `settingsEnabledKey` and updated `AgentAlertMonitor` to skip disabled detectors. Default detectors now include both Codex session polling and Claude hook ingestion.
+- **Settings UX updates**: Added alert source toggles (`alertCodexEventsEnabled`, `alertClaudeHookEventsEnabled`) and setup guidance in the "Agent Alerts (Beta)" section. Increased settings window height to preserve layout with new controls.
+- **Claude hook bridge script**: Added `scripts/claude-hook-alert-bridge.sh` to capture raw Claude hook stdin payloads with a stable UTC capture timestamp and append them safely to the bridge JSONL file.
+- **Tests**: Added `ClaudeHookAlertEventDetectorTests` (Stop/Notification mapping and boundary behavior) and added monitor coverage for disabled source toggles in `CodexAlertEventDetectorTests`.
+- All 127 tests passing
