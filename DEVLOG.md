@@ -240,3 +240,8 @@
 - **Model change**: Added `limit_id` field to `CodexRateLimits` struct for grouping
 - **Test coverage**: Added 2 tests — multi-limit_id merge with sum verification and reset time selection, single-limit_id passthrough
 - All 93 tests passing
+
+## Iteration 31: Code signing with Developer ID Application certificate
+- **project.yml**: Added `DEVELOPMENT_TEAM: <TEAM_ID>`, `CODE_SIGN_STYLE: Manual`, `CODE_SIGN_IDENTITY: "Developer ID Application"` to CCUsageBar target. Test target uses `"Apple Development"` identity with the same team ID to match Team IDs between host app and test bundle
+- **Benefits**: Stable code signing identity across builds eliminates ad-hoc signing issues (Keychain ACL prompts, "Always Allow" not persisting). App is now properly signed for DMG distribution and notarization
+- All 99 tests passing
