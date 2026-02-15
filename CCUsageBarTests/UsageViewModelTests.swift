@@ -282,6 +282,21 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertNil(securityAPI.legacyItems[account])
     }
 
+    func testKeychainSaveUpdatesExistingDataProtectionItemOnDuplicateAdd() throws {
+        let account = "tests.save.upsert_update"
+        let securityAPI = MockKeychainSecurityAPI(
+            dataProtectionItems: [account: Data("original-token".utf8)]
+        )
+
+        try KeychainManager.save(
+            key: "updated-token",
+            account: account,
+            securityAPI: securityAPI
+        )
+
+        XCTAssertEqual(securityAPI.dataProtectionItems[account], Data("updated-token".utf8))
+    }
+
     func testKeychainSaveFallsBackToLegacyWhenDataProtectionMissingEntitlement() throws {
         let account = "tests.save.fallback"
         let securityAPI = MockKeychainSecurityAPI()
@@ -295,6 +310,28 @@ final class UsageViewModelTests: XCTestCase {
 
         XCTAssertNil(securityAPI.dataProtectionItems[account])
         XCTAssertEqual(securityAPI.legacyItems[account], Data("fallback-token".utf8))
+    }
+
+    func testKeychainSaveFailureDoesNotMutateLegacyWhenDataProtectionWriteFails() {
+        let account = "tests.save.legacy_non_destructive"
+        let legacyValue = Data("legacy-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: legacyValue])
+        securityAPI.addStatusByStore[.dataProtection] = errSecInteractionNotAllowed
+
+        XCTAssertThrowsError(
+            try KeychainManager.save(
+                key: "replacement-token",
+                account: account,
+                securityAPI: securityAPI
+            )
+        ) { error in
+            guard case KeychainError.saveFailed(let status) = error else {
+                return XCTFail("Expected KeychainError.saveFailed")
+            }
+            XCTAssertEqual(status, errSecInteractionNotAllowed)
+        }
+        XCTAssertEqual(securityAPI.legacyItems[account], legacyValue)
+        XCTAssertNil(securityAPI.dataProtectionItems[account])
     }
 
     func testKeychainSavePreservesExistingDataProtectionItemWhenUpdateFails() {
@@ -318,6 +355,19 @@ final class UsageViewModelTests: XCTestCase {
             XCTAssertEqual(status, errSecInteractionNotAllowed)
         }
         XCTAssertEqual(securityAPI.dataProtectionItems[account], original)
+    }
+
+    func testKeychainLoadDoesNotFallbackToLegacyOnUnexpectedDataProtectionFailure() {
+        let account = "tests.load.no_fallback_unexpected_status"
+        let tokenData = Data("legacy-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
+        securityAPI.copyStatusByStore[.dataProtection] = errSecInteractionNotAllowed
+
+        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
+
+        XCTAssertNil(loaded)
+        XCTAssertEqual(securityAPI.legacyItems[account], tokenData)
+        XCTAssertNil(securityAPI.dataProtectionItems[account])
     }
 
     func testKeychainLoadMigratesLegacyItemWhenDataProtectionSaveSucceeds() {
