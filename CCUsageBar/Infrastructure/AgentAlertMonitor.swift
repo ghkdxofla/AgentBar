@@ -1,6 +1,11 @@
 import Foundation
 import Combine
 
+private enum CursorSchema {
+    static let legacyVersion = 1
+    static let currentVersion = 2
+}
+
 @MainActor
 final class AgentAlertMonitor {
     private let detectors: [any AgentAlertEventDetectorProtocol]
@@ -57,11 +62,19 @@ final class AgentAlertMonitor {
         for detector in detectors {
             let key = watermarkKey(for: detector.serviceType)
             let eventIDsKey = watermarkEventIDsKey(for: detector.serviceType)
+            let schemaVersionKey = watermarkSchemaVersionKey(for: detector.serviceType)
 
             if defaults.object(forKey: key) == nil {
                 // New installs start with both timestamp and boundary IDs initialized.
                 defaults.set(now, forKey: key)
                 defaults.set([String](), forKey: eventIDsKey)
+                defaults.set(CursorSchema.currentVersion, forKey: schemaVersionKey)
+                continue
+            }
+
+            if defaults.object(forKey: schemaVersionKey) == nil {
+                // Existing installs without version metadata are treated as legacy.
+                defaults.set(CursorSchema.legacyVersion, forKey: schemaVersionKey)
             }
         }
     }
@@ -113,18 +126,24 @@ final class AgentAlertMonitor {
 
             guard !events.isEmpty else { continue }
             let unseenEvents = events.filter { !isAlreadyProcessed($0, at: watermark) }
-            guard !unseenEvents.isEmpty else { continue }
 
-            for event in unseenEvents {
-                guard isEventEnabled(event.type) else { continue }
-                guard shouldNotify(event) else { continue }
+            if !unseenEvents.isEmpty {
+                for event in unseenEvents {
+                    guard isEventEnabled(event.type) else { continue }
+                    guard shouldNotify(event) else { continue }
 
-                await notificationService.post(event: event)
-                lastNotificationByKey[event.dedupeKey] = Date()
+                    await notificationService.post(event: event)
+                    lastNotificationByKey[event.dedupeKey] = Date()
+                }
             }
 
-            let updatedWatermark = updatedWatermarkCursor(from: watermark, with: unseenEvents)
-            if includeBoundary || !areSameTimestamp(updatedWatermark.date, watermark.date) {
+            let eventsForCursorUpdate = watermark.schemaVersion < CursorSchema.currentVersion ? events : unseenEvents
+            guard !eventsForCursorUpdate.isEmpty else { continue }
+
+            let updatedWatermark = updatedWatermarkCursor(from: watermark, with: eventsForCursorUpdate)
+            if includeBoundary ||
+                !areSameTimestamp(updatedWatermark.date, watermark.date) ||
+                watermark.schemaVersion < CursorSchema.currentVersion {
                 saveWatermarkCursor(updatedWatermark, for: serviceType)
             }
         }
@@ -153,11 +172,22 @@ final class AgentAlertMonitor {
         "\(watermarkKey(for: service))_eventIDs"
     }
 
+    private func watermarkSchemaVersionKey(for service: ServiceType) -> String {
+        "\(watermarkKey(for: service))_cursorSchemaVersion"
+    }
+
     private func watermarkCursor(for service: ServiceType) -> WatermarkCursor {
         let timestampKey = watermarkKey(for: service)
         let timestamp = defaults.double(forKey: timestampKey)
         let eventIDs = Set(defaults.stringArray(forKey: watermarkEventIDsKey(for: service)) ?? [])
-        return WatermarkCursor(timestamp: timestamp, eventIDsAtTimestamp: eventIDs)
+        let schemaVersion = defaults.object(forKey: watermarkSchemaVersionKey(for: service)) != nil
+            ? defaults.integer(forKey: watermarkSchemaVersionKey(for: service))
+            : CursorSchema.legacyVersion
+        return WatermarkCursor(
+            timestamp: timestamp,
+            eventIDsAtTimestamp: eventIDs,
+            schemaVersion: schemaVersion
+        )
     }
 
     private func hasStoredWatermarkEventIDs(for service: ServiceType) -> Bool {
@@ -167,11 +197,21 @@ final class AgentAlertMonitor {
     private func saveWatermarkCursor(_ cursor: WatermarkCursor, for service: ServiceType) {
         defaults.set(cursor.timestamp, forKey: watermarkKey(for: service))
         defaults.set(Array(cursor.eventIDsAtTimestamp).sorted(), forKey: watermarkEventIDsKey(for: service))
+        defaults.set(cursor.schemaVersion, forKey: watermarkSchemaVersionKey(for: service))
     }
 
     private func isAlreadyProcessed(_ event: AgentAlertEvent, at watermark: WatermarkCursor) -> Bool {
         guard areSameTimestamp(event.timestamp, watermark.date) else { return false }
-        return watermark.eventIDsAtTimestamp.contains(event.cursorID)
+
+        if watermark.eventIDsAtTimestamp.contains(event.cursorID) {
+            return true
+        }
+
+        if watermark.schemaVersion < CursorSchema.currentVersion {
+            return watermark.eventIDsAtTimestamp.contains(event.legacyCursorID)
+        }
+
+        return false
     }
 
     private func updatedWatermarkCursor(from current: WatermarkCursor, with events: [AgentAlertEvent]) -> WatermarkCursor {
@@ -182,7 +222,11 @@ final class AgentAlertMonitor {
             for event in events where areSameTimestamp(event.timestamp, maxTimestamp) {
                 merged.insert(event.cursorID)
             }
-            return WatermarkCursor(timestamp: current.timestamp, eventIDsAtTimestamp: merged)
+            return WatermarkCursor(
+                timestamp: current.timestamp,
+                eventIDsAtTimestamp: merged,
+                schemaVersion: CursorSchema.currentVersion
+            )
         }
 
         let idsAtMaxTimestamp = Set(
@@ -192,7 +236,8 @@ final class AgentAlertMonitor {
         )
         return WatermarkCursor(
             timestamp: maxTimestamp.timeIntervalSince1970,
-            eventIDsAtTimestamp: idsAtMaxTimestamp
+            eventIDsAtTimestamp: idsAtMaxTimestamp,
+            schemaVersion: CursorSchema.currentVersion
         )
     }
 
@@ -204,6 +249,7 @@ final class AgentAlertMonitor {
 private struct WatermarkCursor: Sendable {
     let timestamp: TimeInterval
     let eventIDsAtTimestamp: Set<String>
+    let schemaVersion: Int
 
     var date: Date {
         Date(timeIntervalSince1970: timestamp)
