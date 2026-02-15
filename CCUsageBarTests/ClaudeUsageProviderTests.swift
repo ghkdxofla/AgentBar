@@ -105,6 +105,32 @@ final class ClaudeUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.weeklyUsage!.percentage, 0.42, accuracy: 0.001)
     }
 
+    func testUsesModelSpecificWindowsWhenAggregateKeysMissing() async throws {
+        let defaults = makeDefaultsSuite()
+        let json = """
+        {
+            "five_hour_sonnet": {"utilization": 37.0, "resets_at": "2099-01-01T05:00:00Z"},
+            "five_hour_opus": {"utilization": 22.0, "resets_at": "2099-01-01T04:30:00Z"},
+            "seven_day_sonnet": {"utilization": 61.0, "resets_at": "2099-01-07T00:00:00Z"},
+            "seven_day_opus": {"utilization": 55.0, "resets_at": "2099-01-06T00:00:00Z"}
+        }
+        """
+        MockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" },
+            defaults: defaults
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.fiveHourUsage.used, 37.0)
+        XCTAssertEqual(usage.weeklyUsage?.used, 61.0)
+        XCTAssertNotNil(usage.fiveHourUsage.resetTime)
+        XCTAssertNotNil(usage.weeklyUsage?.resetTime)
+    }
+
     func testHandlesNullWindows() async throws {
         let defaults = makeDefaultsSuite()
         let json = """

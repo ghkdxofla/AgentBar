@@ -13,44 +13,29 @@ final class StatusBarDisplayPlannerTests: XCTestCase {
         XCTAssertEqual(ranked.map(\.service), [.codex, .gemini, .claude])
     }
 
-    func testReturnsSingleTopPageWhenThreeOrFewerServices() {
+    func testIgnoresUnavailableServicesWhenRanking() {
         let services = [
             makeUsage(service: .claude, fiveHourPct: 0.8),
             makeUsage(service: .codex, fiveHourPct: 0.7),
-            makeUsage(service: .gemini, fiveHourPct: 0.6)
+            makeUsage(service: .gemini, fiveHourPct: 0.9, available: false)
         ]
 
-        let pages = StatusBarDisplayPlanner.pages(from: services)
-        XCTAssertEqual(pages.count, 1)
-        XCTAssertTrue(pages[0].isTopPriority)
-        XCTAssertEqual(pages[0].services.map(\.service), [.claude, .codex, .gemini])
+        let ranked = StatusBarDisplayPlanner.rankedServices(from: services)
+        XCTAssertEqual(ranked.map(\.service), [.claude, .codex])
     }
 
-    func testInterleavesTopPageBetweenOverflowPages() {
+    func testMaxScrollIndexIsZeroWhenServicesWithinVisibleCount() {
         let services = [
             makeUsage(service: .claude, fiveHourPct: 0.95),
             makeUsage(service: .codex, fiveHourPct: 0.90),
-            makeUsage(service: .gemini, fiveHourPct: 0.85),
-            makeUsage(service: .copilot, fiveHourPct: 0.80),
-            makeUsage(service: .cursor, fiveHourPct: 0.75),
-            makeUsage(service: .zai, fiveHourPct: 0.70),
-            makeUsage(service: .claude, fiveHourPct: 0.65, available: false) // ignored
+            makeUsage(service: .gemini, fiveHourPct: 0.85)
         ]
 
-        let pages = StatusBarDisplayPlanner.pages(from: services)
-        XCTAssertEqual(pages.count, 3)
-
-        XCTAssertEqual(pages[0].services.map(\.service), [.claude, .codex, .gemini])
-        XCTAssertTrue(pages[0].isTopPriority)
-
-        XCTAssertEqual(pages[1].services.map(\.service), [.copilot, .cursor, .zai])
-        XCTAssertFalse(pages[1].isTopPriority)
-
-        XCTAssertEqual(pages[2].services.map(\.service), [.claude, .codex, .gemini])
-        XCTAssertTrue(pages[2].isTopPriority)
+        let ranked = StatusBarDisplayPlanner.rankedServices(from: services)
+        XCTAssertEqual(StatusBarDisplayPlanner.maxScrollIndex(for: ranked), 0)
     }
 
-    func testOverflowWithMoreThanOneChunkKeepsReturningToTopPage() {
+    func testMaxScrollIndexEqualsOverflowRowCount() {
         let services = [
             makeUsage(service: .claude, fiveHourPct: 0.99),
             makeUsage(service: .codex, fiveHourPct: 0.98),
@@ -58,26 +43,29 @@ final class StatusBarDisplayPlannerTests: XCTestCase {
             makeUsage(service: .copilot, fiveHourPct: 0.96),
             makeUsage(service: .cursor, fiveHourPct: 0.95),
             makeUsage(service: .zai, fiveHourPct: 0.94),
-            makeUsage(service: .claude, fiveHourPct: 0.93), // duplicate service type acceptable in test fixture
-            makeUsage(service: .codex, fiveHourPct: 0.92)
+            makeUsage(service: .claude, fiveHourPct: 0.93)
         ]
 
-        let pages = StatusBarDisplayPlanner.pages(from: services)
-
-        XCTAssertEqual(pages.count, 5)
-        XCTAssertTrue(pages[0].isTopPriority)
-        XCTAssertFalse(pages[1].isTopPriority)
-        XCTAssertTrue(pages[2].isTopPriority)
-        XCTAssertFalse(pages[3].isTopPriority)
-        XCTAssertTrue(pages[4].isTopPriority)
+        let ranked = StatusBarDisplayPlanner.rankedServices(from: services)
+        XCTAssertEqual(StatusBarDisplayPlanner.maxScrollIndex(for: ranked), 4)
     }
 
-    func testDisplayDurationPrioritizesTopPage() {
-        let topPage = StatusBarDisplayPage(id: "top", services: [makeUsage(service: .claude, fiveHourPct: 0.9)], isTopPriority: true)
-        let overflowPage = StatusBarDisplayPage(id: "overflow", services: [makeUsage(service: .codex, fiveHourPct: 0.5)], isTopPriority: false)
+    func testTieBreakUsesServiceOrder() {
+        let services = [
+            makeUsage(service: .zai, fiveHourPct: 0.50),
+            makeUsage(service: .codex, fiveHourPct: 0.50),
+            makeUsage(service: .claude, fiveHourPct: 0.50)
+        ]
 
-        XCTAssertEqual(StatusBarDisplayPlanner.displayDuration(for: topPage), StatusBarDisplayPlanner.topPriorityHoldSeconds)
-        XCTAssertEqual(StatusBarDisplayPlanner.displayDuration(for: overflowPage), StatusBarDisplayPlanner.overflowHoldSeconds)
+        let ranked = StatusBarDisplayPlanner.rankedServices(from: services)
+        XCTAssertEqual(ranked.map(\.service), [.claude, .codex, .zai])
+    }
+
+    func testTopPriorityHoldIsLongerThanStepHold() {
+        XCTAssertGreaterThan(
+            StatusBarDisplayPlanner.topPriorityHoldSeconds,
+            StatusBarDisplayPlanner.scrollStepHoldSeconds
+        )
     }
 
     private func makeUsage(

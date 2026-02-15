@@ -1,44 +1,18 @@
 import Foundation
 import CoreGraphics
 
-struct StatusBarDisplayPage: Sendable {
-    let id: String
-    let services: [UsageData]
-    let isTopPriority: Bool
-}
-
 enum StatusBarDisplayPlanner {
-    static let topPriorityCount = 3
+    static let visibleRowCount = 3
+    static let rowHeight: CGFloat = 6
+    static let rowSpacing: CGFloat = 1
+    static let viewportHeight: CGFloat = 20
+
     static let topPriorityHoldSeconds: TimeInterval = 8
-    static let overflowHoldSeconds: TimeInterval = 5
-    static let transitionSeconds: TimeInterval = 1.2
-    static let pageHeight: CGFloat = 20
+    static let scrollStepHoldSeconds: TimeInterval = 3
+    static let scrollTransitionSeconds: TimeInterval = 1.2
+    static let resetToTopTransitionSeconds: TimeInterval = 0.6
 
     private static let serviceOrder: [ServiceType] = [.claude, .codex, .gemini, .copilot, .cursor, .zai]
-
-    static func pages(from services: [UsageData]) -> [StatusBarDisplayPage] {
-        let ranked = rankedServices(from: services)
-        guard !ranked.isEmpty else { return [] }
-
-        let top = Array(ranked.prefix(topPriorityCount))
-        guard ranked.count > topPriorityCount else {
-            return [makePage(services: top, isTopPriority: true, index: 0)]
-        }
-
-        let overflow = Array(ranked.dropFirst(topPriorityCount))
-        let overflowChunks = chunk(overflow, size: topPriorityCount)
-
-        var pages: [StatusBarDisplayPage] = [
-            makePage(services: top, isTopPriority: true, index: 0)
-        ]
-
-        for (offset, chunk) in overflowChunks.enumerated() {
-            pages.append(makePage(services: chunk, isTopPriority: false, index: offset + 1))
-            pages.append(makePage(services: top, isTopPriority: true, index: offset + 1))
-        }
-
-        return pages
-    }
 
     static func rankedServices(from services: [UsageData]) -> [UsageData] {
         services
@@ -56,33 +30,12 @@ enum StatusBarDisplayPlanner {
             }
     }
 
-    static func displayDuration(for page: StatusBarDisplayPage) -> TimeInterval {
-        page.isTopPriority ? topPriorityHoldSeconds : overflowHoldSeconds
+    static func maxScrollIndex(for rankedServices: [UsageData]) -> Int {
+        max(0, rankedServices.count - visibleRowCount)
     }
 
     private static func usageScore(_ data: UsageData) -> Double {
         let weekly = data.weeklyUsage?.percentage ?? 0
         return max(data.fiveHourUsage.percentage, weekly)
-    }
-
-    private static func chunk(_ items: [UsageData], size: Int) -> [[UsageData]] {
-        guard size > 0 else { return [items] }
-        var result: [[UsageData]] = []
-        var index = 0
-        while index < items.count {
-            let end = min(index + size, items.count)
-            result.append(Array(items[index..<end]))
-            index = end
-        }
-        return result
-    }
-
-    private static func makePage(services: [UsageData], isTopPriority: Bool, index: Int) -> StatusBarDisplayPage {
-        let serviceIDs = services.map { $0.service.rawValue.replacingOccurrences(of: " ", with: "_") }.joined(separator: ",")
-        return StatusBarDisplayPage(
-            id: "\(isTopPriority ? "top" : "overflow")-\(index)-\(serviceIDs)",
-            services: services,
-            isTopPriority: isTopPriority
-        )
     }
 }
