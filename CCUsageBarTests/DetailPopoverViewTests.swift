@@ -48,6 +48,7 @@ final class DetailPopoverViewTests: XCTestCase {
         guard let scrollView else { return }
 
         let scrollFrame = scrollView.convert(scrollView.bounds, to: rendered.hostingView)
+        XCTAssertGreaterThan(scrollFrame.height, 0, "Expected a non-zero scroll region height after layout.")
         let nonScrollHeight = rendered.hostingView.bounds.height - scrollFrame.height
         XCTAssertGreaterThan(
             nonScrollHeight,
@@ -115,7 +116,8 @@ final class DetailPopoverViewTests: XCTestCase {
             _ = RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
         }
 
-        return findFirstScrollView(in: hostingView)
+        XCTFail("Timed out waiting for scroll view layout to stabilize with non-zero dimensions.")
+        return nil
     }
 
     private func findFirstScrollView(in view: NSView) -> NSScrollView? {
