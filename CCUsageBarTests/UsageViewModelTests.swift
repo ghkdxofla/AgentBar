@@ -104,6 +104,23 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "cursorPlan"), CursorPlan.teams.rawValue)
     }
 
+    func testUnknownCursorPlanRawValueFallsBackToProAndPersists() {
+        let suiteName = "CCUsageBarTests.CursorPlanUnknownValueMigration"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create isolated UserDefaults suite")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set("Legacy-Unknown-Plan", forKey: "cursorPlan")
+
+        let resolvedPlan = CursorPlan.resolveAndMigrateStoredPlan(in: defaults)
+
+        XCTAssertEqual(resolvedPlan, .pro)
+        XCTAssertEqual(defaults.string(forKey: "cursorPlan"), CursorPlan.pro.rawValue)
+    }
+
     func testSanitizedTokenForSavingRejectsMaskedPlaceholder() {
         XCTAssertNil(SettingsView.sanitizedTokenForSaving("*****"))
         XCTAssertNil(SettingsView.sanitizedTokenForSaving("   ******   "))
@@ -151,6 +168,46 @@ final class UsageViewModelTests: XCTestCase {
         } else {
             XCTFail("Expected failure when keychain save throws")
         }
+    }
+
+    func testTokenSaveUIOutcomeOnSuccessMarksSavedAndShowsSuccessAlert() {
+        var savedKey: String?
+        var savedAccount: String?
+
+        let outcome = SettingsView.tokenSaveUIOutcome(
+            currentToken: "  zai_live_key  ",
+            hasSavedToken: false,
+            account: ServiceType.zai.keychainAccount
+        ) { key, account in
+            savedKey = key
+            savedAccount = account
+        }
+
+        XCTAssertTrue(outcome.didSave)
+        XCTAssertTrue(outcome.hasSavedToken)
+        XCTAssertEqual(outcome.tokenFieldValue, "")
+        XCTAssertTrue(outcome.showSavedAlert)
+        XCTAssertFalse(outcome.showSaveErrorAlert)
+        XCTAssertEqual(outcome.saveErrorMessage, "")
+        XCTAssertEqual(savedKey, "zai_live_key")
+        XCTAssertEqual(savedAccount, ServiceType.zai.keychainAccount)
+    }
+
+    func testTokenSaveUIOutcomeOnFailurePreservesTokenAndShowsErrorAlert() {
+        let outcome = SettingsView.tokenSaveUIOutcome(
+            currentToken: "ghp_valid_token",
+            hasSavedToken: false,
+            account: ServiceType.copilot.keychainAccount
+        ) { _, _ in
+            throw StubSaveError.keychainUnavailable
+        }
+
+        XCTAssertFalse(outcome.didSave)
+        XCTAssertFalse(outcome.hasSavedToken)
+        XCTAssertEqual(outcome.tokenFieldValue, "ghp_valid_token")
+        XCTAssertFalse(outcome.showSavedAlert)
+        XCTAssertTrue(outcome.showSaveErrorAlert)
+        XCTAssertEqual(outcome.saveErrorMessage, "Keychain unavailable")
     }
 
     func testCopilotPATSaveOutcomeMarksSavedAndClearsInputOnSuccess() {

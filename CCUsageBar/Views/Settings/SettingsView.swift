@@ -34,6 +34,15 @@ struct SettingsView: View {
     @State private var showSavedAlert = false
     @State private var showSaveErrorAlert = false
     @State private var saveErrorMessage = ""
+    private let keychainSaveAction: @Sendable (String, String) throws -> Void
+
+    init(
+        keychainSaveAction: @escaping @Sendable (String, String) throws -> Void = { key, account in
+            try KeychainManager.save(key: key, account: account)
+        }
+    ) {
+        self.keychainSaveAction = keychainSaveAction
+    }
 
     var body: some View {
         Form {
@@ -226,9 +235,14 @@ struct SettingsView: View {
                     SecureField("API key", text: $zaiAPIKey)
                         .frame(width: 200)
                     Button("Save") {
-                        if saveAPIKey(zaiAPIKey, account: ServiceType.zai.keychainAccount) {
-                            hasSavedZaiAPIKey = true
-                            zaiAPIKey = ""
+                        let outcome = saveTokenWithUIState(
+                            zaiAPIKey,
+                            account: ServiceType.zai.keychainAccount,
+                            hasSavedToken: hasSavedZaiAPIKey
+                        )
+                        hasSavedZaiAPIKey = outcome.hasSavedToken
+                        zaiAPIKey = outcome.tokenFieldValue
+                        if outcome.didSave {
                             NotificationCenter.default.post(name: .limitsChanged, object: nil)
                         }
                     }
@@ -256,38 +270,41 @@ struct SettingsView: View {
     }
 
     @discardableResult
-    private func saveAPIKey(_ key: String, account: String) -> Bool {
-        switch Self.saveAPIKeyResult(key, account: account) {
-        case .success:
-            showSavedAlert = true
-            return true
-        case .failure(let message):
-            saveErrorMessage = message
-            showSaveErrorAlert = true
-            return false
-        }
-    }
-
-    @discardableResult
     private func saveCopilotPAT() -> Bool {
-        let outcome = Self.copilotPATSaveOutcome(
-            currentPAT: copilotPAT,
-            hasSavedCopilotPAT: hasSavedCopilotPAT
-        ) { token in
-            saveAPIKey(token, account: ServiceType.copilot.keychainAccount)
-        }
-        hasSavedCopilotPAT = outcome.hasSavedCopilotPAT
-        copilotPAT = outcome.copilotPAT
+        let outcome = saveTokenWithUIState(
+            copilotPAT,
+            account: ServiceType.copilot.keychainAccount,
+            hasSavedToken: hasSavedCopilotPAT
+        )
+        hasSavedCopilotPAT = outcome.hasSavedToken
+        copilotPAT = outcome.tokenFieldValue
         return outcome.didSave
     }
 
-    private func migrateLegacyCursorPlanIfNeeded() {
-        let migratedPlanRawValue = CursorPlan.migrateLegacyRawValue(cursorPlan)
-        guard migratedPlanRawValue != cursorPlan else { return }
+    private func saveTokenWithUIState(
+        _ token: String,
+        account: String,
+        hasSavedToken: Bool
+    ) -> TokenSaveUIOutcome {
+        let outcome = Self.tokenSaveUIOutcome(
+            currentToken: token,
+            hasSavedToken: hasSavedToken,
+            account: account,
+            save: keychainSaveAction
+        )
+        showSavedAlert = outcome.showSavedAlert
+        showSaveErrorAlert = outcome.showSaveErrorAlert
+        saveErrorMessage = outcome.saveErrorMessage
+        return outcome
+    }
 
-        cursorPlan = migratedPlanRawValue
-        if let migratedPlan = CursorPlan(rawValue: migratedPlanRawValue), migratedPlan != .custom {
-            cursorMonthlyLimit = migratedPlan.monthlyRequestEstimate
+    private func migrateLegacyCursorPlanIfNeeded() {
+        let resolvedPlan = CursorPlan.resolveAndMigrateStoredPlan()
+        guard resolvedPlan.rawValue != cursorPlan else { return }
+
+        cursorPlan = resolvedPlan.rawValue
+        if resolvedPlan != .custom {
+            cursorMonthlyLimit = resolvedPlan.monthlyRequestEstimate
         }
     }
 
@@ -304,23 +321,34 @@ struct SettingsView: View {
         let copilotPAT: String
     }
 
+    struct TokenSaveUIOutcome: Equatable {
+        let didSave: Bool
+        let hasSavedToken: Bool
+        let tokenFieldValue: String
+        let showSavedAlert: Bool
+        let showSaveErrorAlert: Bool
+        let saveErrorMessage: String
+    }
+
     static func copilotPATSaveOutcome(
         currentPAT: String,
         hasSavedCopilotPAT: Bool,
         save: (String) -> Bool
     ) -> CopilotPATSaveOutcome {
-        let didSave = save(currentPAT)
-        if didSave {
-            return CopilotPATSaveOutcome(
-                didSave: true,
-                hasSavedCopilotPAT: true,
-                copilotPAT: ""
-            )
+        let outcome = tokenSaveUIOutcome(
+            currentToken: currentPAT,
+            hasSavedToken: hasSavedCopilotPAT,
+            account: ServiceType.copilot.keychainAccount
+        ) { token, _ in
+            if save(token) {
+                return
+            }
+            throw SaveOutcomeError.didNotSave
         }
         return CopilotPATSaveOutcome(
-            didSave: false,
-            hasSavedCopilotPAT: hasSavedCopilotPAT,
-            copilotPAT: currentPAT
+            didSave: outcome.didSave,
+            hasSavedCopilotPAT: outcome.hasSavedToken,
+            copilotPAT: outcome.tokenFieldValue
         )
     }
 
@@ -351,6 +379,36 @@ struct SettingsView: View {
         }
     }
 
+    static func tokenSaveUIOutcome(
+        currentToken: String,
+        hasSavedToken: Bool,
+        account: String,
+        save: (String, String) throws -> Void = { key, account in
+            try KeychainManager.save(key: key, account: account)
+        }
+    ) -> TokenSaveUIOutcome {
+        switch saveAPIKeyResult(currentToken, account: account, save: save) {
+        case .success:
+            return TokenSaveUIOutcome(
+                didSave: true,
+                hasSavedToken: true,
+                tokenFieldValue: "",
+                showSavedAlert: true,
+                showSaveErrorAlert: false,
+                saveErrorMessage: ""
+            )
+        case .failure(let message):
+            return TokenSaveUIOutcome(
+                didSave: false,
+                hasSavedToken: hasSavedToken,
+                tokenFieldValue: currentToken,
+                showSavedAlert: false,
+                showSaveErrorAlert: true,
+                saveErrorMessage: message
+            )
+        }
+    }
+
     static func sanitizedTokenForSaving(_ value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canSaveToken(trimmed) else { return nil }
@@ -362,4 +420,8 @@ struct SettingsView: View {
         guard !trimmed.isEmpty else { return false }
         return !trimmed.allSatisfy { $0 == "*" }
     }
+}
+
+private enum SaveOutcomeError: Error {
+    case didNotSave
 }

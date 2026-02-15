@@ -20,30 +20,32 @@ enum KeychainError: Error, LocalizedError {
 enum KeychainManager {
     private static let service = "com.agentbar.apikeys"
 
-    /// Base query using Data Protection Keychain (no per-app ACL prompts).
-    private static func baseQuery(account: String) -> [String: Any] {
-        [
-            kSecClass as String:                    kSecClassGenericPassword,
-            kSecAttrService as String:              service,
-            kSecAttrAccount as String:              account,
-            kSecUseDataProtectionKeychain as String: true,
-            kSecAttrAccessible as String:           kSecAttrAccessibleWhenUnlocked,
-        ]
-    }
-
     static func save(key: String, account: String) throws {
         guard let data = key.data(using: .utf8) else {
             throw KeychainError.unexpectedData
         }
 
-        // Migrate: delete from legacy keychain if present
-        deleteLegacyItem(account: account)
+        // Build query with open ACL so any build of this app can read it
+        var query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String:   data,
+        ]
 
-        var query = baseQuery(account: account)
-        query[kSecValueData as String] = data
+        // Create an open-access ACL: no app restriction, no password prompt
+        var access: SecAccess?
+        let accessStatus = SecAccessCreate("CCUsageBar API Key" as CFString, nil, &access)
+        if accessStatus == errSecSuccess, let access = access {
+            query[kSecAttrAccess as String] = access
+        }
 
         // Delete existing item first
-        let deleteQuery = baseQuery(account: account)
+        let deleteQuery: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
         SecItemDelete(deleteQuery as CFDictionary)
 
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -53,53 +55,30 @@ enum KeychainManager {
     }
 
     static func load(account: String) -> String? {
-        // Try Data Protection Keychain first
-        var query = baseQuery(account: account)
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var result: AnyObject?
-        var status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecSuccess, let data = result as? Data {
-            return String(data: data, encoding: .utf8)
-        }
-
-        // Fall back to legacy keychain for items saved before migration
-        let legacyQuery: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String:  true,
             kSecMatchLimit as String:  kSecMatchLimitOne,
         ]
-        result = nil
-        status = SecItemCopyMatching(legacyQuery as CFDictionary, &result)
-        guard status == errSecSuccess, let legacyData = result as? Data,
-              let value = String(data: legacyData, encoding: .utf8) else {
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
             return nil
         }
-
-        // Auto-migrate to Data Protection Keychain
-        try? save(key: value, account: account)
-        return value
+        return String(data: data, encoding: .utf8)
     }
 
     static func delete(account: String) throws {
-        let query = baseQuery(account: account)
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.deleteFailed(status)
-        }
-        // Also clean up legacy item if it exists
-        deleteLegacyItem(account: account)
-    }
-
-    private static func deleteLegacyItem(account: String) {
-        let legacyQuery: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-        SecItemDelete(legacyQuery as CFDictionary)
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.deleteFailed(status)
+        }
     }
 }
