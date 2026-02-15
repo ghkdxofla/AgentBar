@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("alertTaskCompletedEnabled") private var alertTaskCompletedEnabled = true
     @AppStorage("alertPermissionRequiredEnabled") private var alertPermissionRequiredEnabled = true
     @AppStorage("alertDecisionRequiredEnabled") private var alertDecisionRequiredEnabled = true
+    @AppStorage("alertShowMessagePreview") private var alertShowMessagePreview = false
     @AppStorage("alertPollingSeconds") private var alertPollingSeconds: Double = 5
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
@@ -86,6 +87,12 @@ struct SettingsView: View {
                 Toggle("Decision required", isOn: $alertDecisionRequiredEnabled)
                     .disabled(!alertsEnabled)
                     .onChange(of: alertDecisionRequiredEnabled) { _ in
+                        notifyAlertSettingsChanged()
+                    }
+
+                Toggle("Show message preview in notifications", isOn: $alertShowMessagePreview)
+                    .disabled(!alertsEnabled)
+                    .onChange(of: alertShowMessagePreview) { _ in
                         notifyAlertSettingsChanged()
                     }
 

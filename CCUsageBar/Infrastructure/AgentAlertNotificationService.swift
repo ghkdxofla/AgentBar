@@ -1,12 +1,19 @@
 import Foundation
 import UserNotifications
 
-actor AgentAlertNotificationService {
+protocol AgentAlertNotificationServiceProtocol: Sendable {
+    func requestAuthorizationIfNeeded() async
+    func post(event: AgentAlertEvent) async
+}
+
+actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
     private let center: UNUserNotificationCenter
+    private let defaults: UserDefaults
     private var didCheckAuthorization = false
 
-    init(center: UNUserNotificationCenter = .current()) {
+    init(center: UNUserNotificationCenter = .current(), defaults: UserDefaults = .standard) {
         self.center = center
+        self.defaults = defaults
     }
 
     nonisolated static func requestAuthorizationPrompt() {
@@ -25,7 +32,9 @@ actor AgentAlertNotificationService {
     func post(event: AgentAlertEvent) async {
         let content = UNMutableNotificationContent()
         content.title = event.type.notificationTitle
-        content.body = "[\(event.service.rawValue)] \(event.notificationBody)"
+        let showMessagePreview = bool(forKey: "alertShowMessagePreview", defaultValue: false)
+        let body = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
+        content.body = "[\(event.service.rawValue)] \(body)"
         content.sound = .default
 
         let request = UNNotificationRequest(
@@ -67,5 +76,10 @@ actor AgentAlertNotificationService {
                 }
             }
         }
+    }
+
+    private func bool(forKey key: String, defaultValue: Bool) -> Bool {
+        guard defaults.object(forKey: key) != nil else { return defaultValue }
+        return defaults.bool(forKey: key)
     }
 }
