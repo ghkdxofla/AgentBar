@@ -269,3 +269,11 @@
 - **Claude hook bridge script**: Added `scripts/claude-hook-alert-bridge.sh` to capture raw Claude hook stdin payloads with a stable UTC capture timestamp and append them safely to the bridge JSONL file.
 - **Tests**: Added `ClaudeHookAlertEventDetectorTests` (Stop/Notification mapping and boundary behavior) and added monitor coverage for disabled source toggles in `CodexAlertEventDetectorTests`.
 - All 127 tests passing
+
+## Iteration 35: Top-3 prioritized status bar rotation + Claude idle-session fallback
+- **Status bar Top-3 prioritization**: Added `StatusBarDisplayPlanner` to rank services by usage (max of 5h/secondary window percentage), show only top 3 by default, and build a rotation sequence for overflow services.
+- **Overflow rotation UX**: `StackedBarView` now renders paged rows and animates vertical slide transitions. Top page stays visible longer and is interleaved between overflow pages so high-usage services remain prioritized.
+- **Claude usage reset fix**: `ClaudeUsageProvider` no longer hard-resets to 0% when API returns `five_hour`/`seven_day` as null during idle periods. It now caches last valid window metrics in `UserDefaults` and reuses them until their reset time passes.
+- **Test coverage**: Added `StatusBarDisplayPlannerTests` (ranking, paging, Top-page interleaving, durations) and expanded `ClaudeUsageProviderTests` with cache fallback and cache-expiry cases. Updated provider tests to use isolated `UserDefaults` suites.
+- **Signing check**: Ran `./scripts/check-signing-matrix.sh` to verify Debug/Release signing matrix is still correct.
+- All 134 tests passing
