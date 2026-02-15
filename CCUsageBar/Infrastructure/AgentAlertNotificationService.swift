@@ -9,11 +9,17 @@ protocol AgentAlertNotificationServiceProtocol: Sendable {
 actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
     private let center: UNUserNotificationCenter
     private let defaults: UserDefaults
+    private let postBodyOverride: (@Sendable (String) async throws -> Void)?
     private var didCheckAuthorization = false
 
-    init(center: UNUserNotificationCenter = .current(), defaults: UserDefaults = .standard) {
+    init(
+        center: UNUserNotificationCenter = .current(),
+        defaults: UserDefaults = .standard,
+        postBodyOverride: (@Sendable (String) async throws -> Void)? = nil
+    ) {
         self.center = center
         self.defaults = defaults
+        self.postBodyOverride = postBodyOverride
     }
 
     nonisolated static func requestAuthorizationPrompt() {
@@ -44,7 +50,11 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
         )
 
         do {
-            try await add(request)
+            if let postBodyOverride {
+                try await postBodyOverride(content.body)
+            } else {
+                try await add(request)
+            }
         } catch {
             // Ignore posting failures so monitoring loop can continue.
         }

@@ -35,6 +35,23 @@ struct AgentAlertEvent: Sendable, Equatable {
     let timestamp: Date
     let message: String?
     let sessionID: String?
+    let sourceRecordID: String?
+
+    init(
+        service: ServiceType,
+        type: AgentAlertEventType,
+        timestamp: Date,
+        message: String?,
+        sessionID: String?,
+        sourceRecordID: String? = nil
+    ) {
+        self.service = service
+        self.type = type
+        self.timestamp = timestamp
+        self.message = message
+        self.sessionID = sessionID
+        self.sourceRecordID = sourceRecordID
+    }
 
     var dedupeKey: String {
         let session = sessionID ?? "no-session"
@@ -43,7 +60,7 @@ struct AgentAlertEvent: Sendable, Equatable {
 
     var cursorID: String {
         let timestampToken = String(format: "%.6f", timestamp.timeIntervalSince1970)
-        let raw = "\(service.rawValue)|\(type.rawValue)|\(timestampToken)|\(sessionID ?? "")|\(message ?? "")"
+        let raw = "\(service.rawValue)|\(type.rawValue)|\(timestampToken)|\(sessionID ?? "")|\(message ?? "")|\(sourceRecordID ?? "")"
         let digest = SHA256.hash(data: Data(raw.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
