@@ -370,6 +370,20 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertNil(securityAPI.dataProtectionItems[account])
     }
 
+    func testKeychainLoadFallsBackToLegacyOnMissingEntitlementAndKeepsLegacyWhenMigrationFails() {
+        let account = "tests.load.fallback_missing_entitlement"
+        let tokenData = Data("legacy-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
+        securityAPI.copyStatusByStore[.dataProtection] = errSecMissingEntitlement
+        securityAPI.addStatusByStore[.dataProtection] = errSecMissingEntitlement
+
+        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
+
+        XCTAssertEqual(loaded, "legacy-token")
+        XCTAssertNil(securityAPI.dataProtectionItems[account])
+        XCTAssertEqual(securityAPI.legacyItems[account], tokenData)
+    }
+
     func testKeychainLoadMigratesLegacyItemWhenDataProtectionSaveSucceeds() {
         let account = "tests.migration.success"
         let tokenData = Data("legacy-token".utf8)
@@ -422,6 +436,19 @@ final class UsageViewModelTests: XCTestCase {
         }
     }
 
+    func testMockKeychainSecurityAPIRejectsMalformedCopyQuery() {
+        let securityAPI = MockKeychainSecurityAPI()
+
+        let result = securityAPI.copyMatching([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.agentbar.apikeys",
+            kSecAttrAccount as String: "tests.invalid.copy"
+        ])
+
+        XCTAssertEqual(result.status, errSecParam)
+        XCTAssertNil(result.data)
+    }
+
 }
 
 private enum StubSaveError: LocalizedError {
@@ -436,6 +463,8 @@ private enum StubSaveError: LocalizedError {
 }
 
 private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
+    private let expectedService = "com.agentbar.apikeys"
+
     enum Store {
         case dataProtection
         case legacy
@@ -489,6 +518,9 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
         guard let (store, account) = parse(query) else {
             return errSecParam
         }
+        if let compatibilityError = validateUpdateQueryCompatibility(query, attributes: attributes) {
+            return compatibilityError
+        }
         if let forced = updateStatusByStore[store], forced != errSecSuccess {
             return forced
         }
@@ -515,6 +547,9 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
         guard let (store, account) = parse(query) else {
             return (errSecParam, nil)
         }
+        if let compatibilityError = validateCopyQueryCompatibility(query) {
+            return (compatibilityError, nil)
+        }
         if let forced = copyStatusByStore[store], forced != errSecSuccess {
             return (forced, nil)
         }
@@ -537,6 +572,9 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
         guard let (store, account) = parse(query) else {
             return errSecParam
         }
+        if let compatibilityError = validateDeleteQueryCompatibility(query) {
+            return compatibilityError
+        }
         if let forced = deleteStatusByStore[store], forced != errSecSuccess {
             return forced
         }
@@ -555,19 +593,129 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
     }
 
     private func parse(_ query: [String: Any]) -> (Store, String)? {
-        guard let account = query[kSecAttrAccount as String] as? String else {
+        guard isSecConstant(
+            query[kSecClass as String],
+            expected: kSecClassGenericPassword
+        ) else {
             return nil
         }
-        if (query[kSecUseDataProtectionKeychain as String] as? Bool) == true {
+        guard let service = query[kSecAttrService as String] as? String,
+              service == expectedService else {
+            return nil
+        }
+        guard let account = query[kSecAttrAccount as String] as? String,
+              !account.isEmpty else {
+            return nil
+        }
+        if let dataProtectionFlag = query[kSecUseDataProtectionKeychain as String] {
+            guard let enabled = dataProtectionFlag as? Bool, enabled else {
+                return nil
+            }
             return (.dataProtection, account)
         }
         return (.legacy, account)
     }
 
     private func validateAddQueryCompatibility(_ query: [String: Any], store: Store) -> OSStatus? {
-        if store == .legacy && query[kSecAttrAccessible as String] != nil {
+        let allowedKeys: Set<String> = [
+            kSecClass as String,
+            kSecAttrService as String,
+            kSecAttrAccount as String,
+            kSecUseDataProtectionKeychain as String,
+            kSecValueData as String,
+            kSecAttrAccessible as String
+        ]
+        guard hasOnlyAllowedKeys(query, allowed: allowedKeys) else {
+            return errSecParam
+        }
+        guard query[kSecValueData as String] is Data else {
+            return errSecParam
+        }
+
+        if store == .legacy {
+            if query[kSecAttrAccessible as String] != nil {
+                return errSecParam
+            }
+            return nil
+        }
+
+        guard isSecConstant(
+            query[kSecAttrAccessible as String],
+            expected: kSecAttrAccessibleWhenUnlocked
+        ) else {
             return errSecParam
         }
         return nil
+    }
+
+    private func validateUpdateQueryCompatibility(
+        _ query: [String: Any],
+        attributes: [String: Any]
+    ) -> OSStatus? {
+        let allowedQueryKeys: Set<String> = [
+            kSecClass as String,
+            kSecAttrService as String,
+            kSecAttrAccount as String,
+            kSecUseDataProtectionKeychain as String
+        ]
+        guard hasOnlyAllowedKeys(query, allowed: allowedQueryKeys) else {
+            return errSecParam
+        }
+
+        let expectedAttributeKeys: Set<String> = [kSecValueData as String]
+        guard Set(attributes.keys) == expectedAttributeKeys,
+              attributes[kSecValueData as String] is Data else {
+            return errSecParam
+        }
+
+        return nil
+    }
+
+    private func validateCopyQueryCompatibility(_ query: [String: Any]) -> OSStatus? {
+        let allowedKeys: Set<String> = [
+            kSecClass as String,
+            kSecAttrService as String,
+            kSecAttrAccount as String,
+            kSecUseDataProtectionKeychain as String,
+            kSecReturnData as String,
+            kSecMatchLimit as String
+        ]
+        guard hasOnlyAllowedKeys(query, allowed: allowedKeys) else {
+            return errSecParam
+        }
+        guard (query[kSecReturnData as String] as? Bool) == true else {
+            return errSecParam
+        }
+        guard isSecConstant(
+            query[kSecMatchLimit as String],
+            expected: kSecMatchLimitOne
+        ) else {
+            return errSecParam
+        }
+        return nil
+    }
+
+    private func validateDeleteQueryCompatibility(_ query: [String: Any]) -> OSStatus? {
+        let allowedKeys: Set<String> = [
+            kSecClass as String,
+            kSecAttrService as String,
+            kSecAttrAccount as String,
+            kSecUseDataProtectionKeychain as String
+        ]
+        guard hasOnlyAllowedKeys(query, allowed: allowedKeys) else {
+            return errSecParam
+        }
+        return nil
+    }
+
+    private func hasOnlyAllowedKeys(_ query: [String: Any], allowed: Set<String>) -> Bool {
+        Set(query.keys).isSubset(of: allowed)
+    }
+
+    private func isSecConstant(_ value: Any?, expected: CFString) -> Bool {
+        guard let value else {
+            return false
+        }
+        return String(describing: value) == expected as String
     }
 }
