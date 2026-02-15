@@ -27,7 +27,7 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         self.fileManager = fileManager
     }
 
-    func detectEvents(since: Date) async -> [AgentAlertEvent] {
+    func detectEvents(since: Date, includeBoundary: Bool = false) async -> [AgentAlertEvent] {
         guard fileManager.fileExists(atPath: sessionsDir.path) else { return [] }
 
         let files = findRecentSessionFiles(since: since)
@@ -35,13 +35,13 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
 
         var events: [AgentAlertEvent] = []
         for file in files {
-            events.append(contentsOf: extractEvents(from: file, since: since))
+            events.append(contentsOf: extractEvents(from: file, since: since, includeBoundary: includeBoundary))
         }
 
         return events.sorted { $0.timestamp < $1.timestamp }
     }
 
-    private func extractEvents(from file: URL, since: Date) -> [AgentAlertEvent] {
+    private func extractEvents(from file: URL, since: Date, includeBoundary: Bool) -> [AgentAlertEvent] {
         let sessionID = file.deletingPathExtension().lastPathComponent
         guard let records = try? JSONLParser.parseFile(file, as: CodexAlertSessionRecord.self) else {
             return []
@@ -52,7 +52,7 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         for record in records {
             guard let timestamp = record.timestamp,
                   let date = DateUtils.parseISO8601(timestamp),
-                  date > since else { continue }
+                  passesBoundary(date, since: since, includeBoundary: includeBoundary) else { continue }
 
             guard let payload = record.payload else { continue }
             if let event = mapRecord(recordType: record.type, payload: payload, date: date, sessionID: sessionID) {
@@ -111,7 +111,7 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
     private func isEscalationRequired(_ arguments: String?) -> Bool {
         guard let arguments else { return false }
 
-        let compact = arguments.replacingOccurrences(of: " ", with: "")
+        let compact = arguments.replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
         if compact.contains("\"sandbox_permissions\":\"require_escalated\"") {
             return true
         }
@@ -123,6 +123,10 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         }
 
         return permission == "require_escalated"
+    }
+
+    private func passesBoundary(_ date: Date, since: Date, includeBoundary: Bool) -> Bool {
+        includeBoundary ? date >= since : date > since
     }
 
     private func looksLikeDecisionPrompt(_ message: String) -> Bool {
@@ -178,4 +182,3 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         return files.sorted { $0.path < $1.path }
     }
 }
-

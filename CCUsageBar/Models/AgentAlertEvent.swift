@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 enum AgentAlertEventType: String, CaseIterable, Sendable {
     case taskCompleted
@@ -40,6 +41,13 @@ struct AgentAlertEvent: Sendable, Equatable {
         return "\(service.rawValue)|\(type.rawValue)|\(session)"
     }
 
+    var cursorID: String {
+        let timestampToken = String(format: "%.6f", timestamp.timeIntervalSince1970)
+        let raw = "\(service.rawValue)|\(type.rawValue)|\(timestampToken)|\(sessionID ?? "")|\(message ?? "")"
+        let digest = SHA256.hash(data: Data(raw.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
     var notificationBody: String {
         guard let message else {
             return defaultBody
@@ -58,6 +66,10 @@ struct AgentAlertEvent: Sendable, Equatable {
         return normalized
     }
 
+    var redactedNotificationBody: String {
+        defaultBody
+    }
+
     private var defaultBody: String {
         switch type {
         case .taskCompleted:
@@ -69,4 +81,3 @@ struct AgentAlertEvent: Sendable, Equatable {
         }
     }
 }
-

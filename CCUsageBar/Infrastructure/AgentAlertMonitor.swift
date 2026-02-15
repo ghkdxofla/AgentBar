@@ -4,7 +4,7 @@ import Combine
 @MainActor
 final class AgentAlertMonitor {
     private let detectors: [any AgentAlertEventDetectorProtocol]
-    private let notificationService: AgentAlertNotificationService
+    private let notificationService: any AgentAlertNotificationServiceProtocol
     private let defaults: UserDefaults
     private let cooldown: TimeInterval
 
@@ -15,7 +15,7 @@ final class AgentAlertMonitor {
 
     init(
         detectors: [any AgentAlertEventDetectorProtocol]? = nil,
-        notificationService: AgentAlertNotificationService = AgentAlertNotificationService(),
+        notificationService: any AgentAlertNotificationServiceProtocol = AgentAlertNotificationService(),
         defaults: UserDefaults = .standard,
         cooldown: TimeInterval = 90
     ) {
@@ -59,6 +59,11 @@ final class AgentAlertMonitor {
             if defaults.object(forKey: key) == nil {
                 defaults.set(now, forKey: key)
             }
+
+            let eventIDsKey = watermarkEventIDsKey(for: detector.serviceType)
+            if defaults.object(forKey: eventIDsKey) == nil {
+                defaults.set([String](), forKey: eventIDsKey)
+            }
         }
     }
 
@@ -90,7 +95,7 @@ final class AgentAlertMonitor {
             }
     }
 
-    private func processTick() async {
+    func processTick() async {
         guard isAlertsEnabled else { return }
         guard !isProcessing else { return }
 
@@ -98,18 +103,16 @@ final class AgentAlertMonitor {
         defer { isProcessing = false }
 
         for detector in detectors {
-            let key = watermarkKey(for: detector.serviceType)
-            let lastSeen = Date(timeIntervalSince1970: defaults.double(forKey: key))
-            let events = await detector.detectEvents(since: lastSeen)
+            let watermark = watermarkCursor(for: detector.serviceType)
+            let events = await Task.detached(priority: .utility) {
+                await detector.detectEvents(since: watermark.date, includeBoundary: true)
+            }.value
 
             guard !events.isEmpty else { continue }
+            let unseenEvents = events.filter { !isAlreadyProcessed($0, at: watermark) }
+            guard !unseenEvents.isEmpty else { continue }
 
-            var maxTimestamp = lastSeen
-            for event in events {
-                if event.timestamp > maxTimestamp {
-                    maxTimestamp = event.timestamp
-                }
-
+            for event in unseenEvents {
                 guard isEventEnabled(event.type) else { continue }
                 guard shouldNotify(event) else { continue }
 
@@ -117,7 +120,8 @@ final class AgentAlertMonitor {
                 lastNotificationByKey[event.dedupeKey] = Date()
             }
 
-            defaults.set(maxTimestamp.timeIntervalSince1970, forKey: key)
+            let updatedWatermark = updatedWatermarkCursor(from: watermark, with: unseenEvents)
+            saveWatermarkCursor(updatedWatermark, for: detector.serviceType)
         }
     }
 
@@ -139,6 +143,62 @@ final class AgentAlertMonitor {
             .replacingOccurrences(of: " ", with: "_")
         return "alertLastSeen_\(normalized)"
     }
+
+    private func watermarkEventIDsKey(for service: ServiceType) -> String {
+        "\(watermarkKey(for: service))_eventIDs"
+    }
+
+    private func watermarkCursor(for service: ServiceType) -> WatermarkCursor {
+        let timestampKey = watermarkKey(for: service)
+        let timestamp = defaults.double(forKey: timestampKey)
+        let eventIDs = Set(defaults.stringArray(forKey: watermarkEventIDsKey(for: service)) ?? [])
+        return WatermarkCursor(timestamp: timestamp, eventIDsAtTimestamp: eventIDs)
+    }
+
+    private func saveWatermarkCursor(_ cursor: WatermarkCursor, for service: ServiceType) {
+        defaults.set(cursor.timestamp, forKey: watermarkKey(for: service))
+        defaults.set(Array(cursor.eventIDsAtTimestamp).sorted(), forKey: watermarkEventIDsKey(for: service))
+    }
+
+    private func isAlreadyProcessed(_ event: AgentAlertEvent, at watermark: WatermarkCursor) -> Bool {
+        guard areSameTimestamp(event.timestamp, watermark.date) else { return false }
+        return watermark.eventIDsAtTimestamp.contains(event.cursorID)
+    }
+
+    private func updatedWatermarkCursor(from current: WatermarkCursor, with events: [AgentAlertEvent]) -> WatermarkCursor {
+        guard let maxTimestamp = events.map(\.timestamp).max() else { return current }
+
+        if areSameTimestamp(maxTimestamp, current.date) {
+            var merged = current.eventIDsAtTimestamp
+            for event in events where areSameTimestamp(event.timestamp, maxTimestamp) {
+                merged.insert(event.cursorID)
+            }
+            return WatermarkCursor(timestamp: current.timestamp, eventIDsAtTimestamp: merged)
+        }
+
+        let idsAtMaxTimestamp = Set(
+            events
+                .filter { areSameTimestamp($0.timestamp, maxTimestamp) }
+                .map(\.cursorID)
+        )
+        return WatermarkCursor(
+            timestamp: maxTimestamp.timeIntervalSince1970,
+            eventIDsAtTimestamp: idsAtMaxTimestamp
+        )
+    }
+
+    private func areSameTimestamp(_ lhs: Date, _ rhs: Date) -> Bool {
+        abs(lhs.timeIntervalSince1970 - rhs.timeIntervalSince1970) < 0.000_001
+    }
+}
+
+private struct WatermarkCursor: Sendable {
+    let timestamp: TimeInterval
+    let eventIDsAtTimestamp: Set<String>
+
+    var date: Date {
+        Date(timeIntervalSince1970: timestamp)
+    }
 }
 
 private extension UserDefaults {
@@ -147,4 +207,3 @@ private extension UserDefaults {
         return bool(forKey: key)
     }
 }
-
