@@ -18,7 +18,15 @@ final class ClaudeUsageProviderTests: XCTestCase {
         super.tearDown()
     }
 
+    private func makeDefaultsSuite() -> UserDefaults {
+        let suiteName = "CCUsageBarTests.ClaudeUsageProvider.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
+    }
+
     func testFetchesUsageFromAPI() async throws {
+        let defaults = makeDefaultsSuite()
         let json = """
         {
             "five_hour": {"utilization": 19.0, "resets_at": "2026-02-14T18:00:01.107582+00:00"},
@@ -29,7 +37,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         let provider = ClaudeUsageProvider(
             session: MockURLProtocol.session(),
-            credentialProvider: { "test-token" }
+            credentialProvider: { "test-token" },
+            defaults: defaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -44,6 +53,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
     }
 
     func testParsesResetTimes() async throws {
+        let defaults = makeDefaultsSuite()
         let json = """
         {
             "five_hour": {"utilization": 5.0, "resets_at": "2026-02-14T18:00:01.107582+00:00"},
@@ -54,7 +64,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         let provider = ClaudeUsageProvider(
             session: MockURLProtocol.session(),
-            credentialProvider: { "test-token" }
+            credentialProvider: { "test-token" },
+            defaults: defaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -72,6 +83,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
     }
 
     func testPercentageCalculation() async throws {
+        let defaults = makeDefaultsSuite()
         let json = """
         {
             "five_hour": {"utilization": 85.0, "resets_at": null},
@@ -82,7 +94,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         let provider = ClaudeUsageProvider(
             session: MockURLProtocol.session(),
-            credentialProvider: { "test-token" }
+            credentialProvider: { "test-token" },
+            defaults: defaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -93,6 +106,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
     }
 
     func testHandlesNullWindows() async throws {
+        let defaults = makeDefaultsSuite()
         let json = """
         {
             "five_hour": null,
@@ -103,7 +117,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         let provider = ClaudeUsageProvider(
             session: MockURLProtocol.session(),
-            credentialProvider: { "test-token" }
+            credentialProvider: { "test-token" },
+            defaults: defaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -113,12 +128,78 @@ final class ClaudeUsageProviderTests: XCTestCase {
         XCTAssertNil(usage.fiveHourUsage.resetTime)
     }
 
+    func testUsesCachedValuesWhenWindowsTemporarilyMissing() async throws {
+        let defaults = makeDefaultsSuite()
+        let initial = """
+        {
+            "five_hour": {"utilization": 21.0, "resets_at": "2099-01-01T00:00:00Z"},
+            "seven_day": {"utilization": 44.0, "resets_at": "2099-01-07T00:00:00Z"}
+        }
+        """
+        MockURLProtocol.stubResponse(data: Data(initial.utf8), statusCode: 200)
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" },
+            defaults: defaults
+        )
+
+        let first = try await provider.fetchUsage()
+        XCTAssertEqual(first.fiveHourUsage.used, 21.0)
+        XCTAssertEqual(first.weeklyUsage?.used, 44.0)
+
+        let missing = """
+        {
+            "five_hour": null,
+            "seven_day": null
+        }
+        """
+        MockURLProtocol.stubResponse(data: Data(missing.utf8), statusCode: 200)
+        let second = try await provider.fetchUsage()
+
+        XCTAssertEqual(second.fiveHourUsage.used, 21.0)
+        XCTAssertEqual(second.weeklyUsage?.used, 44.0)
+        XCTAssertNotNil(second.fiveHourUsage.resetTime)
+        XCTAssertNotNil(second.weeklyUsage?.resetTime)
+    }
+
+    func testClearsExpiredCachedValuesWhenWindowsMissing() async throws {
+        let defaults = makeDefaultsSuite()
+        defaults.set(55.0, forKey: "claudeUsageCache.fiveHour.used")
+        defaults.set(100.0, forKey: "claudeUsageCache.fiveHour.total")
+        defaults.set(Date(timeIntervalSinceNow: -300).timeIntervalSince1970, forKey: "claudeUsageCache.fiveHour.resetTime")
+
+        defaults.set(77.0, forKey: "claudeUsageCache.sevenDay.used")
+        defaults.set(100.0, forKey: "claudeUsageCache.sevenDay.total")
+        defaults.set(Date(timeIntervalSinceNow: -300).timeIntervalSince1970, forKey: "claudeUsageCache.sevenDay.resetTime")
+
+        let missing = """
+        {
+            "five_hour": null,
+            "seven_day": null
+        }
+        """
+        MockURLProtocol.stubResponse(data: Data(missing.utf8), statusCode: 200)
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "test-token" },
+            defaults: defaults
+        )
+
+        let usage = try await provider.fetchUsage()
+        XCTAssertEqual(usage.fiveHourUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage?.used, 0)
+    }
+
     func testHandlesUnauthorized() async throws {
+        let defaults = makeDefaultsSuite()
         MockURLProtocol.stubResponse(data: Data(), statusCode: 401)
 
         let provider = ClaudeUsageProvider(
             session: MockURLProtocol.session(),
-            credentialProvider: { "expired-token" }
+            credentialProvider: { "expired-token" },
+            defaults: defaults
         )
 
         do {
@@ -130,8 +211,10 @@ final class ClaudeUsageProviderTests: XCTestCase {
     }
 
     func testHandlesMissingCredentials() async {
+        let defaults = makeDefaultsSuite()
         let provider = ClaudeUsageProvider(
-            credentialProvider: { nil }
+            credentialProvider: { nil },
+            defaults: defaults
         )
 
         let isConfigured = await provider.isConfigured()
@@ -139,6 +222,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
     }
 
     func testSendsCorrectHeaders() async throws {
+        let defaults = makeDefaultsSuite()
         let json = """
         {"five_hour": {"utilization": 0, "resets_at": null}, "seven_day": null}
         """
@@ -151,7 +235,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         let provider = ClaudeUsageProvider(
             session: MockURLProtocol.session(),
-            credentialProvider: { "my-token" }
+            credentialProvider: { "my-token" },
+            defaults: defaults
         )
 
         _ = try await provider.fetchUsage()
@@ -295,6 +380,7 @@ final class ClaudeUsageProviderTests: XCTestCase {
     }
 
     func testIgnoresExtraFields() async throws {
+        let defaults = makeDefaultsSuite()
         let json = """
         {
             "five_hour": {"utilization": 19.0, "resets_at": "2026-02-14T18:00:01+00:00"},
@@ -309,7 +395,8 @@ final class ClaudeUsageProviderTests: XCTestCase {
 
         let provider = ClaudeUsageProvider(
             session: MockURLProtocol.session(),
-            credentialProvider: { "test-token" }
+            credentialProvider: { "test-token" },
+            defaults: defaults
         )
 
         let usage = try await provider.fetchUsage()

@@ -27,6 +27,7 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     private let session: URLSession
     private let credentialProvider: @Sendable () -> String?
+    private let defaults: UserDefaults
 
     static let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
@@ -43,10 +44,12 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     init(
         session: URLSession = .shared,
-        credentialProvider: (@Sendable () -> String?)? = nil
+        credentialProvider: (@Sendable () -> String?)? = nil,
+        defaults: UserDefaults = .standard
     ) {
         self.session = session
         self.credentialProvider = credentialProvider ?? { Self.readKeychainTokenViaCLI() }
+        self.defaults = defaults
     }
 
     func isConfigured() async -> Bool {
@@ -77,26 +80,61 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
         let usageResponse = try JSONDecoder().decode(ClaudeUsageResponse.self, from: data)
 
-        let fiveHour = usageResponse.five_hour
-        let sevenDay = usageResponse.seven_day
+        let fiveHour = resolveMetric(window: usageResponse.five_hour, cacheKey: "claudeUsageCache.fiveHour")
+        let sevenDay = resolveMetric(window: usageResponse.seven_day, cacheKey: "claudeUsageCache.sevenDay")
 
         return UsageData(
             service: .claude,
-            fiveHourUsage: UsageMetric(
-                used: fiveHour?.utilization ?? 0,
-                total: 100,
-                unit: .percent,
-                resetTime: fiveHour?.resets_at.flatMap { DateUtils.parseISO8601($0) }
-            ),
-            weeklyUsage: UsageMetric(
-                used: sevenDay?.utilization ?? 0,
-                total: 100,
-                unit: .percent,
-                resetTime: sevenDay?.resets_at.flatMap { DateUtils.parseISO8601($0) }
-            ),
+            fiveHourUsage: fiveHour,
+            weeklyUsage: sevenDay,
             lastUpdated: Date(),
             isAvailable: true
         )
+    }
+
+    private func resolveMetric(window: ClaudeUsageWindow?, cacheKey: String) -> UsageMetric {
+        if let window {
+            let metric = UsageMetric(
+                used: window.utilization,
+                total: 100,
+                unit: .percent,
+                resetTime: window.resets_at.flatMap { DateUtils.parseISO8601($0) }
+            )
+            saveMetricCache(metric, forKey: cacheKey)
+            return metric
+        }
+
+        if let cached = loadMetricCache(forKey: cacheKey) {
+            let now = Date()
+            if let resetTime = cached.resetTime, resetTime <= now {
+                clearMetricCache(forKey: cacheKey)
+            } else {
+                return cached
+            }
+        }
+
+        return UsageMetric(used: 0, total: 100, unit: .percent, resetTime: nil)
+    }
+
+    private func saveMetricCache(_ metric: UsageMetric, forKey key: String) {
+        defaults.set(metric.used, forKey: "\(key).used")
+        defaults.set(metric.total, forKey: "\(key).total")
+        defaults.set(metric.resetTime?.timeIntervalSince1970, forKey: "\(key).resetTime")
+    }
+
+    private func loadMetricCache(forKey key: String) -> UsageMetric? {
+        guard defaults.object(forKey: "\(key).used") != nil else { return nil }
+        let used = defaults.double(forKey: "\(key).used")
+        let total = defaults.object(forKey: "\(key).total") != nil ? defaults.double(forKey: "\(key).total") : 100
+        let resetTimestamp = defaults.object(forKey: "\(key).resetTime") as? Double
+        let resetTime = resetTimestamp.map { Date(timeIntervalSince1970: $0) }
+        return UsageMetric(used: used, total: total, unit: .percent, resetTime: resetTime)
+    }
+
+    private func clearMetricCache(forKey key: String) {
+        defaults.removeObject(forKey: "\(key).used")
+        defaults.removeObject(forKey: "\(key).total")
+        defaults.removeObject(forKey: "\(key).resetTime")
     }
 
     // MARK: - Keychain Access via security CLI

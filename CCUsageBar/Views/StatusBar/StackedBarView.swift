@@ -4,12 +4,18 @@ struct StackedBarView: View {
     let services: [UsageData]
     var hasError: Bool = false
 
-    private var activeServices: [UsageData] {
-        services.filter(\.isAvailable)
+    @State private var currentPageIndex = 0
+
+    private var pages: [StatusBarDisplayPage] {
+        StatusBarDisplayPlanner.pages(from: services)
+    }
+
+    private var cycleTaskID: String {
+        pages.map(\.id).joined(separator: "|")
     }
 
     var body: some View {
-        if activeServices.isEmpty {
+        if pages.isEmpty {
             HStack(spacing: 2) {
                 if hasError {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -23,14 +29,62 @@ struct StackedBarView: View {
             }
             .frame(width: 24, height: 20)
         } else {
-            VStack(spacing: 1) {
-                ForEach(activeServices) { data in
-                    SingleBarView(usage: data, serviceCount: activeServices.count)
+            scrollingPages
+                .task(id: cycleTaskID) {
+                    await startCycleIfNeeded()
                 }
-            }
-            .frame(height: 20)
             .padding(.horizontal, 2)
         }
+    }
+
+    private var scrollingPages: some View {
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                ForEach(pages, id: \.id) { page in
+                    StatusBarPageView(services: page.services)
+                        .frame(height: StatusBarDisplayPlanner.pageHeight)
+                }
+            }
+            .offset(y: -CGFloat(currentPageIndex) * StatusBarDisplayPlanner.pageHeight)
+            .animation(
+                .easeInOut(duration: StatusBarDisplayPlanner.transitionSeconds),
+                value: currentPageIndex
+            )
+        }
+        .frame(height: StatusBarDisplayPlanner.pageHeight)
+        .clipped()
+    }
+
+    @MainActor
+    private func startCycleIfNeeded() async {
+        currentPageIndex = 0
+        guard pages.count > 1 else { return }
+
+        while !Task.isCancelled {
+            let currentPage = pages[currentPageIndex]
+            let duration = StatusBarDisplayPlanner.displayDuration(for: currentPage)
+            let nanoseconds = UInt64(duration * 1_000_000_000)
+
+            try? await Task.sleep(nanoseconds: nanoseconds)
+            guard !Task.isCancelled else { return }
+
+            withAnimation(.easeInOut(duration: StatusBarDisplayPlanner.transitionSeconds)) {
+                currentPageIndex = (currentPageIndex + 1) % pages.count
+            }
+        }
+    }
+}
+
+private struct StatusBarPageView: View {
+    let services: [UsageData]
+
+    var body: some View {
+        VStack(spacing: 1) {
+            ForEach(services) { data in
+                SingleBarView(usage: data, serviceCount: services.count)
+            }
+        }
+        .frame(height: StatusBarDisplayPlanner.pageHeight)
     }
 }
 
