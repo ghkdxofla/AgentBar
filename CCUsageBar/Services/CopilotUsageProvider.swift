@@ -22,33 +22,60 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .copilot
 
     private let session: URLSession
-    private let credentialProvider: @Sendable () -> String?
+    private let primaryCredentialProvider: @Sendable () -> String?
+    private let fallbackCredentialProvider: @Sendable () -> String?
 
     static let apiURL = URL(string: "https://api.github.com/copilot_internal/user")!
+    private static let defaultGHTokenCacheTTL: TimeInterval = 60
+    private static let ghTokenLookupTimeout: TimeInterval = 2
+    private static let ghTokenCacheLock = NSLock()
+    nonisolated(unsafe) static var ghCLICommandRunner: @Sendable (_ timeout: TimeInterval) -> String? = { timeout in
+        runGHCLICommand(timeout: timeout)
+    }
+    nonisolated(unsafe) private static var cachedGHCLIToken: String?
+    nonisolated(unsafe) private static var ghTokenLastLookupAt: Date?
 
     init(
         session: URLSession = .shared,
-        credentialProvider: (@Sendable () -> String?)? = nil
+        credentialProvider: (@Sendable () -> String?)? = nil,
+        fallbackCredentialProvider: (@Sendable () -> String?)? = nil
     ) {
         self.session = session
-        self.credentialProvider = credentialProvider ?? {
-            // Try gh CLI first, then fall back to manual PAT in Keychain
-            if let ghToken = Self.readGHCLIToken() {
-                return ghToken
+        if let credentialProvider {
+            self.primaryCredentialProvider = credentialProvider
+            self.fallbackCredentialProvider = fallbackCredentialProvider ?? { nil }
+        } else {
+            self.primaryCredentialProvider = { Self.readGHCLIToken() }
+            self.fallbackCredentialProvider = fallbackCredentialProvider ?? {
+                KeychainManager.load(account: ServiceType.copilot.keychainAccount)
             }
-            return KeychainManager.load(account: ServiceType.copilot.keychainAccount)
         }
     }
 
     func isConfigured() async -> Bool {
-        credentialProvider() != nil
+        primaryCredentialProvider() != nil || fallbackCredentialProvider() != nil
     }
 
     func fetchUsage() async throws -> UsageData {
-        guard let pat = credentialProvider() else {
+        if let primaryToken = primaryCredentialProvider() {
+            do {
+                return try await fetchUsage(using: primaryToken)
+            } catch APIError.unauthorized {
+                if let fallbackToken = fallbackCredentialProvider(), fallbackToken != primaryToken {
+                    return try await fetchUsage(using: fallbackToken)
+                }
+                throw APIError.unauthorized
+            }
+        }
+
+        guard let fallbackToken = fallbackCredentialProvider() else {
             throw APIError.unauthorized
         }
 
+        return try await fetchUsage(using: fallbackToken)
+    }
+
+    private func fetchUsage(using pat: String) async throws -> UsageData {
         var request = URLRequest(url: Self.apiURL, timeoutInterval: 10)
         request.httpMethod = "GET"
         request.setValue("Bearer \(pat)", forHTTPHeaderField: "Authorization")
@@ -112,26 +139,67 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     // MARK: - gh CLI Token
 
-    static func readGHCLIToken() -> String? {
+    static func readGHCLIToken(now: Date = Date(), cacheTTL: TimeInterval? = nil) -> String? {
+        let effectiveCacheTTL = max(0, cacheTTL ?? cacheTTLFromRefreshInterval())
+        ghTokenCacheLock.lock()
+        defer { ghTokenCacheLock.unlock() }
+
+        if let lastLookupAt = ghTokenLastLookupAt,
+           now.timeIntervalSince(lastLookupAt) < effectiveCacheTTL {
+            return cachedGHCLIToken
+        }
+
+        let token = ghCLICommandRunner(ghTokenLookupTimeout)
+        cachedGHCLIToken = token
+        ghTokenLastLookupAt = now
+        return token
+    }
+
+    static func resetGHCLITokenCache() {
+        ghTokenCacheLock.lock()
+        cachedGHCLIToken = nil
+        ghTokenLastLookupAt = nil
+        ghTokenCacheLock.unlock()
+    }
+
+    private static func cacheTTLFromRefreshInterval() -> TimeInterval {
+        let refreshInterval = UserDefaults.standard.double(forKey: "refreshInterval")
+        return refreshInterval > 0 ? refreshInterval : defaultGHTokenCacheTTL
+    }
+
+    private static func runGHCLICommand(timeout: TimeInterval) -> String? {
         let process = Process()
         let pipe = Pipe()
+        let terminationSignal = DispatchSemaphore(value: 0)
+
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["gh", "auth", "token"]
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
+        process.terminationHandler = { _ in
+            terminationSignal.signal()
+        }
 
         do {
             try process.run()
-            process.waitUntilExit()
-
-            guard process.terminationStatus == 0 else { return nil }
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let token = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return token?.isEmpty == true ? nil : token
         } catch {
             return nil
         }
+
+        let waitResult = terminationSignal.wait(timeout: .now() + timeout)
+        if waitResult == .timedOut {
+            if process.isRunning {
+                process.terminate()
+                _ = terminationSignal.wait(timeout: .now() + 0.25)
+            }
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let token = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return token?.isEmpty == true ? nil : token
     }
 
     // MARK: - Helpers

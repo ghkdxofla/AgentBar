@@ -2,14 +2,19 @@ import XCTest
 @testable import CCUsageBar
 
 final class CopilotUsageProviderTests: XCTestCase {
+    private var originalGHCLICommandRunner: (@Sendable (TimeInterval) -> String?)!
 
     override func setUp() {
         super.setUp()
         CopilotMockURLProtocol.reset()
+        CopilotUsageProvider.resetGHCLITokenCache()
+        originalGHCLICommandRunner = CopilotUsageProvider.ghCLICommandRunner
     }
 
     override func tearDown() {
         CopilotMockURLProtocol.reset()
+        CopilotUsageProvider.resetGHCLITokenCache()
+        CopilotUsageProvider.ghCLICommandRunner = originalGHCLICommandRunner
         super.tearDown()
     }
 
@@ -144,12 +149,81 @@ final class CopilotUsageProviderTests: XCTestCase {
         }
     }
 
+    func testFallsBackToManualPATWhenPrimaryTokenUnauthorized() async throws {
+        let json = """
+        {
+            "copilot_plan": "pro",
+            "quota_snapshots": [
+                {"quota_id": "premium_requests", "entitlement": 300, "remaining": 200, "unlimited": false}
+            ]
+        }
+        """
+        CopilotMockURLProtocol.responseProvider = { request in
+            let authHeader = request.value(forHTTPHeaderField: "Authorization")
+            if authHeader == "Bearer gh_cli_token" {
+                return (Data(), 401)
+            }
+            return (Data(json.utf8), 200)
+        }
+        CopilotMockURLProtocol.onRequest = { request, attempt in
+            let authHeader = request.value(forHTTPHeaderField: "Authorization")
+            if attempt == 0 {
+                XCTAssertEqual(authHeader, "Bearer gh_cli_token")
+            } else if attempt == 1 {
+                XCTAssertEqual(authHeader, "Bearer ghp_manual_pat")
+            } else {
+                XCTFail("Unexpected extra request attempt")
+            }
+        }
+
+        let provider = CopilotUsageProvider(
+            session: CopilotMockURLProtocol.session(),
+            credentialProvider: { "gh_cli_token" },
+            fallbackCredentialProvider: { "ghp_manual_pat" }
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(CopilotMockURLProtocol.requestCount, 2)
+        XCTAssertEqual(usage.fiveHourUsage.used, 100)
+        XCTAssertEqual(usage.fiveHourUsage.total, 300)
+    }
+
+    func testReadGHCLITokenCachesResultWithinTTL() {
+        let counter = CounterBox()
+        CopilotUsageProvider.ghCLICommandRunner = { _ in
+            counter.increment()
+            return "ghp_cached"
+        }
+
+        let now = Date(timeIntervalSince1970: 1_000)
+        XCTAssertEqual(CopilotUsageProvider.readGHCLIToken(now: now, cacheTTL: 60), "ghp_cached")
+        XCTAssertEqual(CopilotUsageProvider.readGHCLIToken(now: now.addingTimeInterval(10), cacheTTL: 60), "ghp_cached")
+        XCTAssertEqual(counter.value, 1)
+
+        XCTAssertEqual(CopilotUsageProvider.readGHCLIToken(now: now.addingTimeInterval(61), cacheTTL: 60), "ghp_cached")
+        XCTAssertEqual(counter.value, 2)
+    }
+
+    func testReadGHCLITokenCachesTimeoutFailureWithinTTL() {
+        let counter = CounterBox()
+        CopilotUsageProvider.ghCLICommandRunner = { _ in
+            counter.increment()
+            return nil
+        }
+
+        let now = Date(timeIntervalSince1970: 2_000)
+        XCTAssertNil(CopilotUsageProvider.readGHCLIToken(now: now, cacheTTL: 60))
+        XCTAssertNil(CopilotUsageProvider.readGHCLIToken(now: now.addingTimeInterval(5), cacheTTL: 60))
+        XCTAssertEqual(counter.value, 1)
+    }
+
     func testSendsCorrectHeaders() async throws {
         let json = """
         {"copilot_plan": "free", "quota_snapshots": [{"quota_id": "premium_requests", "entitlement": 50, "remaining": 50, "unlimited": false}]}
         """
         CopilotMockURLProtocol.stubResponse(data: Data(json.utf8), statusCode: 200)
-        CopilotMockURLProtocol.onRequest = { request in
+        CopilotMockURLProtocol.onRequest = { request, _ in
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer ghp_my_token")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
             XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "CCUsageBar")
@@ -170,11 +244,15 @@ final class CopilotUsageProviderTests: XCTestCase {
 private final class CopilotMockURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var stubData: Data = Data()
     nonisolated(unsafe) static var stubStatusCode: Int = 200
-    nonisolated(unsafe) static var onRequest: ((URLRequest) -> Void)?
+    nonisolated(unsafe) static var requestCount: Int = 0
+    nonisolated(unsafe) static var responseProvider: ((URLRequest) -> (data: Data, statusCode: Int))?
+    nonisolated(unsafe) static var onRequest: ((URLRequest, Int) -> Void)?
 
     static func reset() {
         stubData = Data()
         stubStatusCode = 200
+        requestCount = 0
+        responseProvider = nil
         onRequest = nil
     }
 
@@ -193,19 +271,42 @@ private final class CopilotMockURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        CopilotMockURLProtocol.onRequest?(request)
+        let currentRequestCount = CopilotMockURLProtocol.requestCount
+        CopilotMockURLProtocol.requestCount += 1
+        CopilotMockURLProtocol.onRequest?(request, currentRequestCount)
+
+        let stubbed = CopilotMockURLProtocol.responseProvider?(request)
+        let data = stubbed?.data ?? CopilotMockURLProtocol.stubData
+        let statusCode = stubbed?.statusCode ?? CopilotMockURLProtocol.stubStatusCode
 
         let response = HTTPURLResponse(
             url: request.url!,
-            statusCode: CopilotMockURLProtocol.stubStatusCode,
+            statusCode: statusCode,
             httpVersion: nil,
             headerFields: nil
         )!
 
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: CopilotMockURLProtocol.stubData)
+        client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
     }
 
     override func stopLoading() {}
+}
+
+private final class CounterBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValue: Int = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedValue
+    }
+
+    func increment() {
+        lock.lock()
+        storedValue += 1
+        lock.unlock()
+    }
 }
