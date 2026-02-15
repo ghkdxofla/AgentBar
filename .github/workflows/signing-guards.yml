@@ -1,0 +1,20 @@
+name: Signing Guards
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  signing-guards:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify signing matrix
+        run: bash scripts/check-signing-matrix.sh
+
+      - name: Test signing verifier parser
+        run: bash scripts/test-verify-release-signing.sh
