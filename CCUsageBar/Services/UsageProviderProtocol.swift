@@ -15,24 +15,6 @@ struct CLIProcessRuntime {
     let readOutput: () -> Data
 }
 
-private final class CLIProcessOutputBuffer: @unchecked Sendable {
-    private let lock = NSLock()
-    private var data = Data()
-
-    func append(_ chunk: Data) {
-        lock.lock()
-        data.append(chunk)
-        lock.unlock()
-    }
-
-    func snapshot() -> Data {
-        lock.lock()
-        let current = data
-        lock.unlock()
-        return current
-    }
-}
-
 enum CLIProcessExecutor {
     private static let terminateGracePeriod: TimeInterval = 0.25
 
@@ -45,7 +27,6 @@ enum CLIProcessExecutor {
         let pipe = Pipe()
         let outputHandle = pipe.fileHandleForReading
         let terminationSignal = DispatchSemaphore(value: 0)
-        let outputBuffer = CLIProcessOutputBuffer()
 
         process.executableURL = executableURL
         process.arguments = arguments
@@ -53,12 +34,6 @@ enum CLIProcessExecutor {
         process.standardError = FileHandle.nullDevice
         process.terminationHandler = { _ in
             terminationSignal.signal()
-        }
-
-        outputHandle.readabilityHandler = { handle in
-            let chunk = handle.availableData
-            guard !chunk.isEmpty else { return }
-            outputBuffer.append(chunk)
         }
 
         let runtime = CLIProcessRuntime(
@@ -70,14 +45,10 @@ enum CLIProcessExecutor {
             terminate: { process.terminate() },
             terminationStatus: { process.terminationStatus },
             readOutput: {
-                outputHandle.readabilityHandler = nil
-                let remainder = outputHandle.readDataToEndOfFile()
-                outputBuffer.append(remainder)
-                return outputBuffer.snapshot()
+                outputHandle.readDataToEndOfFile()
             }
         )
 
-        defer { outputHandle.readabilityHandler = nil }
         return executeCommand(timeout: timeout, runtime: runtime)
     }
 

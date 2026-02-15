@@ -245,6 +245,36 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertEqual(waitTimeouts[1], 0.25, accuracy: 0.0001)
     }
 
+    func testExecuteGHCLICommandReturnsNilForNonZeroExitStatus() {
+        let runtime = CopilotUsageProvider.GHCLIProcessRuntime(
+            run: {},
+            waitForTermination: { _ in .success },
+            isRunning: { false },
+            terminate: {},
+            terminationStatus: { 1 },
+            readOutput: { Data("ghp_test".utf8) }
+        )
+
+        let result = CopilotUsageProvider.executeGHCLICommand(timeout: 0.05, runtime: runtime)
+
+        XCTAssertNil(result)
+    }
+
+    func testExecuteGHCLICommandReturnsNilForEmptyOutput() {
+        let runtime = CopilotUsageProvider.GHCLIProcessRuntime(
+            run: {},
+            waitForTermination: { _ in .success },
+            isRunning: { false },
+            terminate: {},
+            terminationStatus: { 0 },
+            readOutput: { Data("   \n\t".utf8) }
+        )
+
+        let result = CopilotUsageProvider.executeGHCLICommand(timeout: 0.05, runtime: runtime)
+
+        XCTAssertNil(result)
+    }
+
     func testSendsCorrectHeaders() async throws {
         let json = """
         {"copilot_plan": "free", "quota_snapshots": [{"quota_id": "premium_requests", "entitlement": 50, "remaining": 50, "unlimited": false}]}
