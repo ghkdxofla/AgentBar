@@ -56,12 +56,11 @@ final class AgentAlertMonitor {
         let now = Date().timeIntervalSince1970
         for detector in detectors {
             let key = watermarkKey(for: detector.serviceType)
-            if defaults.object(forKey: key) == nil {
-                defaults.set(now, forKey: key)
-            }
-
             let eventIDsKey = watermarkEventIDsKey(for: detector.serviceType)
-            if defaults.object(forKey: eventIDsKey) == nil {
+
+            if defaults.object(forKey: key) == nil {
+                // New installs start with both timestamp and boundary IDs initialized.
+                defaults.set(now, forKey: key)
                 defaults.set([String](), forKey: eventIDsKey)
             }
         }
@@ -101,11 +100,15 @@ final class AgentAlertMonitor {
 
         isProcessing = true
         defer { isProcessing = false }
+        ensureInitialWatermarks()
 
         for detector in detectors {
-            let watermark = watermarkCursor(for: detector.serviceType)
+            let serviceType = detector.serviceType
+            let watermark = watermarkCursor(for: serviceType)
+            // Legacy installs may have a timestamp but no ID set; stay boundary-exclusive until the cursor advances.
+            let includeBoundary = hasStoredWatermarkEventIDs(for: serviceType)
             let events = await Task.detached(priority: .utility) {
-                await detector.detectEvents(since: watermark.date, includeBoundary: true)
+                await detector.detectEvents(since: watermark.date, includeBoundary: includeBoundary)
             }.value
 
             guard !events.isEmpty else { continue }
@@ -121,7 +124,9 @@ final class AgentAlertMonitor {
             }
 
             let updatedWatermark = updatedWatermarkCursor(from: watermark, with: unseenEvents)
-            saveWatermarkCursor(updatedWatermark, for: detector.serviceType)
+            if includeBoundary || !areSameTimestamp(updatedWatermark.date, watermark.date) {
+                saveWatermarkCursor(updatedWatermark, for: serviceType)
+            }
         }
     }
 
@@ -153,6 +158,10 @@ final class AgentAlertMonitor {
         let timestamp = defaults.double(forKey: timestampKey)
         let eventIDs = Set(defaults.stringArray(forKey: watermarkEventIDsKey(for: service)) ?? [])
         return WatermarkCursor(timestamp: timestamp, eventIDsAtTimestamp: eventIDs)
+    }
+
+    private func hasStoredWatermarkEventIDs(for service: ServiceType) -> Bool {
+        defaults.object(forKey: watermarkEventIDsKey(for: service)) != nil
     }
 
     private func saveWatermarkCursor(_ cursor: WatermarkCursor, for service: ServiceType) {

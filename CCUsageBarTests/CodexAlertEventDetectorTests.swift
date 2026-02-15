@@ -226,6 +226,62 @@ final class AgentAlertMonitorTests: XCTestCase {
         XCTAssertTrue(postedEvents.isEmpty)
     }
 
+    func testLegacyWatermarkWithoutEventIDsDoesNotReplayBoundaryEvents() async throws {
+        let suiteName = "CCUsageBarTests.AgentAlertMonitor.LegacyWatermarkMigration.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: "alertsEnabled")
+
+        guard let watermarkTimestamp = DateUtils.parseISO8601("2026-02-15T13:00:00Z") else {
+            XCTFail("Failed to create watermark timestamp")
+            return
+        }
+        let newerTimestamp = watermarkTimestamp.addingTimeInterval(1)
+
+        defaults.set(watermarkTimestamp.timeIntervalSince1970, forKey: watermarkKey(for: .codex))
+        defaults.removeObject(forKey: watermarkEventIDsKey(for: .codex))
+
+        let boundaryEvent = AgentAlertEvent(
+            service: .codex,
+            type: .taskCompleted,
+            timestamp: watermarkTimestamp,
+            message: nil,
+            sessionID: "legacy-session"
+        )
+        let newerEvent = AgentAlertEvent(
+            service: .codex,
+            type: .permissionRequired,
+            timestamp: newerTimestamp,
+            message: "Codex requested elevated command permissions.",
+            sessionID: "legacy-session"
+        )
+
+        let detector = BoundaryAwareTestAgentAlertDetector(events: [boundaryEvent, newerEvent])
+        let notificationService = TestAgentAlertNotificationService()
+        let monitor = AgentAlertMonitor(
+            detectors: [detector],
+            notificationService: notificationService,
+            defaults: defaults,
+            cooldown: 0
+        )
+
+        await monitor.processTick()
+        await monitor.processTick()
+
+        let postedEvents = await notificationService.postedEvents()
+        XCTAssertEqual(postedEvents.count, 1)
+        XCTAssertEqual(postedEvents.first?.type, .permissionRequired)
+        XCTAssertEqual(postedEvents.first?.timestamp, newerTimestamp)
+
+        let includeBoundaryCalls = await detector.includeBoundaryCalls()
+        XCTAssertEqual(includeBoundaryCalls, [false, true])
+    }
+
     func testCooldownSuppressesRepeatedNotificationsForSameDedupeKey() async throws {
         let suiteName = "CCUsageBarTests.AgentAlertMonitor.Cooldown.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
@@ -311,6 +367,28 @@ private actor TestAgentAlertDetector: AgentAlertEventDetectorProtocol {
     }
 }
 
+private actor BoundaryAwareTestAgentAlertDetector: AgentAlertEventDetectorProtocol {
+    nonisolated let serviceType: ServiceType = .codex
+
+    private let events: [AgentAlertEvent]
+    private var includeBoundaryHistory: [Bool] = []
+
+    init(events: [AgentAlertEvent]) {
+        self.events = events
+    }
+
+    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentAlertEvent] {
+        includeBoundaryHistory.append(includeBoundary)
+        return events.filter { event in
+            includeBoundary ? event.timestamp >= since : event.timestamp > since
+        }
+    }
+
+    func includeBoundaryCalls() -> [Bool] {
+        includeBoundaryHistory
+    }
+}
+
 private actor TestAgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
     private var events: [AgentAlertEvent] = []
 
@@ -322,5 +400,106 @@ private actor TestAgentAlertNotificationService: AgentAlertNotificationServicePr
 
     func postedEvents() -> [AgentAlertEvent] {
         events
+    }
+}
+
+final class AgentAlertNotificationServiceTests: XCTestCase {
+    func testPostUsesRedactedBodyWhenMessagePreviewDisabled() async throws {
+        let suiteName = "CCUsageBarTests.AgentAlertNotificationService.Redacted.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(false, forKey: "alertShowMessagePreview")
+
+        let recorder = NotificationBodyRecorder()
+        let service = AgentAlertNotificationService(
+            defaults: defaults,
+            postBodyOverride: { body in
+                recorder.append(body)
+            }
+        )
+
+        let event = AgentAlertEvent(
+            service: .codex,
+            type: .decisionRequired,
+            timestamp: Date(timeIntervalSince1970: 1),
+            message: "Should I proceed with the schema migration?",
+            sessionID: "session-1"
+        )
+        await service.post(event: event)
+
+        XCTAssertEqual(recorder.bodies(), ["[\(event.service.rawValue)] Agent is waiting for your input."])
+    }
+
+    func testPostUsesMessagePreviewWhenEnabled() async throws {
+        let suiteName = "CCUsageBarTests.AgentAlertNotificationService.Preview.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(true, forKey: "alertShowMessagePreview")
+
+        let recorder = NotificationBodyRecorder()
+        let service = AgentAlertNotificationService(
+            defaults: defaults,
+            postBodyOverride: { body in
+                recorder.append(body)
+            }
+        )
+
+        let event = AgentAlertEvent(
+            service: .codex,
+            type: .decisionRequired,
+            timestamp: Date(timeIntervalSince1970: 1),
+            message: "Should I proceed with the schema migration?",
+            sessionID: "session-1"
+        )
+        await service.post(event: event)
+
+        XCTAssertEqual(recorder.bodies(), ["[\(event.service.rawValue)] Should I proceed with the schema migration?"])
+    }
+}
+
+final class AgentAlertEventTests: XCTestCase {
+    func testCursorIDDiffersWhenSourceRecordIDDiffers() {
+        let timestamp = Date(timeIntervalSince1970: 1_739_616_000)
+        let first = AgentAlertEvent(
+            service: .codex,
+            type: .permissionRequired,
+            timestamp: timestamp,
+            message: "Codex requested elevated command permissions.",
+            sessionID: "session-1",
+            sourceRecordID: "session-1#12"
+        )
+        let second = AgentAlertEvent(
+            service: .codex,
+            type: .permissionRequired,
+            timestamp: timestamp,
+            message: "Codex requested elevated command permissions.",
+            sessionID: "session-1",
+            sourceRecordID: "session-1#13"
+        )
+
+        XCTAssertNotEqual(first.cursorID, second.cursorID)
+    }
+}
+
+private final class NotificationBodyRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var capturedBodies: [String] = []
+
+    func append(_ body: String) {
+        lock.lock()
+        capturedBodies.append(body)
+        lock.unlock()
+    }
+
+    func bodies() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return capturedBodies
     }
 }

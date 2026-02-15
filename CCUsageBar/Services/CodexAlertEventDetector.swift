@@ -49,13 +49,20 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
 
         var events: [AgentAlertEvent] = []
 
-        for record in records {
+        for (index, record) in records.enumerated() {
             guard let timestamp = record.timestamp,
                   let date = DateUtils.parseISO8601(timestamp),
                   passesBoundary(date, since: since, includeBoundary: includeBoundary) else { continue }
 
             guard let payload = record.payload else { continue }
-            if let event = mapRecord(recordType: record.type, payload: payload, date: date, sessionID: sessionID) {
+            let sourceRecordID = "\(sessionID)#\(index)"
+            if let event = mapRecord(
+                recordType: record.type,
+                payload: payload,
+                date: date,
+                sessionID: sessionID,
+                sourceRecordID: sourceRecordID
+            ) {
                 events.append(event)
             }
         }
@@ -67,7 +74,8 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         recordType: String?,
         payload: CodexAlertPayload,
         date: Date,
-        sessionID: String
+        sessionID: String,
+        sourceRecordID: String
     ) -> AgentAlertEvent? {
         if recordType == "event_msg" {
             if payload.type == "task_complete" {
@@ -76,7 +84,8 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
                     type: .taskCompleted,
                     timestamp: date,
                     message: nil,
-                    sessionID: sessionID
+                    sessionID: sessionID,
+                    sourceRecordID: sourceRecordID
                 )
             }
 
@@ -88,7 +97,8 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
                     type: .decisionRequired,
                     timestamp: date,
                     message: message,
-                    sessionID: sessionID
+                    sessionID: sessionID,
+                    sourceRecordID: sourceRecordID
                 )
             }
         }
@@ -101,7 +111,8 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
                 type: .permissionRequired,
                 timestamp: date,
                 message: "Codex requested elevated command permissions.",
-                sessionID: sessionID
+                sessionID: sessionID,
+                sourceRecordID: sourceRecordID
             )
         }
 
