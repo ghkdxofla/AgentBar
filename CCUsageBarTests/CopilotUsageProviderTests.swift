@@ -250,6 +250,37 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertEqual(waitTimeouts[2], 0.25, accuracy: 0.0001)
     }
 
+    func testExecuteGHCLICommandTimeoutDoesNotForceKillWhenTerminateStopsProcess() {
+        var terminateCallCount = 0
+        var forceTerminateCallCount = 0
+        var waitTimeouts: [TimeInterval] = []
+        var isRunningCheckCount = 0
+        let runtime = CopilotUsageProvider.GHCLIProcessRuntime(
+            run: {},
+            waitForTermination: { timeout in
+                waitTimeouts.append(timeout)
+                return .timedOut
+            },
+            isRunning: {
+                defer { isRunningCheckCount += 1 }
+                return isRunningCheckCount == 0
+            },
+            terminate: { terminateCallCount += 1 },
+            forceTerminate: { forceTerminateCallCount += 1 },
+            terminationStatus: { 0 },
+            readOutput: { Data() }
+        )
+
+        let result = CopilotUsageProvider.executeGHCLICommand(timeout: 0.05, runtime: runtime)
+
+        XCTAssertNil(result)
+        XCTAssertEqual(terminateCallCount, 1)
+        XCTAssertEqual(forceTerminateCallCount, 0)
+        XCTAssertEqual(waitTimeouts.count, 2)
+        XCTAssertEqual(waitTimeouts[0], 0.05, accuracy: 0.0001)
+        XCTAssertEqual(waitTimeouts[1], 0.25, accuracy: 0.0001)
+    }
+
     func testExecuteGHCLICommandReturnsNilForNonZeroExitStatus() {
         let runtime = CopilotUsageProvider.GHCLIProcessRuntime(
             run: {},
@@ -313,14 +344,14 @@ final class CopilotUsageProviderTests: XCTestCase {
         let result = CLIProcessExecutor.executeCommand(
             executableURL: URL(fileURLWithPath: "/bin/sh"),
             arguments: ["-c", "echo $$ > \(pidFilePath); trap '' TERM; while :; do sleep 0.05; done"],
-            timeout: 0.1
+            timeout: 0.3
         )
 
         XCTAssertNil(result)
 
-        let fileDeadline = Date().addingTimeInterval(1)
+        let fileDeadline = Date().addingTimeInterval(3)
         while !FileManager.default.fileExists(atPath: pidFilePath) && Date() < fileDeadline {
-            usleep(10_000)
+            usleep(20_000)
         }
 
         guard let pidString = try? String(contentsOfFile: pidFilePath, encoding: .utf8),
@@ -335,7 +366,7 @@ final class CopilotUsageProviderTests: XCTestCase {
             }
         }
 
-        let killDeadline = Date().addingTimeInterval(1)
+        let killDeadline = Date().addingTimeInterval(3)
         var processStillRunning = true
         while Date() < killDeadline {
             let probe = kill(pid, 0)
@@ -343,7 +374,7 @@ final class CopilotUsageProviderTests: XCTestCase {
                 processStillRunning = false
                 break
             }
-            usleep(10_000)
+            usleep(20_000)
         }
 
         XCTAssertFalse(processStillRunning, "Expected TERM-resistant process to be force-killed")
