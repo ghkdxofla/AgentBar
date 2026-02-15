@@ -27,7 +27,6 @@ struct SettingsView: View {
 
     @AppStorage("zaiEnabled") private var zaiEnabled = true
 
-    @State private var openaiAPIKey: String = ""
     @State private var copilotPAT: String = ""
     @State private var zaiAPIKey: String = ""
     @State private var showSavedAlert = false
@@ -66,15 +65,6 @@ struct SettingsView: View {
                     .onChange(of: codexEnabled) { _ in
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
-                HStack {
-                    Text("API Key:")
-                    SecureField("sk-...", text: $openaiAPIKey)
-                        .frame(width: 200)
-                    Button("Save") {
-                        saveAPIKey(openaiAPIKey, account: ServiceType.codex.keychainAccount)
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
-                    }
-                }
 
                 Picker("Plan", selection: $codexPlan) {
                     ForEach(CodexPlan.allCases, id: \.rawValue) { plan in
@@ -116,6 +106,10 @@ struct SettingsView: View {
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
                 }
+
+                Text("Usage is derived from local session logs in ~/.codex/sessions")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // Google Gemini
@@ -147,18 +141,24 @@ struct SettingsView: View {
                     .onChange(of: copilotEnabled) { _ in
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
-                HStack {
-                    Text("GitHub PAT:")
-                    SecureField("ghp_...", text: $copilotPAT)
-                        .frame(width: 200)
-                    Button("Save") {
-                        saveAPIKey(copilotPAT, account: ServiceType.copilot.keychainAccount)
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
-                    }
-                }
-                Text("Requires a GitHub Personal Access Token with Copilot access")
+                Text("Token is auto-read from gh CLI (gh auth token)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                DisclosureGroup("Manual PAT (optional fallback)") {
+                    HStack {
+                        SecureField("ghp_...", text: $copilotPAT)
+                            .frame(width: 200)
+                        Button("Save") {
+                            saveAPIKey(copilotPAT, account: ServiceType.copilot.keychainAccount)
+                            NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        }
+                    }
+                    Text("Only needed if gh CLI is not installed")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption)
             }
 
             // Cursor
@@ -175,13 +175,13 @@ struct SettingsView: View {
                 }
                 .onChange(of: cursorPlan) { newValue in
                     if let plan = CursorPlan(rawValue: newValue), plan != .custom {
-                        cursorMonthlyLimit = plan.monthlyRequestLimit
+                        cursorMonthlyLimit = plan.monthlyRequestEstimate
                     }
                     NotificationCenter.default.post(name: .limitsChanged, object: nil)
                 }
 
                 HStack {
-                    Text("Monthly request limit:")
+                    Text("Est. monthly requests:")
                     TextField("", value: $cursorMonthlyLimit, format: .number)
                         .frame(width: 120)
                         .disabled(cursorPlan != CursorPlan.custom.rawValue)
@@ -194,7 +194,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("Token is auto-read from Cursor's local database")
+                Text("Credit-based pricing since June 2025. Actual limit varies by model. Token is auto-read from Cursor's local database.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -236,9 +236,6 @@ struct SettingsView: View {
     }
 
     private func loadAPIKeys() {
-        if let key = KeychainManager.load(account: ServiceType.codex.keychainAccount) {
-            openaiAPIKey = String(repeating: "*", count: min(key.count, 12))
-        }
         if let key = KeychainManager.load(account: ServiceType.copilot.keychainAccount) {
             copilotPAT = String(repeating: "*", count: min(key.count, 12))
         }

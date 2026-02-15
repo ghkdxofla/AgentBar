@@ -151,9 +151,9 @@ final class UsageViewModel: ObservableObject {
             let cursorPlan = CursorPlan(rawValue: cursorPlanRaw) ?? .pro
             let cursorLimit: Double
             if cursorPlan == .custom {
-                cursorLimit = defaults.double(forKey: "cursorMonthlyLimit").nonZero ?? CursorPlan.pro.monthlyRequestLimit
+                cursorLimit = defaults.double(forKey: "cursorMonthlyLimit").nonZero ?? CursorPlan.pro.monthlyRequestEstimate
             } else {
-                cursorLimit = cursorPlan.monthlyRequestLimit
+                cursorLimit = cursorPlan.monthlyRequestEstimate
             }
             providers.append(CursorUsageProvider(monthlyRequestLimit: cursorLimit))
         }

@@ -32,7 +32,11 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     ) {
         self.session = session
         self.credentialProvider = credentialProvider ?? {
-            KeychainManager.load(account: ServiceType.copilot.keychainAccount)
+            // Try gh CLI first, then fall back to manual PAT in Keychain
+            if let ghToken = Self.readGHCLIToken() {
+                return ghToken
+            }
+            return KeychainManager.load(account: ServiceType.copilot.keychainAccount)
         }
     }
 
@@ -103,6 +107,30 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             lastUpdated: Date(),
             isAvailable: true
         )
+    }
+
+    // MARK: - gh CLI Token
+
+    static func readGHCLIToken() -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["gh", "auth", "token"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            guard process.terminationStatus == 0 else { return nil }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let token = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return token?.isEmpty == true ? nil : token
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Helpers
