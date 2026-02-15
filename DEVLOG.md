@@ -1,4 +1,4 @@
-# CCUsageBar Development Log (formerly AgentBar)
+# AgentBar Development Log
 
 ## Iteration 1: Project Scaffolding + Build Verification
 - Created `project.yml` for xcodegen (macOS 13.0, LSUIElement, entitlements)
@@ -119,7 +119,7 @@
 - **Z.ai single rate window**: Z.ai only has one quota (monthly TIME_LIMIT), removed weekly API fetch and made `UsageData.weeklyUsage` optional. Z.ai now shows single "Quota" row instead of two rows
 - **Z.ai label fix**: `fiveHourLabel` returns "Quota" for Z.ai, "5h" for others; `weeklyLabel` returns "7d"
 - **Rename "Z.ai GLM" → "Z.ai Coding Plan"**
-- **Rename AgentBar → CCUsageBar**: project name, directories (`CCUsageBar/`, `CCUsageBarTests/`), bundle ID (`com.ccusagebar.app`), entitlements, `@main` struct, all imports, UI text, notification names
+- **Rename AgentBar → AgentBar**: project name, directories (`AgentBar/`, `AgentBarTests/`), bundle ID (`com.agentbar.app`), entitlements, `@main` struct, all imports, UI text, notification names
 - Removed unused `ZaiModelUsageResponse`, `ZaiModelUsageData`, `ZaiTotalUsage` models and `fetchWeeklyUsage()` method
 - Views updated to handle optional `weeklyUsage` (DetailPopoverView, StackedBarView, MiniBarView)
 - All 35 tests passing
@@ -193,7 +193,7 @@
 - **SubscriptionPlan**: Added `CopilotPlan` (Free/Pro/Pro+/Business/Enterprise/Custom) and `CursorPlan` (Free/Pro/Business/Custom) with monthly request limits
 - **CopilotUsageProvider** (new): Calls `GET https://api.github.com/copilot_internal/user` with GitHub PAT from Keychain. Parses `premium_requests` quota snapshot (`entitlement - remaining = used`). Handles `unlimited: true` case. Reset = 1st of next month UTC. Single monthly window (`weeklyUsage: nil`)
 - **CursorUsageProvider** (new): Reads JWT from SQLite DB at `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`, decodes `sub` claim for user ID, calls `GET https://www.cursor.com/api/usage?user={userId}` with session cookie. Sums `numRequests` across all model buckets (gpt-4, gpt-3.5-turbo, cursor-small, claude-3.5-sonnet). Reset parsed from `startOfMonth + 1 month`. Uses `import SQLite3` C API
-- **project.yml**: Added `libsqlite3.tbd` dependency to both CCUsageBar and CCUsageBarTests targets
+- **project.yml**: Added `libsqlite3.tbd` dependency to both AgentBar and AgentBarTests targets
 - **UsageViewModel**: Wired `CopilotUsageProvider` and `CursorUsageProvider` into `buildProviders()` with enable toggles and plan-based limits. Updated sort order: claude, codex, gemini, copilot, cursor, zai
 - **SettingsView**: Added GitHub Copilot section (enable toggle, PAT SecureField) and Cursor section (enable toggle, plan picker, monthly limit field). Form height increased from 640 to 800
 - **CopilotUsageProviderTests** (new): 6 tests — premium request parsing, reset time calculation, unlimited quota, missing credentials, 401 handling, header verification
@@ -214,7 +214,7 @@
 ## Iteration 27: Fix Keychain password prompt on every launch
 - **Root cause**: `KeychainManager` used legacy Keychain (login.keychain) without explicit ACL. Debug builds have ad-hoc code signing that changes each build, so macOS treats each build as a "new" app → prompts for login password every time, even after "Always Allow"
 - **Attempted fix 1**: `kSecUseDataProtectionKeychain: true` — caused `-34018 errSecMissingEntitlement` because Data Protection Keychain requires proper code signing entitlements not available for ad-hoc Debug builds
-- **Final fix**: Reverted to legacy Keychain but added `SecAccessCreate` with `nil` trusted app list to create an open-access ACL. This removes per-app restriction so any build of CCUsageBar can read items without password prompts
+- **Final fix**: Reverted to legacy Keychain but added `SecAccessCreate` with `nil` trusted app list to create an open-access ACL. This removes per-app restriction so any build of AgentBar can read items without password prompts
 - **SettingsView compile fix**: Replaced `Result<Void, String>` (invalid — `String` doesn't conform to `Error`) with `SaveResult` enum
 - All 72 tests passing
 
@@ -227,7 +227,7 @@
 
 ## Iteration 29: Read Claude Code credentials via security CLI
 - **Implementation provenance**: Source and test changes for this iteration landed in commit `126806a` (`ClaudeUsageProvider.swift`, `ClaudeUsageProviderTests.swift`). Commit `6c80cdf` updated this devlog entry only.
-- **Problem**: `ClaudeUsageProvider` used `SecItemCopyMatching` to read `"Claude Code-credentials"` from Keychain. This item is owned by Claude Code CLI with a per-app ACL, so macOS prompts "CCUsageBar wants to use your confidential information" on every access. Ad-hoc code signing means "Always Allow" resets each build
+- **Problem**: `ClaudeUsageProvider` used `SecItemCopyMatching` to read `"Claude Code-credentials"` from Keychain. This item is owned by Claude Code CLI with a per-app ACL, so macOS prompts "AgentBar wants to use your confidential information" on every access. Ad-hoc code signing means "Always Allow" resets each build
 - **Fix**: Replaced direct Keychain API with `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w` via `Process`. The `security` binary is a system-trusted app that bypasses per-app ACL prompts. Same pattern as Copilot's `gh auth token`
 - **Caching**: Added NSLock-guarded token cache with TTL matching the app's refresh interval, preventing repeated CLI invocations within the same polling cycle
 - **`import Security` removed**: No longer needed since all Keychain access goes through the CLI
@@ -242,13 +242,13 @@
 - All 93 tests passing
 
 ## Iteration 31: Code signing with Developer ID Application certificate
-- **project.yml**: Added `DEVELOPMENT_TEAM: <TEAM_ID>`, `CODE_SIGN_STYLE: Manual`, `CODE_SIGN_IDENTITY: "Developer ID Application"` to CCUsageBar target. Test target uses `"Apple Development"` identity with the same team ID to match Team IDs between host app and test bundle
+- **project.yml**: Added `DEVELOPMENT_TEAM: <TEAM_ID>`, `CODE_SIGN_STYLE: Manual`, `CODE_SIGN_IDENTITY: "Developer ID Application"` to AgentBar target. Test target uses `"Apple Development"` identity with the same team ID to match Team IDs between host app and test bundle
 - **Benefits**: Stable code signing identity across builds eliminates ad-hoc signing issues (Keychain ACL prompts, "Always Allow" not persisting). App is now properly signed for DMG distribution and notarization
 - All 99 tests passing
 
 ## Iteration 32: Scope Developer ID signing to Release + add signing verification
-- **Signing scope fix**: `project.yml` now uses automatic signing by default for `CCUsageBar`, with `Developer ID Application` manual signing restricted to `Release` config only. This avoids Debug/CI failures on machines without distribution certificates.
-- **Test target portability fix**: Removed hard-pinned team/certificate from `CCUsageBarTests` and switched to automatic signing so tests can run across contributor and CI environments without a specific Apple team setup.
+- **Signing scope fix**: `project.yml` now uses automatic signing by default for `AgentBar`, with `Developer ID Application` manual signing restricted to `Release` config only. This avoids Debug/CI failures on machines without distribution certificates.
+- **Test target portability fix**: Removed hard-pinned team/certificate from `AgentBarTests` and switched to automatic signing so tests can run across contributor and CI environments without a specific Apple team setup.
 - **Release verification automation**: Added `scripts/verify-release-signing.sh` to archive a Release build and verify signing with `codesign --verify` and `spctl --assess`. Added the command to `CLAUDE.md` Build & Run section.
 - All 103 tests passing
 
@@ -263,7 +263,7 @@
 
 ## Iteration 34: Phase 1.5 Claude hook ingestion + source toggles
 - **Roadmap extended to Phase 1.5**: Updated `docs/AGENT_ALERTING_ROADMAP.md` with a new addendum for Claude Code hook ingestion (`Notification`/`Stop`/`SubagentStop`) and clarified the hybrid model (event-driven source + polling fallback).
-- **Claude hook detector**: Added `ClaudeHookAlertEventDetector` to parse bridge JSONL records from `~/.claude/ccusagebar/hook-events.jsonl`, decode base64 payloads, and map them into normalized alert events (`taskCompleted`, `permissionRequired`, `decisionRequired`).
+- **Claude hook detector**: Added `ClaudeHookAlertEventDetector` to parse bridge JSONL records from `~/.claude/agentbar/hook-events.jsonl`, decode base64 payloads, and map them into normalized alert events (`taskCompleted`, `permissionRequired`, `decisionRequired`).
 - **Monitor source toggles**: Extended `AgentAlertEventDetectorProtocol` with optional `settingsEnabledKey` and updated `AgentAlertMonitor` to skip disabled detectors. Default detectors now include both Codex session polling and Claude hook ingestion.
 - **Settings UX updates**: Added alert source toggles (`alertCodexEventsEnabled`, `alertClaudeHookEventsEnabled`) and setup guidance in the "Agent Alerts (Beta)" section. Increased settings window height to preserve layout with new controls.
 - **Claude hook bridge script**: Added `scripts/claude-hook-alert-bridge.sh` to capture raw Claude hook stdin payloads with a stable UTC capture timestamp and append them safely to the bridge JSONL file.
@@ -290,6 +290,14 @@
 - **Hover freeze semantics**: While hovered, the status bar repeatedly enforces Top position and suppresses all scroll progression until hover exits.
 - **Claude payload hardening**: `ClaudeUsageProvider` now treats unexpected 200-response payload shapes as an empty usage payload instead of throwing decode errors, allowing existing cache fallback logic to preserve valid 5h/7d values during idle/temporary API shape drift.
 - **Test coverage**: Added `testUsesCachedValuesWhenResponsePayloadIsUnexpected` and retained idle-window cache preference tests for zero/null edge cases.
+- All 139 tests passing
+
+## Iteration 39: Rename CCUsageBar to AgentBar
+- **Project-wide rename**: Replaced all occurrences of `CCUsageBar` → `AgentBar`, `ccusagebar` → `agentbar`, and `CCUSAGEBAR` → `AGENTBAR` across 28+ files including pbxproj, project.yml, Swift sources, tests, scripts, and docs
+- **File renames**: `CCUsageBarApp.swift` → `AgentBarApp.swift`, `CCUsageBar.entitlements` → `AgentBar.entitlements`
+- **Directory renames**: `CCUsageBar/` → `AgentBar/`, `CCUsageBarTests/` → `AgentBarTests/`, `CCUsageBar.xcodeproj/` → `AgentBar.xcodeproj/`
+- **Data paths updated**: `~/.claude/ccusagebar/` → `~/.claude/agentbar/`, env var `CCUSAGEBAR_CLAUDE_HOOK_LOG` → `AGENTBAR_CLAUDE_HOOK_LOG`
+- **Keychain service unchanged**: `com.agentbar.apikeys` was already the correct name
 - All 139 tests passing
 
 ## Iteration 38: Fix Top-row clipping by correcting viewport and host alignment

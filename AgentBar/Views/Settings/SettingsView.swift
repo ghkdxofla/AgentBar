@@ -2,8 +2,8 @@ import SwiftUI
 import ServiceManagement
 
 extension Notification.Name {
-    static let limitsChanged = Notification.Name("CCUsageBarLimitsChanged")
-    static let alertsSettingsChanged = Notification.Name("CCUsageBarAlertsSettingsChanged")
+    static let limitsChanged = Notification.Name("AgentBarLimitsChanged")
+    static let alertsSettingsChanged = Notification.Name("AgentBarAlertsSettingsChanged")
 }
 
 struct SettingsView: View {
@@ -129,7 +129,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text("Claude alerts read hook bridge events from ~/.claude/ccusagebar/hook-events.jsonl.")
+                Text("Claude alerts read hook bridge events from ~/.claude/agentbar/hook-events.jsonl.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

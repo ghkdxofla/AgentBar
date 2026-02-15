@@ -34,7 +34,7 @@ final class ClaudeHookAlertEventDetector: AgentAlertEventDetectorProtocol, @unch
         fileManager: FileManager = .default
     ) {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        self.hookEventsFile = hookEventsFile ?? home.appendingPathComponent(".claude/ccusagebar/hook-events.jsonl")
+        self.hookEventsFile = hookEventsFile ?? home.appendingPathComponent(".claude/agentbar/hook-events.jsonl")
         self.fileManager = fileManager
     }
 

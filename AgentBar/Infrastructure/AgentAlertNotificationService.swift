@@ -44,7 +44,7 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
         content.sound = .default
 
         let request = UNNotificationRequest(
-            identifier: "ccusagebar-agent-alert-\(UUID().uuidString)",
+            identifier: "agentbar-agent-alert-\(UUID().uuidString)",
             content: content,
             trigger: nil
         )

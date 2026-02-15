@@ -1,5 +1,5 @@
 import XCTest
-@testable import CCUsageBar
+@testable import AgentBar
 
 private struct TestRecord: Decodable {
     let type: String?

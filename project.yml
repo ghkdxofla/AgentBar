@@ -1,6 +1,6 @@
-name: CCUsageBar
+name: AgentBar
 options:
-  bundleIdPrefix: com.ccusagebar
+  bundleIdPrefix: com.agentbar
   deploymentTarget:
     macOS: "13.0"
   xcodeVersion: "26.2"
@@ -12,18 +12,18 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "13.0"
 
 targets:
-  CCUsageBar:
+  AgentBar:
     type: application
     platform: macOS
     sources:
-      - path: CCUsageBar
+      - path: AgentBar
     dependencies:
       - sdk: libsqlite3.tbd
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ccusagebar.app
-        INFOPLIST_FILE: CCUsageBar/Info.plist
-        CODE_SIGN_ENTITLEMENTS: CCUsageBar/CCUsageBar.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.agentbar.app
+        INFOPLIST_FILE: AgentBar/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AgentBar/AgentBar.entitlements
         ENABLE_HARDENED_RUNTIME: YES
         COMBINE_HIDPI_IMAGES: YES
         SWIFT_STRICT_CONCURRENCY: complete
@@ -34,16 +34,16 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
 
-  CCUsageBarTests:
+  AgentBarTests:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - path: CCUsageBarTests
+      - path: AgentBarTests
     dependencies:
-      - target: CCUsageBar
+      - target: AgentBar
       - sdk: libsqlite3.tbd
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ccusagebar.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.agentbar.app.tests
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_STYLE: Automatic

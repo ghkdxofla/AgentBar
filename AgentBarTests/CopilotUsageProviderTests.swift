@@ -1,6 +1,6 @@
 import XCTest
 import Darwin
-@testable import CCUsageBar
+@testable import AgentBar
 
 final class CopilotUsageProviderTests: XCTestCase {
     private var originalGHCLICommandRunner: (@Sendable (TimeInterval) -> String?)!
@@ -323,7 +323,7 @@ final class CopilotUsageProviderTests: XCTestCase {
     }
 
     func testCLIProcessExecutorReturnsNilQuicklyWhenExecutableIsMissing() {
-        let executablePath = "/tmp/ccusagebar-missing-\(UUID().uuidString)"
+        let executablePath = "/tmp/agentbar-missing-\(UUID().uuidString)"
         let start = Date()
 
         let result = CLIProcessExecutor.executeCommand(
@@ -338,7 +338,7 @@ final class CopilotUsageProviderTests: XCTestCase {
     }
 
     func testCLIProcessExecutorTimeoutForceKillsTermResistantProcess() throws {
-        let pidFilePath = "/tmp/ccusagebar-timeout-\(UUID().uuidString).pid"
+        let pidFilePath = "/tmp/agentbar-timeout-\(UUID().uuidString).pid"
         defer { try? FileManager.default.removeItem(atPath: pidFilePath) }
 
         let result = CLIProcessExecutor.executeCommand(
@@ -388,7 +388,7 @@ final class CopilotUsageProviderTests: XCTestCase {
         CopilotMockURLProtocol.onRequest = { request, _ in
             XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer ghp_my_token")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "CCUsageBar")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "AgentBar")
             XCTAssertEqual(request.url, CopilotUsageProvider.apiURL)
         }
 
