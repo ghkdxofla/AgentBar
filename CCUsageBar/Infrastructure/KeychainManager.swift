@@ -150,8 +150,10 @@ enum KeychainManager {
         let query = itemQuery(account: account, store: store)
         var addQuery = query
         addQuery[kSecValueData as String] = data
-        // Use standard app-scoped keychain access; do not weaken ACLs for secrets.
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+        if store == .dataProtection {
+            // Accessible is valid for Data Protection items and keeps secrets locked at rest.
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+        }
 
         let addStatus = securityAPI.add(addQuery)
         if addStatus == errSecSuccess {

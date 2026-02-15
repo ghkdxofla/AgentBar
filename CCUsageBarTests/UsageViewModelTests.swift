@@ -460,6 +460,9 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
         guard let (store, account) = parse(query) else {
             return errSecParam
         }
+        if let compatibilityError = validateAddQueryCompatibility(query, store: store) {
+            return compatibilityError
+        }
         if let forced = addStatusByStore[store], forced != errSecSuccess {
             return forced
         }
@@ -559,5 +562,12 @@ private final class MockKeychainSecurityAPI: KeychainManager.SecurityAPI {
             return (.dataProtection, account)
         }
         return (.legacy, account)
+    }
+
+    private func validateAddQueryCompatibility(_ query: [String: Any], store: Store) -> OSStatus? {
+        if store == .legacy && query[kSecAttrAccessible as String] != nil {
+            return errSecParam
+        }
+        return nil
     }
 }
