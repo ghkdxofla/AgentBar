@@ -284,3 +284,10 @@
 - **Claude idle-session bug fix**: Expanded OAuth usage decoding to support model-scoped keys (`five_hour_*`, `seven_day_*`) when aggregate keys are absent, and kept cache fallback for transient null windows. This prevents false 0%/missing reset regressions when no active session exists.
 - **Test updates**: Added model-scoped Claude window test coverage and updated status bar planner tests for continuous-scroll semantics (`maxScrollIndex`, ranking, tie-break, visibility behavior).
 - All 136 tests passing
+
+## Iteration 37: Precise Top reset + Claude decode-fallback cache resilience
+- **Exact Top reset behavior**: Removed implicit offset animation in `StackedBarView` and kept explicit step animations only. Bottom-to-top transition and hover reset now always jump directly to offset `0` in a no-animation transaction.
+- **Hover freeze semantics**: While hovered, the status bar repeatedly enforces Top position and suppresses all scroll progression until hover exits.
+- **Claude payload hardening**: `ClaudeUsageProvider` now treats unexpected 200-response payload shapes as an empty usage payload instead of throwing decode errors, allowing existing cache fallback logic to preserve valid 5h/7d values during idle/temporary API shape drift.
+- **Test coverage**: Added `testUsesCachedValuesWhenResponsePayloadIsUnexpected` and retained idle-window cache preference tests for zero/null edge cases.
+- All 139 tests passing

@@ -10,7 +10,6 @@ enum StatusBarDisplayPlanner {
     static let topPriorityHoldSeconds: TimeInterval = 8
     static let scrollStepHoldSeconds: TimeInterval = 3
     static let scrollTransitionSeconds: TimeInterval = 1.2
-    static let resetToTopTransitionSeconds: TimeInterval = 0.6
 
     private static let serviceOrder: [ServiceType] = [.claude, .codex, .gemini, .copilot, .cursor, .zai]
 
