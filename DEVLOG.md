@@ -210,3 +210,10 @@
 - **Copilot gh CLI auto-read**: `CopilotUsageProvider` now tries `gh auth token` (via `Process`) first, falls back to manual PAT in Keychain. `readGHCLIToken()` runs `/usr/bin/env gh auth token` and captures stdout. Settings updated: primary note says "Token is auto-read from gh CLI", manual PAT moved to `DisclosureGroup` as optional fallback
 - **Cursor credit-based plans**: Updated `CursorPlan` to reflect June 2025 pricing overhaul — Free/$0, Pro/$20, Pro+/$60, Ultra/$200, Teams/$40, Custom. Added `monthlyCreditDollars` and `monthlyRequestEstimate` (approximate, varies by model: ~225 for Claude Sonnet, ~500 for GPT-5 per $20). Renamed `monthlyRequestLimit` → `monthlyRequestEstimate` across provider, ViewModel, and Settings. Settings label changed to "Est. monthly requests" with explanatory caption
 - All 52 tests passing
+
+## Iteration 27: Fix Keychain password prompt on every launch
+- **Root cause**: `KeychainManager` used legacy Keychain (login.keychain) which enforces per-app ACL. Debug builds have ad-hoc code signing that changes each build, so macOS treats each build as a "new" app → prompts for login password every time, even after "Always Allow"
+- **Fix**: Added `kSecUseDataProtectionKeychain: true` and `kSecAttrAccessible: kSecAttrAccessibleWhenUnlocked` to all Keychain operations. Data Protection Keychain has no per-app ACL — items are accessible when Mac is unlocked, without prompts
+- **Migration**: `load()` falls back to legacy keychain if item not found in Data Protection keychain, then auto-migrates the item. `save()` and `delete()` also clean up legacy items
+- **SettingsView compile fix**: Replaced `Result<Void, String>` (invalid — `String` doesn't conform to `Error`) with `SaveResult` enum
+- All 68 tests passing

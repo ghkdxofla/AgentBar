@@ -32,6 +32,8 @@ struct SettingsView: View {
     @State private var zaiAPIKey: String = ""
     @State private var hasSavedZaiAPIKey = false
     @State private var showSavedAlert = false
+    @State private var showSaveErrorAlert = false
+    @State private var saveErrorMessage = ""
 
     var body: some View {
         Form {
@@ -246,28 +248,37 @@ struct SettingsView: View {
         .alert("Saved", isPresented: $showSavedAlert) {
             Button("OK", role: .cancel) {}
         }
+        .alert("Save Failed", isPresented: $showSaveErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveErrorMessage)
+        }
     }
 
     @discardableResult
     private func saveAPIKey(_ key: String, account: String) -> Bool {
-        guard let sanitizedKey = Self.sanitizedTokenForSaving(key) else { return false }
-        do {
-            try KeychainManager.save(key: sanitizedKey, account: account)
-        } catch {
+        switch Self.saveAPIKeyResult(key, account: account) {
+        case .success:
+            showSavedAlert = true
+            return true
+        case .failure(let message):
+            saveErrorMessage = message
+            showSaveErrorAlert = true
             return false
         }
-        showSavedAlert = true
-        return true
     }
 
     @discardableResult
     private func saveCopilotPAT() -> Bool {
-        if saveAPIKey(copilotPAT, account: ServiceType.copilot.keychainAccount) {
-            hasSavedCopilotPAT = true
-            copilotPAT = ""
-            return true
+        let outcome = Self.copilotPATSaveOutcome(
+            currentPAT: copilotPAT,
+            hasSavedCopilotPAT: hasSavedCopilotPAT
+        ) { token in
+            saveAPIKey(token, account: ServiceType.copilot.keychainAccount)
         }
-        return false
+        hasSavedCopilotPAT = outcome.hasSavedCopilotPAT
+        copilotPAT = outcome.copilotPAT
+        return outcome.didSave
     }
 
     private func migrateLegacyCursorPlanIfNeeded() {
@@ -285,6 +296,59 @@ struct SettingsView: View {
         hasSavedZaiAPIKey = KeychainManager.load(account: ServiceType.zai.keychainAccount) != nil
         copilotPAT = ""
         zaiAPIKey = ""
+    }
+
+    struct CopilotPATSaveOutcome: Equatable {
+        let didSave: Bool
+        let hasSavedCopilotPAT: Bool
+        let copilotPAT: String
+    }
+
+    static func copilotPATSaveOutcome(
+        currentPAT: String,
+        hasSavedCopilotPAT: Bool,
+        save: (String) -> Bool
+    ) -> CopilotPATSaveOutcome {
+        let didSave = save(currentPAT)
+        if didSave {
+            return CopilotPATSaveOutcome(
+                didSave: true,
+                hasSavedCopilotPAT: true,
+                copilotPAT: ""
+            )
+        }
+        return CopilotPATSaveOutcome(
+            didSave: false,
+            hasSavedCopilotPAT: hasSavedCopilotPAT,
+            copilotPAT: currentPAT
+        )
+    }
+
+    enum SaveResult {
+        case success
+        case failure(String)
+    }
+
+    static func saveAPIKeyResult(
+        _ key: String,
+        account: String,
+        save: (String, String) throws -> Void = { key, account in
+            try KeychainManager.save(key: key, account: account)
+        }
+    ) -> SaveResult {
+        guard let sanitizedKey = sanitizedTokenForSaving(key) else {
+            return .failure("Please enter a valid token before saving.")
+        }
+        do {
+            try save(sanitizedKey, account)
+            return .success
+        } catch {
+            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            if message.isEmpty {
+                return .failure("Failed to save token to Keychain.")
+            }
+            return .failure(message)
+        }
     }
 
     static func sanitizedTokenForSaving(_ value: String) -> String? {
