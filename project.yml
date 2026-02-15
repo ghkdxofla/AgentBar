@@ -27,9 +27,12 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         COMBINE_HIDPI_IMAGES: YES
         SWIFT_STRICT_CONCURRENCY: complete
-        DEVELOPMENT_TEAM: <TEAM_ID>
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "Developer ID Application"
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        Release:
+          DEVELOPMENT_TEAM: <TEAM_ID>
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
 
   CCUsageBarTests:
     type: bundle.unit-test
@@ -43,6 +46,4 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ccusagebar.app.tests
         GENERATE_INFOPLIST_FILE: YES
-        DEVELOPMENT_TEAM: <TEAM_ID>
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: Automatic

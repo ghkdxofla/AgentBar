@@ -245,3 +245,9 @@
 - **project.yml**: Added `DEVELOPMENT_TEAM: <TEAM_ID>`, `CODE_SIGN_STYLE: Manual`, `CODE_SIGN_IDENTITY: "Developer ID Application"` to CCUsageBar target. Test target uses `"Apple Development"` identity with the same team ID to match Team IDs between host app and test bundle
 - **Benefits**: Stable code signing identity across builds eliminates ad-hoc signing issues (Keychain ACL prompts, "Always Allow" not persisting). App is now properly signed for DMG distribution and notarization
 - All 99 tests passing
+
+## Iteration 32: Scope Developer ID signing to Release + add signing verification
+- **Signing scope fix**: `project.yml` now uses automatic signing by default for `CCUsageBar`, with `Developer ID Application` manual signing restricted to `Release` config only. This avoids Debug/CI failures on machines without distribution certificates.
+- **Test target portability fix**: Removed hard-pinned team/certificate from `CCUsageBarTests` and switched to automatic signing so tests can run across contributor and CI environments without a specific Apple team setup.
+- **Release verification automation**: Added `scripts/verify-release-signing.sh` to archive a Release build and verify signing with `codesign --verify` and `spctl --assess`. Added the command to `CLAUDE.md` Build & Run section.
+- All 103 tests passing
