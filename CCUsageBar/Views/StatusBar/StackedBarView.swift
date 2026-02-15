@@ -64,7 +64,7 @@ struct StackedBarView: View {
                     * (StatusBarDisplayPlanner.rowHeight + StatusBarDisplayPlanner.rowSpacing)
             )
         }
-        .frame(height: StatusBarDisplayPlanner.viewportHeight)
+        .frame(height: StatusBarDisplayPlanner.viewportHeight, alignment: .top)
         .clipped()
     }
 
