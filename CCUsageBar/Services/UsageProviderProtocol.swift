@@ -17,6 +17,22 @@ struct CLIProcessRuntime {
 
 enum CLIProcessExecutor {
     private static let terminateGracePeriod: TimeInterval = 0.25
+    private final class LockedDataBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+
+        func set(_ newData: Data) {
+            lock.lock()
+            data = newData
+            lock.unlock()
+        }
+
+        func get() -> Data {
+            lock.lock()
+            defer { lock.unlock() }
+            return data
+        }
+    }
 
     static func executeCommand(
         executableURL: URL,
@@ -27,6 +43,8 @@ enum CLIProcessExecutor {
         let pipe = Pipe()
         let outputHandle = pipe.fileHandleForReading
         let terminationSignal = DispatchSemaphore(value: 0)
+        let outputData = LockedDataBox()
+        let outputReadSignal = DispatchSemaphore(value: 0)
 
         process.executableURL = executableURL
         process.arguments = arguments
@@ -34,6 +52,13 @@ enum CLIProcessExecutor {
         process.standardError = FileHandle.nullDevice
         process.terminationHandler = { _ in
             terminationSignal.signal()
+        }
+
+        // Drain stdout while the process is running to avoid pipe backpressure deadlocks.
+        DispatchQueue.global(qos: .utility).async {
+            let data = outputHandle.readDataToEndOfFile()
+            outputData.set(data)
+            outputReadSignal.signal()
         }
 
         let runtime = CLIProcessRuntime(
@@ -45,7 +70,8 @@ enum CLIProcessExecutor {
             terminate: { process.terminate() },
             terminationStatus: { process.terminationStatus },
             readOutput: {
-                outputHandle.readDataToEndOfFile()
+                _ = outputReadSignal.wait(timeout: .distantFuture)
+                return outputData.get()
             }
         )
 

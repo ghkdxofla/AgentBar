@@ -275,6 +275,17 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertNil(result)
     }
 
+    func testCLIProcessExecutorHandlesLargeStdoutWithoutTimingOut() {
+        let result = CLIProcessExecutor.executeCommand(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "awk 'BEGIN { for (i = 0; i < 200000; i++) printf \"a\" }'"],
+            timeout: 2
+        )
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.count, 200_000)
+    }
+
     func testSendsCorrectHeaders() async throws {
         let json = """
         {"copilot_plan": "free", "quota_snapshots": [{"quota_id": "premium_requests", "entitlement": 50, "remaining": 50, "unlimited": false}]}
