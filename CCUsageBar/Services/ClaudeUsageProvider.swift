@@ -13,6 +13,10 @@ struct ClaudeOAuthToken: Decodable, Sendable {
 struct ClaudeUsageResponse: Decodable, Sendable {
     private let windows: [String: ClaudeUsageWindow]
 
+    init(windows: [String: ClaudeUsageWindow] = [:]) {
+        self.windows = windows
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKey.self)
         var parsed: [String: ClaudeUsageWindow] = [:]
@@ -131,7 +135,8 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             throw APIError.httpError(httpResponse.statusCode)
         }
 
-        let usageResponse = try JSONDecoder().decode(ClaudeUsageResponse.self, from: data)
+        let usageResponse = (try? JSONDecoder().decode(ClaudeUsageResponse.self, from: data))
+            ?? ClaudeUsageResponse()
 
         let fiveHour = resolveMetric(
             window: usageResponse.mergedWindow(for: "five_hour"),
@@ -152,27 +157,67 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
 
     private func resolveMetric(window: ClaudeUsageWindow?, cacheKey: String) -> UsageMetric {
-        if let window {
-            let metric = UsageMetric(
-                used: window.utilization,
-                total: 100,
-                unit: .percent,
-                resetTime: window.resets_at.flatMap { DateUtils.parseISO8601($0) }
-            )
-            saveMetricCache(metric, forKey: cacheKey)
-            return metric
+        let now = Date()
+        let cached = validCachedMetric(forKey: cacheKey, now: now)
+
+        guard let window else {
+            return cached ?? UsageMetric(used: 0, total: 100, unit: .percent, resetTime: nil)
         }
 
-        if let cached = loadMetricCache(forKey: cacheKey) {
-            let now = Date()
-            if let resetTime = cached.resetTime, resetTime <= now {
-                clearMetricCache(forKey: cacheKey)
-            } else {
-                return cached
-            }
+        let incoming = UsageMetric(
+            used: window.utilization,
+            total: 100,
+            unit: .percent,
+            resetTime: window.resets_at.flatMap { DateUtils.parseISO8601($0) }
+        )
+
+        if shouldPreferCachedMetric(cached, over: incoming, now: now) {
+            return cached!
         }
 
-        return UsageMetric(used: 0, total: 100, unit: .percent, resetTime: nil)
+        saveMetricCache(incoming, forKey: cacheKey)
+        return incoming
+    }
+
+    private func validCachedMetric(forKey key: String, now: Date) -> UsageMetric? {
+        guard let cached = loadMetricCache(forKey: key) else { return nil }
+
+        if let reset = cached.resetTime, reset <= now {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+
+        // Legacy or meaningless cache entry from older builds.
+        if cached.used <= 0, cached.resetTime == nil {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+
+        return cached
+    }
+
+    private func shouldPreferCachedMetric(
+        _ cached: UsageMetric?,
+        over incoming: UsageMetric,
+        now: Date
+    ) -> Bool {
+        guard let cached else { return false }
+        guard cached.used > 0 else { return false }
+        guard let cachedReset = cached.resetTime, cachedReset > now else { return false }
+        guard incoming.used <= 0 else { return false }
+
+        // Idle sessions can return empty windows; keep cached usage until known reset.
+        if incoming.resetTime == nil {
+            return true
+        }
+
+        // If reset boundary didn't actually advance, sudden zero is likely a transient API gap.
+        if let incomingReset = incoming.resetTime,
+           abs(incomingReset.timeIntervalSince(cachedReset)) < 1 {
+            return true
+        }
+
+        return false
     }
 
     private func saveMetricCache(_ metric: UsageMetric, forKey key: String) {

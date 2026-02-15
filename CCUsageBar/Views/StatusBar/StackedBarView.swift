@@ -63,10 +63,6 @@ struct StackedBarView: View {
                 y: -CGFloat(currentScrollIndex)
                     * (StatusBarDisplayPlanner.rowHeight + StatusBarDisplayPlanner.rowSpacing)
             )
-            .animation(
-                .easeInOut(duration: StatusBarDisplayPlanner.scrollTransitionSeconds),
-                value: currentScrollIndex
-            )
         }
         .frame(height: StatusBarDisplayPlanner.viewportHeight)
         .clipped()
@@ -78,9 +74,14 @@ struct StackedBarView: View {
 
         let maxIndex = StatusBarDisplayPlanner.maxScrollIndex(for: rankedServices)
         guard maxIndex > 0 else { return }
-        guard !isHovered else { return }
 
         while !Task.isCancelled {
+            if isHovered {
+                jumpToTopImmediately()
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                continue
+            }
+
             let duration = currentScrollIndex == 0
                 ? StatusBarDisplayPlanner.topPriorityHoldSeconds
                 : StatusBarDisplayPlanner.scrollStepHoldSeconds
@@ -95,9 +96,7 @@ struct StackedBarView: View {
                     currentScrollIndex += 1
                 }
             } else {
-                withAnimation(.easeInOut(duration: StatusBarDisplayPlanner.resetToTopTransitionSeconds)) {
-                    currentScrollIndex = 0
-                }
+                jumpToTopImmediately()
             }
         }
     }
