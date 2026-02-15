@@ -481,6 +481,57 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertNil(result.data)
     }
 
+    func testMockKeychainSecurityAPIRejectsMalformedAddQuery() {
+        let account = "tests.invalid.add"
+        let securityAPI = MockKeychainSecurityAPI()
+
+        let status = securityAPI.add([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.agentbar.apikeys",
+            kSecAttrAccount as String: account,
+            kSecValueData as String: Data("token".utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        ])
+
+        XCTAssertEqual(status, errSecParam)
+        XCTAssertNil(securityAPI.dataProtectionItems[account])
+        XCTAssertNil(securityAPI.legacyItems[account])
+    }
+
+    func testMockKeychainSecurityAPIRejectsMalformedUpdateQuery() {
+        let account = "tests.invalid.update"
+        let existingData = Data("existing-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: existingData])
+
+        let status = securityAPI.update([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.agentbar.apikeys",
+            kSecAttrAccount as String: account
+        ], attributes: [
+            kSecValueData as String: Data("replacement-token".utf8),
+            kSecReturnData as String: true
+        ])
+
+        XCTAssertEqual(status, errSecParam)
+        XCTAssertEqual(securityAPI.legacyItems[account], existingData)
+    }
+
+    func testMockKeychainSecurityAPIRejectsMalformedDeleteQuery() {
+        let account = "tests.invalid.delete"
+        let existingData = Data("existing-token".utf8)
+        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: existingData])
+
+        let status = securityAPI.delete([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.agentbar.apikeys",
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true
+        ])
+
+        XCTAssertEqual(status, errSecParam)
+        XCTAssertEqual(securityAPI.legacyItems[account], existingData)
+    }
+
     private static func isSkippableSystemKeychainStatus(_ status: OSStatus) -> Bool {
         switch status {
         case errSecNotAvailable,
