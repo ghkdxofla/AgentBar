@@ -277,3 +277,10 @@
 - **Test coverage**: Added `StatusBarDisplayPlannerTests` (ranking, paging, Top-page interleaving, durations) and expanded `ClaudeUsageProviderTests` with cache fallback and cache-expiry cases. Updated provider tests to use isolated `UserDefaults` suites.
 - **Signing check**: Ran `./scripts/check-signing-matrix.sh` to verify Debug/Release signing matrix is still correct.
 - All 134 tests passing
+
+## Iteration 36: Continuous Top-3-first scroll + Claude idle-window parsing hardening
+- **Status bar behavior correction**: Reworked menu bar rendering to a continuous vertical list with fixed row height, 3-row viewport, and step-by-step downward scrolling through overflow rows. After reaching the bottom window, it returns to Top 3 and holds before repeating.
+- **Hover interaction**: Added hover handling so mouseover immediately snaps to Top 3 and pauses scrolling while hovered.
+- **Claude idle-session bug fix**: Expanded OAuth usage decoding to support model-scoped keys (`five_hour_*`, `seven_day_*`) when aggregate keys are absent, and kept cache fallback for transient null windows. This prevents false 0%/missing reset regressions when no active session exists.
+- **Test updates**: Added model-scoped Claude window test coverage and updated status bar planner tests for continuous-scroll semantics (`maxScrollIndex`, ranking, tie-break, visibility behavior).
+- All 136 tests passing

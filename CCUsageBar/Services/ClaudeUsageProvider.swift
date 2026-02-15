@@ -11,13 +11,66 @@ struct ClaudeOAuthToken: Decodable, Sendable {
 }
 
 struct ClaudeUsageResponse: Decodable, Sendable {
-    let five_hour: ClaudeUsageWindow?
-    let seven_day: ClaudeUsageWindow?
+    private let windows: [String: ClaudeUsageWindow]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKey.self)
+        var parsed: [String: ClaudeUsageWindow] = [:]
+
+        for key in container.allKeys {
+            if let window = try? container.decode(ClaudeUsageWindow.self, forKey: key) {
+                parsed[key.stringValue] = window
+            }
+        }
+        self.windows = parsed
+    }
+
+    func mergedWindow(for baseKey: String) -> ClaudeUsageWindow? {
+        if let exact = windows[baseKey] {
+            return exact
+        }
+
+        let prefix = "\(baseKey)_"
+        let candidates = windows
+            .filter { $0.key.hasPrefix(prefix) }
+            .map(\.value)
+        guard !candidates.isEmpty else { return nil }
+
+        let utilization = candidates.map(\.utilization).max() ?? 0
+        let resetTime = candidates
+            .compactMap { window -> (Date, String)? in
+                guard let resetRaw = window.resets_at,
+                      let resetDate = DateUtils.parseISO8601(resetRaw) else {
+                    return nil
+                }
+                return (resetDate, resetRaw)
+            }
+            .sorted { $0.0 < $1.0 }
+            .first?
+            .1
+
+        return ClaudeUsageWindow(utilization: utilization, resets_at: resetTime)
+    }
 }
 
 struct ClaudeUsageWindow: Decodable, Sendable {
     let utilization: Double
     let resets_at: String?
+}
+
+private struct DynamicCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
 }
 
 // MARK: - Provider
@@ -80,8 +133,14 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
         let usageResponse = try JSONDecoder().decode(ClaudeUsageResponse.self, from: data)
 
-        let fiveHour = resolveMetric(window: usageResponse.five_hour, cacheKey: "claudeUsageCache.fiveHour")
-        let sevenDay = resolveMetric(window: usageResponse.seven_day, cacheKey: "claudeUsageCache.sevenDay")
+        let fiveHour = resolveMetric(
+            window: usageResponse.mergedWindow(for: "five_hour"),
+            cacheKey: "claudeUsageCache.fiveHour"
+        )
+        let sevenDay = resolveMetric(
+            window: usageResponse.mergedWindow(for: "seven_day"),
+            cacheKey: "claudeUsageCache.sevenDay"
+        )
 
         return UsageData(
             service: .claude,
