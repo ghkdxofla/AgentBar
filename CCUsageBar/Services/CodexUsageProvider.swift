@@ -35,6 +35,7 @@ struct CodexTokenUsage: Decodable, Sendable {
 }
 
 struct CodexRateLimits: Decodable, Sendable {
+    let limit_id: String?
     let primary: CodexRateWindow?
     let secondary: CodexRateWindow?
 }
@@ -181,15 +182,66 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             return nil
         }
 
-        // Find the last event_msg with token_count type that has rate_limits
-        var latest: CodexRateLimits?
+        // Track the latest rate_limits per limit_id, then merge.
+        // Codex sessions may interleave multiple limit_ids (e.g. "codex",
+        // "codex_bengalfox") with independent usage counters.  We keep each
+        // limit_id's last entry and sum their used_percent values so the bar
+        // reflects total usage across all model buckets.
+        var latestByLimitID: [String: CodexRateLimits] = [:]
         for record in records {
             guard record.type == "event_msg",
                   record.payload?.type == "token_count",
-                  record.payload?.rate_limits != nil else { continue }
-            latest = record.payload?.rate_limits
+                  let rl = record.payload?.rate_limits else { continue }
+            let key = rl.limit_id ?? ""
+            latestByLimitID[key] = rl
         }
-        return latest
+
+        guard !latestByLimitID.isEmpty else { return nil }
+
+        // If only one limit_id, return it directly
+        if latestByLimitID.count == 1 {
+            return latestByLimitID.values.first
+        }
+
+        // Merge: sum used_percent, keep the earliest resets_at (most
+        // conservative) and the window_minutes from any entry that has it.
+        var totalPrimaryPercent: Double = 0
+        var totalSecondaryPercent: Double = 0
+        var primaryResetAt: Int?
+        var secondaryResetAt: Int?
+        var primaryWindowMinutes: Int?
+        var secondaryWindowMinutes: Int?
+
+        for rl in latestByLimitID.values {
+            if let p = rl.primary {
+                totalPrimaryPercent += p.used_percent ?? 0
+                if let r = p.resets_at {
+                    primaryResetAt = min(primaryResetAt ?? Int.max, r)
+                }
+                if primaryWindowMinutes == nil { primaryWindowMinutes = p.window_minutes }
+            }
+            if let s = rl.secondary {
+                totalSecondaryPercent += s.used_percent ?? 0
+                if let r = s.resets_at {
+                    secondaryResetAt = min(secondaryResetAt ?? Int.max, r)
+                }
+                if secondaryWindowMinutes == nil { secondaryWindowMinutes = s.window_minutes }
+            }
+        }
+
+        return CodexRateLimits(
+            limit_id: nil,
+            primary: CodexRateWindow(
+                used_percent: totalPrimaryPercent,
+                window_minutes: primaryWindowMinutes,
+                resets_at: primaryResetAt
+            ),
+            secondary: CodexRateWindow(
+                used_percent: totalSecondaryPercent,
+                window_minutes: secondaryWindowMinutes,
+                resets_at: secondaryResetAt
+            )
+        )
     }
 
     // MARK: - Token Summing Fallback

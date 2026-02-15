@@ -233,3 +233,10 @@
 - **`import Security` removed**: No longer needed since all Keychain access goes through the CLI
 - **Test coverage**: Added 4 tests — CLI cache within TTL, cache nil on failure, valid JSON parsing, invalid JSON rejection
 - All 85 tests passing
+
+## Iteration 30: Fix Codex usage showing wrong values due to multiple limit_ids
+- **Root cause**: Codex session JSONL files contain interleaved `rate_limits` records with different `limit_id` values (`"codex"` for the main model, `"codex_bengalfox"` for GPT-5.3-Codex-Spark). Code used the last record regardless of `limit_id`, so when `codex_bengalfox` (0% used) came after `codex` (14% used), usage showed 0%. The displayed reset timer also jumped between the two limit_ids' different `resets_at` values
+- **Fix**: `extractLatestRateLimits` now tracks the last record per `limit_id` separately, then merges by summing `used_percent` and taking the earliest `resets_at` across all limit_ids. Single `limit_id` sessions still use the fast path (no merge overhead)
+- **Model change**: Added `limit_id` field to `CodexRateLimits` struct for grouping
+- **Test coverage**: Added 2 tests — multi-limit_id merge with sum verification and reset time selection, single-limit_id passthrough
+- All 93 tests passing
