@@ -31,9 +31,8 @@ final class StatusBarController {
 
         let barView = StackedBarView(services: viewModel.usageData)
         let hosting = NSHostingView(rootView: barView)
-        hosting.frame = NSRect(x: 0, y: 0, width: 84, height: 22)
-
-        button.frame = NSRect(x: 0, y: 0, width: 90, height: 22)
+        hosting.frame = button.bounds.insetBy(dx: 3, dy: 0)
+        hosting.autoresizingMask = [.width, .height]
         button.addSubview(hosting)
         self.hostingView = hosting
 

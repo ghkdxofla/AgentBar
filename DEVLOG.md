@@ -291,3 +291,8 @@
 - **Claude payload hardening**: `ClaudeUsageProvider` now treats unexpected 200-response payload shapes as an empty usage payload instead of throwing decode errors, allowing existing cache fallback logic to preserve valid 5h/7d values during idle/temporary API shape drift.
 - **Test coverage**: Added `testUsesCachedValuesWhenResponsePayloadIsUnexpected` and retained idle-window cache preference tests for zero/null edge cases.
 - All 139 tests passing
+
+## Iteration 38: Fix Top-row clipping by correcting viewport and host alignment
+- **Viewport alignment fix**: `StackedBarView` now applies the 20px viewport frame with `.top` alignment instead of the default center alignment, so `offset 0` truly maps to the first row at the top edge without partial clipping.
+- **Status button host layout fix**: `StatusBarController` no longer overwrites the system-managed status button frame. The SwiftUI host view is now pinned to `button.bounds` (with horizontal inset) and autoresizes with the button, preventing vertical misalignment in the menu bar slot.
+- All 139 tests passing
