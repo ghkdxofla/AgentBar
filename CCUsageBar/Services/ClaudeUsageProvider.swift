@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 // MARK: - API Response Models
 
@@ -31,12 +30,22 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     static let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
+    private static let keychainService = "Claude Code-credentials"
+    private static let tokenCacheLock = NSLock()
+    private static let defaultCacheTTL: TimeInterval = 60
+    private static let securityCLITimeout: TimeInterval = 2
+    nonisolated(unsafe) private static var cachedToken: String?
+    nonisolated(unsafe) private static var tokenLastLookupAt: Date?
+    nonisolated(unsafe) static var securityCLIRunner: @Sendable (_ timeout: TimeInterval) -> String? = { timeout in
+        runSecurityCLICommand(timeout: timeout)
+    }
+
     init(
         session: URLSession = .shared,
         credentialProvider: (@Sendable () -> String?)? = nil
     ) {
         self.session = session
-        self.credentialProvider = credentialProvider ?? Self.readKeychainToken
+        self.credentialProvider = credentialProvider ?? { Self.readKeychainTokenViaCLI() }
     }
 
     func isConfigured() async -> Bool {
@@ -89,23 +98,84 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         )
     }
 
-    // MARK: - Keychain Access
+    // MARK: - Keychain Access via security CLI
 
-    private static func readKeychainToken() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Code-credentials",
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+    /// Reads the Claude Code OAuth token using the `security` CLI to avoid
+    /// per-app Keychain ACL prompts. The result is cached with a TTL matching
+    /// the app's refresh interval.
+    static func readKeychainTokenViaCLI(now: Date = Date(), cacheTTL: TimeInterval? = nil) -> String? {
+        let effectiveTTL = max(0, cacheTTL ?? cacheTTLFromRefreshInterval())
+        tokenCacheLock.lock()
+        defer { tokenCacheLock.unlock() }
 
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        if let lastLookup = tokenLastLookupAt,
+           now.timeIntervalSince(lastLookup) < effectiveTTL {
+            return cachedToken
+        }
 
-        guard let creds = try? JSONDecoder().decode(ClaudeOAuthCredentials.self, from: data) else {
+        let rawJSON = securityCLIRunner(securityCLITimeout)
+        let token = rawJSON.flatMap { parseAccessToken(from: $0) }
+        cachedToken = token
+        tokenLastLookupAt = now
+        return token
+    }
+
+    static func resetTokenCache() {
+        tokenCacheLock.lock()
+        cachedToken = nil
+        tokenLastLookupAt = nil
+        tokenCacheLock.unlock()
+    }
+
+    /// Parses the OAuth access token from the raw JSON credential blob.
+    static func parseAccessToken(from jsonString: String) -> String? {
+        guard let data = jsonString.data(using: .utf8),
+              let creds = try? JSONDecoder().decode(ClaudeOAuthCredentials.self, from: data) else {
             return nil
         }
         return creds.claudeAiOauth.accessToken
+    }
+
+    private static func cacheTTLFromRefreshInterval() -> TimeInterval {
+        let refreshInterval = UserDefaults.standard.double(forKey: "refreshInterval")
+        return refreshInterval > 0 ? refreshInterval : defaultCacheTTL
+    }
+
+    /// Runs `security find-generic-password -s "Claude Code-credentials" -w`
+    /// which outputs the password data to stdout. The `security` binary is a
+    /// system-trusted application so it bypasses per-app ACL prompts.
+    private static func runSecurityCLICommand(timeout: TimeInterval) -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        let terminationSignal = DispatchSemaphore(value: 0)
+
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = ["find-generic-password", "-s", keychainService, "-w"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        process.terminationHandler = { _ in
+            terminationSignal.signal()
+        }
+
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        let waitResult = terminationSignal.wait(timeout: .now() + timeout)
+        if waitResult == .timedOut {
+            if process.isRunning {
+                process.terminate()
+                _ = terminationSignal.wait(timeout: .now() + 0.25)
+            }
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else { return nil }
+
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return output?.isEmpty == true ? nil : output
     }
 }

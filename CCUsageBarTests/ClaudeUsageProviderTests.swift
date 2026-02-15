@@ -2,14 +2,19 @@ import XCTest
 @testable import CCUsageBar
 
 final class ClaudeUsageProviderTests: XCTestCase {
+    private var originalSecurityCLIRunner: (@Sendable (TimeInterval) -> String?)!
 
     override func setUp() {
         super.setUp()
         MockURLProtocol.reset()
+        ClaudeUsageProvider.resetTokenCache()
+        originalSecurityCLIRunner = ClaudeUsageProvider.securityCLIRunner
     }
 
     override func tearDown() {
         MockURLProtocol.reset()
+        ClaudeUsageProvider.resetTokenCache()
+        ClaudeUsageProvider.securityCLIRunner = originalSecurityCLIRunner
         super.tearDown()
     }
 
@@ -152,6 +157,54 @@ final class ClaudeUsageProviderTests: XCTestCase {
         _ = try await provider.fetchUsage()
     }
 
+    // MARK: - security CLI token reading
+
+    func testReadKeychainTokenViaCLICachesWithinTTL() {
+        let credJSON = """
+        {"claudeAiOauth":{"accessToken":"cached-token"}}
+        """
+        let counter = CLICounterBox()
+        ClaudeUsageProvider.securityCLIRunner = { _ in
+            counter.increment()
+            return credJSON
+        }
+
+        let now = Date(timeIntervalSince1970: 1_000)
+        XCTAssertEqual(ClaudeUsageProvider.readKeychainTokenViaCLI(now: now, cacheTTL: 60), "cached-token")
+        XCTAssertEqual(ClaudeUsageProvider.readKeychainTokenViaCLI(now: now.addingTimeInterval(10), cacheTTL: 60), "cached-token")
+        XCTAssertEqual(counter.value, 1, "Should only call CLI once within TTL")
+
+        // After TTL expires, should call again
+        XCTAssertEqual(ClaudeUsageProvider.readKeychainTokenViaCLI(now: now.addingTimeInterval(61), cacheTTL: 60), "cached-token")
+        XCTAssertEqual(counter.value, 2)
+    }
+
+    func testReadKeychainTokenViaCLICachesNilOnFailure() {
+        let counter = CLICounterBox()
+        ClaudeUsageProvider.securityCLIRunner = { _ in
+            counter.increment()
+            return nil
+        }
+
+        let now = Date(timeIntervalSince1970: 2_000)
+        XCTAssertNil(ClaudeUsageProvider.readKeychainTokenViaCLI(now: now, cacheTTL: 60))
+        XCTAssertNil(ClaudeUsageProvider.readKeychainTokenViaCLI(now: now.addingTimeInterval(5), cacheTTL: 60))
+        XCTAssertEqual(counter.value, 1)
+    }
+
+    func testParseAccessTokenFromValidJSON() {
+        let json = """
+        {"claudeAiOauth":{"accessToken":"sk-ant-oauth-test-123"}}
+        """
+        XCTAssertEqual(ClaudeUsageProvider.parseAccessToken(from: json), "sk-ant-oauth-test-123")
+    }
+
+    func testParseAccessTokenFromInvalidJSON() {
+        XCTAssertNil(ClaudeUsageProvider.parseAccessToken(from: "not json"))
+        XCTAssertNil(ClaudeUsageProvider.parseAccessToken(from: "{}"))
+        XCTAssertNil(ClaudeUsageProvider.parseAccessToken(from: "{\"other\":\"field\"}"))
+    }
+
     func testIgnoresExtraFields() async throws {
         let json = """
         {
@@ -221,4 +274,21 @@ private final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+}
+
+private final class CLICounterBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValue: Int = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedValue
+    }
+
+    func increment() {
+        lock.lock()
+        storedValue += 1
+        lock.unlock()
+    }
 }
