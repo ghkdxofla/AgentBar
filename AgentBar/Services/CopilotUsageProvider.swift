@@ -135,7 +135,7 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         // Reset = 1st of next month 00:00 UTC
         let resetTime = Self.firstOfNextMonthUTC()
 
-        let planName = apiResponse.copilot_plan.map { Self.capitalizedPlanName($0) }
+        let planName = apiResponse.copilot_plan.map { Self.capitalizedPlanName($0) } ?? "Free"
 
         return UsageData(
             service: .copilot,

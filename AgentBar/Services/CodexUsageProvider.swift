@@ -104,8 +104,8 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             weeklyUsed = Double(weekly)
         }
 
-        let planName = UserDefaults.standard.string(forKey: "codexPlan")
-            .flatMap { CodexPlan(rawValue: $0) }?.rawValue
+        let planName = (UserDefaults.standard.string(forKey: "codexPlan")
+            .flatMap { CodexPlan(rawValue: $0) } ?? .pro).rawValue
 
         return UsageData(
             service: .codex,

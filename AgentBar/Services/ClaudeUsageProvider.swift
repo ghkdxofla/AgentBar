@@ -132,8 +132,8 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             cacheKey: "claudeUsageCache.sevenDay"
         )
 
-        let planName = defaults.string(forKey: "claudePlan")
-            .flatMap { ClaudePlan(rawValue: $0) }?.rawValue
+        let planName = (defaults.string(forKey: "claudePlan")
+            .flatMap { ClaudePlan(rawValue: $0) } ?? .pro).rawValue
 
         return UsageData(
             service: .claude,
