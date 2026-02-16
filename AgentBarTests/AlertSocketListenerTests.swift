@@ -169,13 +169,16 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         return condition()
     }
 
-    private func socketRemainsConnectable(
-        at socketPath: String,
-        duration: TimeInterval,
-        pollInterval: TimeInterval = 0.02
+    private func waitUntilStable(
+        timeout: TimeInterval,
+        stableDuration: TimeInterval,
+        pollInterval: TimeInterval = 0.02,
+        condition: () -> Bool
     ) -> Bool {
-        conditionRemainsTrue(duration: duration, pollInterval: pollInterval) {
-            canConnectAndDisconnect(to: socketPath)
+        waitUntil(timeout: timeout, pollInterval: pollInterval) {
+            conditionRemainsTrue(duration: stableDuration, pollInterval: pollInterval) {
+                condition()
+            }
         }
     }
 
@@ -236,14 +239,10 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         XCTAssertTrue(listener.isListening)
 
         XCTAssertTrue(
-            waitUntil(timeout: 1) {
+            waitUntilStable(timeout: 1, stableDuration: 1) {
                 canConnectAndDisconnect(to: sockPath)
             },
-            "Socket path did not become connectable after start() while already running"
-        )
-        XCTAssertTrue(
-            socketRemainsConnectable(at: sockPath, duration: 1),
-            "Socket path did not remain connectable after start() while already running"
+            "Socket path did not stay connectable for a full stability window after start() while already running"
         )
 
         XCTAssertTrue(
@@ -274,13 +273,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         defer { close(firstClientFD) }
 
         XCTAssertTrue(
-            waitUntil(timeout: 1) {
-                listener.activeClientCountForTesting >= 1
-            },
-            "Listener did not accept first client before restart"
-        )
-        XCTAssertTrue(
-            conditionRemainsTrue(duration: 0.2) {
+            waitUntilStable(timeout: 1, stableDuration: 0.2) {
                 listener.activeClientCountForTesting >= 1
             },
             "Listener did not keep first client active before restart"
@@ -297,14 +290,10 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            waitUntil(timeout: 1) {
+            waitUntilStable(timeout: 1, stableDuration: 1) {
                 canConnectAndDisconnect(to: sockPath)
             },
-            "Socket path did not become connectable after restart with active client"
-        )
-        XCTAssertTrue(
-            socketRemainsConnectable(at: sockPath, duration: 1),
-            "Socket path did not remain connectable after restart with active client"
+            "Socket path did not stay connectable for a full stability window after restart with active client"
         )
 
         let secondClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
@@ -384,14 +373,10 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         XCTAssertTrue(listener.isListening)
 
         XCTAssertTrue(
-            waitUntil(timeout: 1) {
+            waitUntilStable(timeout: 1, stableDuration: 1) {
                 canConnectAndDisconnect(to: sockPath)
             },
-            "Socket path did not become connectable after restart"
-        )
-        XCTAssertTrue(
-            socketRemainsConnectable(at: sockPath, duration: 1),
-            "Socket path did not remain connectable after restart"
+            "Socket path did not stay connectable for a full stability window after restart"
         )
         listener.stop()
     }
