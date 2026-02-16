@@ -7,7 +7,7 @@ extension Notification.Name {
 }
 
 struct SettingsView: View {
-    @AppStorage("launchAtLogin") private var launchAtLogin = false
+    @AppStorage("launchAtLogin") private var launchAtLogin = true
     @AppStorage("refreshInterval") private var refreshInterval: Double = 60
     @AppStorage("notificationsEnabled") private var notificationsEnabled = false
     @AppStorage("notificationTaskCompletedEnabled") private var notificationTaskCompletedEnabled = true
