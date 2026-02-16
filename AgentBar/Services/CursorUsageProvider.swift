@@ -118,8 +118,8 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             resetTime = CopilotUsageProvider.firstOfNextMonthUTC()
         }
 
-        let planName = UserDefaults.standard.string(forKey: "cursorPlan")
-            .flatMap { CursorPlan(rawValue: $0) }?.rawValue
+        let planName = (UserDefaults.standard.string(forKey: "cursorPlan")
+            .flatMap { CursorPlan(rawValue: $0) } ?? .pro).rawValue
 
         return UsageData(
             service: .cursor,

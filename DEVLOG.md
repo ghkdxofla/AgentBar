@@ -1,5 +1,11 @@
 # AgentBar Development Log
 
+## Iteration 47: Ensure planName always shows for configured services
+- **Default planName for manual providers**: Claude/Codex/Cursor providers now fall back to default plan (`.pro`) when UserDefaults has no stored value, instead of returning nil. Previously planName only appeared after opening Settings at least once
+- **Copilot nil fallback**: When API returns `copilot_plan: null`, defaults to "Free" instead of showing nothing
+- **Gemini unchanged**: No plan concept — planName stays nil (no label shown)
+- All 186 tests passing
+
 ## Iteration 46: Z.ai plan auto-detect, Claude Max 5x/20x split
 - **Z.ai auto-detection**: Wired existing `ZaiQuotaData.level` field (already decoded but unused) to `UsageData.planName` via `capitalizedPlanName()` helper — plan now appears in popover automatically from API
 - **Claude Max 5x/20x split**: Changed `ClaudePlan.max` to `.max5x = "Max 5x"` and `.max20x = "Max 20x"` for distinct tier selection. Added `migrateLegacyClaudePlanIfNeeded()` to convert stored "Max" → "Max 5x"
