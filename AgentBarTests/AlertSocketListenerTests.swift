@@ -100,6 +100,19 @@ final class AlertSocketListenerTests: XCTestCase {
 final class AlertSocketListenerLifecycleTests: XCTestCase {
     private var tempDir: URL!
 
+    private func waitUntil(
+        timeout: TimeInterval,
+        pollInterval: TimeInterval = 0.01,
+        condition: () -> Bool
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(pollInterval))
+        }
+        return condition()
+    }
+
     private func openClientSocket(to socketPath: String) -> Int32? {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }
@@ -185,18 +198,21 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
         listener.start()
         XCTAssertTrue(listener.isListening)
+        defer { listener.stop() }
 
         // Reentrant start() is implemented as stop+start and must leave a live socket.
         listener.start()
         XCTAssertTrue(listener.isListening)
 
-        // Give stale cancel handlers a chance to run.
-        usleep(100_000)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                FileManager.default.fileExists(atPath: sockPath)
+            },
+            "Socket path did not remain available after start() while already running"
+        )
 
         let clientFD = try XCTUnwrap(openClientSocket(to: sockPath))
         close(clientFD)
-        listener.stop()
     }
 
     func testStartWhileRunningWithActiveClientAllowsNewConnections() throws {
@@ -205,6 +221,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
         listener.start()
         XCTAssertTrue(listener.isListening)
+        defer { listener.stop() }
 
         let firstClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
         defer { close(firstClientFD) }
@@ -213,13 +230,15 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         listener.start()
         XCTAssertTrue(listener.isListening)
 
-        // Stale cancel handlers must not remove the rebound socket path.
-        usleep(100_000)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                FileManager.default.fileExists(atPath: sockPath)
+            },
+            "Socket path did not remain available after restart with active client"
+        )
 
         let secondClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
         close(secondClientFD)
-        listener.stop()
     }
 
     func testStopWithoutStartIsNoOp() {
