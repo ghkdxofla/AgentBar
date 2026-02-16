@@ -14,9 +14,12 @@ final class AgentAlertMonitor {
     private let cooldown: TimeInterval
 
     private let socketListener: AlertSocketListener
+    private var timerCancellable: AnyCancellable?
     private var settingsCancellable: AnyCancellable?
     private var lastNotificationByKey: [String: Date] = [:]
     private var isProcessing = false
+
+    private static let fallbackPollingInterval: TimeInterval = 10
 
     init(
         detectors: [any AgentAlertEventDetectorProtocol]? = nil,
@@ -25,7 +28,7 @@ final class AgentAlertMonitor {
         cooldown: TimeInterval = 90,
         socketListener: AlertSocketListener? = nil
     ) {
-        self.detectors = detectors ?? [CodexAlertEventDetector()]
+        self.detectors = detectors ?? [CodexAlertEventDetector(), ClaudeHookAlertEventDetector()]
         self.notificationService = notificationService
         self.defaults = defaults
         self.cooldown = cooldown
@@ -39,12 +42,15 @@ final class AgentAlertMonitor {
         if isAlertsEnabled {
             Task { await notificationService.requestAuthorizationIfNeeded() }
             startSocketListener()
+            restartFallbackTimer()
             Task { await processTick() }
         }
     }
 
     func stop() {
         socketListener.stop()
+        timerCancellable?.cancel()
+        timerCancellable = nil
         settingsCancellable?.cancel()
         settingsCancellable = nil
     }
@@ -55,6 +61,20 @@ final class AgentAlertMonitor {
 
     private var isAlertsEnabled: Bool {
         defaults.bool(forKey: "alertsEnabled", defaultValue: false)
+    }
+
+    private func restartFallbackTimer() {
+        timerCancellable?.cancel()
+        timerCancellable = nil
+
+        guard !detectors.isEmpty else { return }
+
+        timerCancellable = Timer.publish(every: Self.fallbackPollingInterval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.processTick() }
+            }
     }
 
     private func startSocketListener() {
@@ -124,10 +144,13 @@ final class AgentAlertMonitor {
                     if !self.socketListener.isListening {
                         self.startSocketListener()
                     }
+                    self.restartFallbackTimer()
                     Task { await self.notificationService.requestAuthorizationIfNeeded() }
                     Task { await self.processTick() }
                 } else {
                     self.socketListener.stop()
+                    self.timerCancellable?.cancel()
+                    self.timerCancellable = nil
                 }
             }
     }

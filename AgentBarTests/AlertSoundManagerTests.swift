@@ -169,4 +169,39 @@ final class AlertSoundManagerTests: XCTestCase {
             )
         }
     }
+
+    func testAutoRestoresPersistedPackOnInit() throws {
+        let manifest = """
+        {"name": "Persisted Pack", "sounds": {"task.complete": ["a.wav"]}}
+        """
+        try manifest.write(
+            to: tempDir.appendingPathComponent("openpeon.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let suiteName = "AgentBarTests.SoundManager.AutoRestore.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(tempDir.path, forKey: "alertSoundPackPath")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = AlertSoundManager(defaults: defaults)
+
+        XCTAssertTrue(manager.isPackLoaded)
+        XCTAssertEqual(manager.packName, "Persisted Pack")
+    }
+
+    func testDoesNotCrashOnInitWithInvalidPersistedPath() {
+        let suiteName = "AgentBarTests.SoundManager.InvalidPath.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set("/nonexistent/path/to/pack", forKey: "alertSoundPackPath")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = AlertSoundManager(defaults: defaults)
+
+        XCTAssertFalse(manager.isPackLoaded)
+        XCTAssertNil(manager.packName)
+    }
 }
