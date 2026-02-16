@@ -148,6 +148,28 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         return fd
     }
 
+    private func canConnectAndDisconnect(to socketPath: String) -> Bool {
+        guard FileManager.default.fileExists(atPath: socketPath),
+              let clientFD = openClientSocket(to: socketPath) else {
+            return false
+        }
+        close(clientFD)
+        return true
+    }
+
+    private func socketRemainsConnectable(
+        at socketPath: String,
+        duration: TimeInterval,
+        pollInterval: TimeInterval = 0.02
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(duration)
+        while Date() < deadline {
+            guard canConnectAndDisconnect(to: socketPath) else { return false }
+            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(pollInterval))
+        }
+        return canConnectAndDisconnect(to: socketPath)
+    }
+
     override func setUp() {
         super.setUp()
         tempDir = FileManager.default.temporaryDirectory
@@ -206,9 +228,13 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
         XCTAssertTrue(
             waitUntil(timeout: 1) {
-                FileManager.default.fileExists(atPath: sockPath)
+                canConnectAndDisconnect(to: sockPath)
             },
-            "Socket path did not remain available after start() while already running"
+            "Socket path did not become connectable after start() while already running"
+        )
+        XCTAssertTrue(
+            socketRemainsConnectable(at: sockPath, duration: 0.25),
+            "Socket path did not remain connectable after start() while already running"
         )
 
         let clientFD = try XCTUnwrap(openClientSocket(to: sockPath))
@@ -226,15 +252,26 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         let firstClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
         defer { close(firstClientFD) }
 
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                listener.activeClientCountForTesting >= 1
+            },
+            "Listener did not accept first client before restart"
+        )
+
         // Restart while a client is still connected.
         listener.start()
         XCTAssertTrue(listener.isListening)
 
         XCTAssertTrue(
             waitUntil(timeout: 1) {
-                FileManager.default.fileExists(atPath: sockPath)
+                canConnectAndDisconnect(to: sockPath)
             },
-            "Socket path did not remain available after restart with active client"
+            "Socket path did not become connectable after restart with active client"
+        )
+        XCTAssertTrue(
+            socketRemainsConnectable(at: sockPath, duration: 0.25),
+            "Socket path did not remain connectable after restart with active client"
         )
 
         let secondClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
@@ -307,12 +344,16 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         listener.start()
         XCTAssertTrue(listener.isListening)
 
-        // Give stale cancel handlers a chance to run; socket path should remain valid.
-        usleep(100_000)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
-
-        let clientFD = try XCTUnwrap(openClientSocket(to: sockPath))
-        close(clientFD)
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                canConnectAndDisconnect(to: sockPath)
+            },
+            "Socket path did not become connectable after restart"
+        )
+        XCTAssertTrue(
+            socketRemainsConnectable(at: sockPath, duration: 0.25),
+            "Socket path did not remain connectable after restart"
+        )
         listener.stop()
     }
 }

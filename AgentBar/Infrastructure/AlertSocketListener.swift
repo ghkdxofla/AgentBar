@@ -28,6 +28,12 @@ final class AlertSocketListener: @unchecked Sendable {
         queue.sync { _isListening }
     }
 
+    // Exposed for deterministic lifecycle tests that need to verify a client
+    // has been accepted before issuing a restart.
+    var activeClientCountForTesting: Int {
+        queue.sync { clientSources.count }
+    }
+
     init(
         socketPath: String? = nil,
         fileManager: FileManager = .default
