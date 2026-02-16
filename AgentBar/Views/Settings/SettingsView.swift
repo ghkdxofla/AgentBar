@@ -16,7 +16,10 @@ struct SettingsView: View {
     @AppStorage("alertCodexEventsEnabled") private var alertCodexEventsEnabled = true
     @AppStorage("alertClaudeHookEventsEnabled") private var alertClaudeHookEventsEnabled = true
     @AppStorage("alertShowMessagePreview") private var alertShowMessagePreview = false
-    @AppStorage("alertPollingSeconds") private var alertPollingSeconds: Double = 5
+    @AppStorage("alertSoundPackPath") private var alertSoundPackPath: String = ""
+    @AppStorage("alertSoundVolume") private var alertSoundVolume: Double = 0.7
+    @AppStorage("alertSoundTaskCompleteEnabled") private var alertSoundTaskCompleteEnabled = true
+    @AppStorage("alertSoundInputRequiredEnabled") private var alertSoundInputRequiredEnabled = true
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
 
@@ -92,13 +95,13 @@ struct SettingsView: View {
                         notifyAlertSettingsChanged()
                     }
 
-                Toggle("Codex session polling source", isOn: $alertCodexEventsEnabled)
+                Toggle("Codex file watcher (fallback)", isOn: $alertCodexEventsEnabled)
                     .disabled(!alertsEnabled)
                     .onChange(of: alertCodexEventsEnabled) { _ in
                         notifyAlertSettingsChanged()
                     }
 
-                Toggle("Claude hook source", isOn: $alertClaudeHookEventsEnabled)
+                Toggle("Claude hook (socket)", isOn: $alertClaudeHookEventsEnabled)
                     .disabled(!alertsEnabled)
                     .onChange(of: alertClaudeHookEventsEnabled) { _ in
                         notifyAlertSettingsChanged()
@@ -110,32 +113,63 @@ struct SettingsView: View {
                         notifyAlertSettingsChanged()
                     }
 
-                Picker("Polling interval", selection: $alertPollingSeconds) {
-                    Text("3s").tag(3.0)
-                    Text("5s").tag(5.0)
-                    Text("10s").tag(10.0)
-                }
-                .disabled(!alertsEnabled)
-                .onChange(of: alertPollingSeconds) { _ in
-                    notifyAlertSettingsChanged()
-                }
-
                 Button("Request Notification Permission") {
                     AgentAlertNotificationService.requestAuthorizationPrompt()
                 }
                 .disabled(!alertsEnabled)
 
-                Text("Codex alerts are derived from local session polling in ~/.codex/sessions.")
+                Text("Events are received via Unix socket at ~/.agentbar/events.sock.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text("Claude alerts read hook bridge events from ~/.claude/agentbar/hook-events.jsonl.")
+                Text("Register hooks with scripts/agentbar-hook.sh (Claude) or scripts/agentbar-codex-hook.sh (Codex).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text("Register Claude Notification/Stop/SubagentStop hooks with scripts/claude-hook-alert-bridge.sh.")
+                Text("Codex fallback watcher monitors ~/.codex/sessions for users without hook configuration.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                DisclosureGroup("Alert Sounds") {
+                    HStack {
+                        Text("Sound pack:")
+                        Text(alertSoundPackPath.isEmpty ? "No pack loaded" : (URL(fileURLWithPath: alertSoundPackPath).lastPathComponent))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Browse...") {
+                            chooseSoundPackDirectory()
+                        }
+                    }
+                    .disabled(!alertsEnabled)
+
+                    HStack {
+                        Text("Volume:")
+                        Slider(value: $alertSoundVolume, in: 0...1, step: 0.1)
+                            .frame(width: 150)
+                        Text(String(format: "%.0f%%", alertSoundVolume * 100))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .disabled(!alertsEnabled)
+
+                    Toggle("Task complete sounds", isOn: $alertSoundTaskCompleteEnabled)
+                        .disabled(!alertsEnabled)
+
+                    Toggle("Input required sounds", isOn: $alertSoundInputRequiredEnabled)
+                        .disabled(!alertsEnabled)
+
+                    HStack {
+                        Button("Test task.complete") {
+                            _ = AlertSoundManager.shared.playTest(category: "task.complete")
+                        }
+                        .disabled(!alertsEnabled || alertSoundPackPath.isEmpty)
+
+                        Button("Test input.required") {
+                            _ = AlertSoundManager.shared.playTest(category: "input.required")
+                        }
+                        .disabled(!alertsEnabled || alertSoundPackPath.isEmpty)
+                    }
+                }
             }
 
             // Claude Code
@@ -331,7 +365,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 860)
+        .frame(width: 450, height: 920)
         .onAppear {
             migrateLegacyCursorPlanIfNeeded()
             loadAPIKeys()
@@ -405,6 +439,18 @@ struct SettingsView: View {
 
     private func notifyAlertSettingsChanged() {
         NotificationCenter.default.post(name: .alertsSettingsChanged, object: nil)
+    }
+
+    private func chooseSoundPackDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a CESP-compatible sound pack directory containing openpeon.json"
+        if panel.runModal() == .OK, let url = panel.url {
+            alertSoundPackPath = url.path
+            _ = AlertSoundManager.shared.loadPack(from: url.path)
+        }
     }
 
     struct CopilotPATSaveOutcome: Equatable {

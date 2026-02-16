@@ -51,6 +51,10 @@
 		E06F8D718A20503782B9E5CE /* AgentAlertMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDEE1BCA1B5C7EA30906CEB /* AgentAlertMonitor.swift */; };
 		E8B1DFB6B5B8AAF9E782995E /* ClaudeHookAlertEventDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793B8B27034FF2E5F368B93B /* ClaudeHookAlertEventDetector.swift */; };
 		E9076A7E04516EC78730A56F /* AgentAlertEventDetectorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4353236CBB8AFE7BB776F8 /* AgentAlertEventDetectorProtocol.swift */; };
+		AA11BB22CC33DD44EE550001 /* AlertSocketListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660001 /* AlertSocketListener.swift */; };
+		AA11BB22CC33DD44EE550002 /* AlertSoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */; };
+		AA11BB22CC33DD44EE550003 /* AlertSocketListenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */; };
+		AA11BB22CC33DD44EE550004 /* AlertSoundManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */; };
 		F2839E6C0ED51B67719A8DCE /* ClaudeUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B733F774C2C2F1CD302B7C44 /* ClaudeUsageProvider.swift */; };
 		F3A2828533B7A7BED0B07B05 /* DetailPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958043861908BC4336BBBA33 /* DetailPopoverView.swift */; };
 		FE0F1D61470670565A9138AB /* ClaudeUsageProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7B37753F62413F688AB6A4F /* ClaudeUsageProviderTests.swift */; };
@@ -117,6 +121,10 @@
 		F6F6B73553CC3A668FD49F47 /* CopilotUsageProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotUsageProviderTests.swift; sourceTree = "<group>"; };
 		F7E27036ECB86702128AA6D3 /* UsageProviderProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageProviderProtocol.swift; sourceTree = "<group>"; };
 		FBEF9DD6ACD858A989E7BFD6 /* AgentAlertNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAlertNotificationService.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660001 /* AlertSocketListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSocketListener.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSoundManager.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSocketListenerTests.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSoundManagerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,6 +150,8 @@
 		0069C812341347AEA0A781AC /* AgentBarTests */ = {
 			isa = PBXGroup;
 			children = (
+				AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */,
+				AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */,
 				6A00624C4111E5F30845D2EA /* ClaudeHookAlertEventDetectorTests.swift */,
 				E7B37753F62413F688AB6A4F /* ClaudeUsageProviderTests.swift */,
 				8530FA15630B8A9DC1855C63 /* CodexAlertEventDetectorTests.swift */,
@@ -219,6 +229,8 @@
 			children = (
 				AEDEE1BCA1B5C7EA30906CEB /* AgentAlertMonitor.swift */,
 				FBEF9DD6ACD858A989E7BFD6 /* AgentAlertNotificationService.swift */,
+				AA11BB22CC33DD44EE660001 /* AlertSocketListener.swift */,
+				AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */,
 				785EE56F911793A50F8D47A3 /* KeychainManager.swift */,
 				BBF18F69EEAB5FA2F0F71C51 /* LoginItemManager.swift */,
 			);
@@ -400,6 +412,8 @@
 				E9076A7E04516EC78730A56F /* AgentAlertEventDetectorProtocol.swift in Sources */,
 				E06F8D718A20503782B9E5CE /* AgentAlertMonitor.swift in Sources */,
 				56DFA771608D6A15AE080C3F /* AgentAlertNotificationService.swift in Sources */,
+				AA11BB22CC33DD44EE550001 /* AlertSocketListener.swift in Sources */,
+				AA11BB22CC33DD44EE550002 /* AlertSoundManager.swift in Sources */,
 				58756EC2FE2D900C54DB04B5 /* AppDelegate.swift in Sources */,
 				1D93EBFD3F9DBFBA9A8DB838 /* AgentBarApp.swift in Sources */,
 				E8B1DFB6B5B8AAF9E782995E /* ClaudeHookAlertEventDetector.swift in Sources */,
@@ -433,6 +447,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA11BB22CC33DD44EE550003 /* AlertSocketListenerTests.swift in Sources */,
+				AA11BB22CC33DD44EE550004 /* AlertSoundManagerTests.swift in Sources */,
 				7003E59E8334A9C56CA9C285 /* ClaudeHookAlertEventDetectorTests.swift in Sources */,
 				FE0F1D61470670565A9138AB /* ClaudeUsageProviderTests.swift in Sources */,
 				2097600D5C7367C6943F06EF /* CodexAlertEventDetectorTests.swift in Sources */,

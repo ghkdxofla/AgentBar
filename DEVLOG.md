@@ -1,5 +1,15 @@
 # AgentBar Development Log
 
+## Iteration 40: Socket listener + custom sound support
+- **AlertSocketListener**: NWListener-based Unix domain socket at `~/.agentbar/events.sock` replaces Timer-based polling as primary event source. Accepts newline-delimited JSON with normalized agent/event/session_id/message/timestamp fields.
+- **AlertSoundManager**: CESP-compatible sound pack loader with `openpeon.json` manifest parsing, per-category enable/disable, no-repeat selection, and AVAudioPlayer playback with configurable volume.
+- **AgentAlertMonitor refactored**: Removed Timer.publish polling loop and pollingInterval property. Socket listener is primary event source; CodexAlertEventDetector retained as fallback for users without hook configuration. New `receive(event:)` method handles push-based events with same dedup/cooldown/settings filtering.
+- **AgentAlertNotificationService**: Integrated AlertSoundManager — custom sound plays instead of system default when sound pack configured.
+- **Hook scripts**: `scripts/agentbar-hook.sh` (Claude) and `scripts/agentbar-codex-hook.sh` (Codex) send normalized JSON to socket with JSONL file fallback.
+- **SettingsView**: Removed polling interval picker; added Alert Sounds subsection with pack directory browser, volume slider, per-category toggles, and test buttons. Updated help text for socket-based architecture.
+- **AgentAlertEvent**: Added `cespCategory` property for event-type-to-sound-category mapping.
+- All 170 tests passing
+
 ## Iteration 1: Project Scaffolding + Build Verification
 - Created `project.yml` for xcodegen (macOS 13.0, LSUIElement, entitlements)
 - Set up `AgentBar/Info.plist` with LSUIElement=true
