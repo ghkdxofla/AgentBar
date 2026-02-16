@@ -34,6 +34,7 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .zai
 
     private let apiClient: APIClient
+    private let credentialProvider: @Sendable () -> String?
 
     /// Minimum cache TTL to avoid excessive API requests (Z.ai is API-based).
     static let minCacheTTL: TimeInterval = 60
@@ -41,12 +42,18 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var cachedResponse: UsageData?
     nonisolated(unsafe) private static var cachedAt: Date?
 
-    init(apiClient: APIClient = APIClient()) {
+    init(
+        apiClient: APIClient = APIClient(),
+        credentialProvider: (@Sendable () -> String?)? = nil
+    ) {
         self.apiClient = apiClient
+        self.credentialProvider = credentialProvider ?? {
+            KeychainManager.load(account: ServiceType.zai.keychainAccount)
+        }
     }
 
     func isConfigured() async -> Bool {
-        KeychainManager.load(account: ServiceType.zai.keychainAccount) != nil
+        credentialProvider() != nil
     }
 
     /// Returns cached response if within minimum TTL, nil otherwise.
@@ -74,7 +81,7 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             return cached
         }
 
-        guard let apiKey = KeychainManager.load(account: ServiceType.zai.keychainAccount) else {
+        guard let apiKey = credentialProvider() else {
             throw APIError.unauthorized
         }
 
