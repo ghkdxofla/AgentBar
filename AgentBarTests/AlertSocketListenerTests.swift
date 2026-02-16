@@ -179,6 +179,49 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         listener.stop()
     }
 
+    func testStartTwiceWithoutStopRetainsSocketPathAndAcceptsConnections() throws {
+        let sockPath = tempDir.appendingPathComponent("double-start.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+
+        // Reentrant start() is implemented as stop+start and must leave a live socket.
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+
+        // Give stale cancel handlers a chance to run.
+        usleep(100_000)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
+
+        let clientFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        close(clientFD)
+        listener.stop()
+    }
+
+    func testStartWhileRunningWithActiveClientAllowsNewConnections() throws {
+        let sockPath = tempDir.appendingPathComponent("b.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+
+        let firstClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        defer { close(firstClientFD) }
+
+        // Restart while a client is still connected.
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+
+        // Stale cancel handlers must not remove the rebound socket path.
+        usleep(100_000)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
+
+        let secondClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        close(secondClientFD)
+        listener.stop()
+    }
+
     func testStopWithoutStartIsNoOp() {
         let sockPath = tempDir.appendingPathComponent("noop.sock").path
         let listener = AlertSocketListener(socketPath: sockPath)
