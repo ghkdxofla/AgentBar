@@ -56,6 +56,7 @@ struct DetailPopoverView: View {
                     NSApp.terminate(nil)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
                 .foregroundStyle(.secondary)
             }
         }
