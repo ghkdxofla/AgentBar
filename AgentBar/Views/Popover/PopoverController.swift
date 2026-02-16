@@ -30,6 +30,11 @@ final class PopoverController {
         popover.delegate = PopoverDelegateHandler.shared
         self.popover = popover
         isShown = true
+
+        // Clear first responder so no button shows a focus ring on open.
+        DispatchQueue.main.async {
+            popover.contentViewController?.view.window?.makeFirstResponder(nil)
+        }
     }
 
     func hide() {
