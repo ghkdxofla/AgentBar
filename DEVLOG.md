@@ -420,6 +420,12 @@
 - All 186 tests passing
 
 
+## Iteration 50: Split agent sources into separate section, add help sheet, Z.ai cache TTL
+- **Agent Sources section**: Moved Codex file watcher and Claude hook toggles from "Agent Notifications (Beta)" into a dedicated "Agent Sources" section, since they are agent-specific configuration
+- **Help sheet**: Removed inline description captions (socket path, hook script setup, codex fallback) from the notifications UI and added a `?` button on the Agent Sources header that opens `AgentSourcesHelpSheet` with full documentation
+- **Z.ai response cache**: Added 60-second minimum cache TTL to `ZaiUsageProvider` via `cachedIfFresh()`/`updateCache()` static methods, preventing excessive API requests when refresh interval is below 60s
+- All 186 tests passing
+
 ## Iteration 49: Rename Alert → Notification terminology
 - **Renamed models**: `AgentAlertEvent` → `AgentNotifyEvent`, `AgentAlertEventType` → `AgentNotifyEventType`
 - **Renamed infrastructure**: `AgentAlertMonitor` → `AgentNotifyMonitor`, `AgentAlertNotificationService` → `AgentNotifyNotificationService`, `AlertSocketListener` → `NotifySocketListener`, `AlertSoundManager` → `NotifySoundManager`

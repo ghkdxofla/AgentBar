@@ -35,6 +35,12 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     private let apiClient: APIClient
 
+    /// Minimum cache TTL to avoid excessive API requests (Z.ai is API-based).
+    static let minCacheTTL: TimeInterval = 60
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cachedResponse: UsageData?
+    nonisolated(unsafe) private static var cachedAt: Date?
+
     init(apiClient: APIClient = APIClient()) {
         self.apiClient = apiClient
     }
@@ -43,7 +49,31 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         KeychainManager.load(account: ServiceType.zai.keychainAccount) != nil
     }
 
+    /// Returns cached response if within minimum TTL, nil otherwise.
+    static func cachedIfFresh(now: Date = Date()) -> UsageData? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        guard let cached = cachedResponse,
+              let cachedTime = cachedAt,
+              now.timeIntervalSince(cachedTime) < minCacheTTL else {
+            return nil
+        }
+        return cached
+    }
+
+    /// Stores a response in the cache.
+    static func updateCache(_ data: UsageData, now: Date = Date()) {
+        cacheLock.lock()
+        cachedResponse = data
+        cachedAt = now
+        cacheLock.unlock()
+    }
+
     func fetchUsage() async throws -> UsageData {
+        if let cached = Self.cachedIfFresh() {
+            return cached
+        }
+
         guard let apiKey = KeychainManager.load(account: ServiceType.zai.keychainAccount) else {
             throw APIError.unauthorized
         }
@@ -77,7 +107,7 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
         let planName = data.level.map { Self.capitalizedPlanName($0) }
 
-        return UsageData(
+        let result = UsageData(
             service: .zai,
             fiveHourUsage: UsageMetric(
                 used: fiveHourPercent,
@@ -95,6 +125,9 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             isAvailable: true,
             planName: planName
         )
+
+        Self.updateCache(result, now: now)
+        return result
     }
 
     // MARK: - Helpers
