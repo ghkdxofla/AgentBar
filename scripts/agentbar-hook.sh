@@ -47,8 +47,9 @@ esac
 
 timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-# Build JSON safely with python3 to handle all escaping
-normalized_json="$(python3 -c "
+# Build JSON safely; prefer python3 for proper escaping, fall back to printf
+if command -v python3 >/dev/null 2>&1; then
+  normalized_json="$(python3 -c "
 import json, sys
 print(json.dumps({
     'agent': 'claude',
@@ -58,6 +59,14 @@ print(json.dumps({
     'timestamp': sys.argv[4]
 }))
 " "$event_type" "$session_id" "$message" "$timestamp" 2>/dev/null)" || exit 0
+else
+  # Minimal fallback: strip quotes from values to prevent injection
+  safe_event="${event_type//\"/}"
+  safe_sid="${session_id//\"/}"
+  safe_msg="${message//\"/}"
+  safe_ts="${timestamp//\"/}"
+  normalized_json="{\"agent\":\"claude\",\"event\":\"${safe_event}\",\"session_id\":\"${safe_sid}\",\"message\":\"${safe_msg}\",\"timestamp\":\"${safe_ts}\"}"
+fi
 
 # Try socket first
 if [[ -S "$SOCKET_PATH" ]]; then

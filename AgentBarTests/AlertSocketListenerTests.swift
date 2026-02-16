@@ -96,6 +96,85 @@ final class AlertSocketListenerTests: XCTestCase {
     }
 }
 
+final class AlertSocketListenerLifecycleTests: XCTestCase {
+    private var tempDir: URL!
+
+    override func setUp() {
+        super.setUp()
+        tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: tempDir)
+        super.tearDown()
+    }
+
+    func testStartSetsIsListeningAndStopClearsIt() {
+        let sockPath = tempDir.appendingPathComponent("test.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        XCTAssertFalse(listener.isListening)
+
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
+
+        listener.stop()
+        XCTAssertFalse(listener.isListening)
+    }
+
+    func testRapidRestartDoesNotCorruptState() {
+        let sockPath = tempDir.appendingPathComponent("restart.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        // Rapid start/stop cycles
+        for _ in 0..<5 {
+            listener.start()
+            XCTAssertTrue(listener.isListening)
+            listener.stop()
+            XCTAssertFalse(listener.isListening)
+        }
+
+        // Final start should work
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+        listener.stop()
+    }
+
+    func testStopWithoutStartIsNoOp() {
+        let sockPath = tempDir.appendingPathComponent("noop.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        // Should not crash
+        listener.stop()
+        XCTAssertFalse(listener.isListening)
+    }
+
+    func testDoubleStopIsNoOp() {
+        let sockPath = tempDir.appendingPathComponent("double.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        listener.start()
+        listener.stop()
+        listener.stop()
+        XCTAssertFalse(listener.isListening)
+    }
+
+    func testIsListeningIsFalseImmediatelyAfterStop() {
+        let sockPath = tempDir.appendingPathComponent("immediate.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+
+        // isListening must be false synchronously after stop() returns
+        listener.stop()
+        XCTAssertFalse(listener.isListening)
+    }
+}
+
 @MainActor
 final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
     func testReceivePostsNotificationForEnabledEvent() async throws {
