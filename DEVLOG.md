@@ -332,3 +332,7 @@
 - **Hook script python3 fallback**: Both hook scripts now fall back to safe printf-based JSON with quote-stripped values when `python3` is unavailable.
 - **Lifecycle tests**: Added 5 tests for socket listener start/stop, rapid restart, double stop, and synchronous `isListening` state.
 - All 177 tests passing
+
+## Iteration 43: Brighten Codex bar text color
+- **Codex darkColor brightened**: Changed from emerald-600 `(0.020, 0.588, 0.412)` to emerald-500 `(0.063, 0.725, 0.506)` for better readability of the "CX" label and bar fill in the menu bar.
+- All 183 tests passing
