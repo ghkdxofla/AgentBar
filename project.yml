@@ -30,7 +30,6 @@ targets:
         CODE_SIGN_STYLE: Automatic
       configs:
         Release:
-          DEVELOPMENT_TEAM: <TEAM_ID>
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
 

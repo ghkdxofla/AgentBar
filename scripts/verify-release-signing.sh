@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/AgentBar.xcodeproj"
 SCHEME="AgentBar"
-TEAM_ID="${DEVELOPMENT_TEAM:-<TEAM_ID>}"
+TEAM_ID="${DEVELOPMENT_TEAM:-}"
 SIGNING_IDENTITY="${CODE_SIGN_IDENTITY:-Developer ID Application}"
 ARCHIVE_PATH="$ROOT_DIR/build/AgentBar.xcarchive"
 REQUIRE_NOTARIZED=0
@@ -15,6 +15,10 @@ Usage: verify-release-signing.sh [--require-notarized] [archive-path]
 
 Options:
   --require-notarized   Fail if Gatekeeper assessment indicates the app is not notarized.
+
+Environment:
+  DEVELOPMENT_TEAM      Apple Developer Team ID (required for archive signing).
+  CODE_SIGN_IDENTITY    Signing identity (default: Developer ID Application).
 EOF
 }
 
@@ -68,6 +72,19 @@ archive_release_app() {
     CODE_SIGN_IDENTITY="$SIGNING_IDENTITY"
 }
 
+require_team_id() {
+  if [[ -n "${TEAM_ID//[[:space:]]/}" ]]; then
+    return
+  fi
+
+  cat <<'EOF' >&2
+DEVELOPMENT_TEAM is required for release signing.
+Example:
+  DEVELOPMENT_TEAM=YOUR_TEAM_ID ./scripts/verify-release-signing.sh
+EOF
+  exit 1
+}
+
 verify_codesign() {
   local app_path="$1"
   local signing_details
@@ -116,6 +133,7 @@ main() {
   local app_path
 
   parse_args "$@"
+  require_team_id
   archive_release_app
 
   app_path="$ARCHIVE_PATH/Products/Applications/AgentBar.app"

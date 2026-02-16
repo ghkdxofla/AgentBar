@@ -47,7 +47,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 - **Build + Run (fallback, no skill)**: `xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet && (pkill -x AgentBar || true) && open build/Build/Products/Debug/AgentBar.app`
 - Build only: `xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet`
 - Test: `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS'`
-- Release signing verify: `./scripts/verify-release-signing.sh`
+- Release signing verify: `DEVELOPMENT_TEAM=YOUR_TEAM_ID ./scripts/verify-release-signing.sh`
 - DMG: `hdiutil create -volname AgentBar -srcfolder build/Build/Products/Release/AgentBar.app -ov -format UDZO AgentBar.dmg`
 
 ## Architecture

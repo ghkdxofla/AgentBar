@@ -122,6 +122,27 @@ set -e
 assert_equals "1" "$invalid_status" "multiple archive args should fail"
 assert_contains "$invalid_output" "Unexpected argument: second" "invalid argument output"
 
+set +e
+missing_team_output="$(
+  /bin/bash <<BASH 2>&1
+set -euo pipefail
+source "$ROOT_DIR/scripts/verify-release-signing.sh"
+TEAM_ID=""
+require_team_id
+BASH
+)"
+missing_team_status=$?
+set -e
+assert_equals "1" "$missing_team_status" "require_team_id should fail when team is missing"
+assert_contains "$missing_team_output" "DEVELOPMENT_TEAM is required" "missing team error output"
+
+/bin/bash <<BASH >/dev/null 2>&1
+set -euo pipefail
+source "$ROOT_DIR/scripts/verify-release-signing.sh"
+TEAM_ID="ABCDEFGHIJ"
+require_team_id
+BASH
+
 SPCTL_STUB_DIR="$(mktemp -d)"
 cleanup() {
   rm -rf "$SPCTL_STUB_DIR"

@@ -475,3 +475,11 @@
 - **OpenCode plugin event coverage**: Installer-generated plugin now forwards `session.completed` in addition to idle/permission/question/error events.
 - **Tests**: Added `AgentHookConfigurationCheckerTests` + `AgentNotifySettingsMigratorTests`; expanded `AgentNotifyEventTests` (dedupe fallbacks) and `NotifySocketListenerTests` (OpenCode mapping + source toggle behavior).
 - **Verification**: Targeted suite run passed (`AgentHookConfigurationCheckerTests`, `AgentNotifySettingsMigratorTests`, `AgentNotifyEventTests`, `NotifySocketListenerTests`, `StatusBarDisplayPlannerTests`) — 32 tests, 0 failures.
+
+## Iteration 55: OSS hardening for signing secrets + history cleanup
+- **Team ID de-hardcode**: Removed hardcoded `DEVELOPMENT_TEAM` from `project.yml` and `AgentBar.xcodeproj/project.pbxproj`. Release signing scripts now require `DEVELOPMENT_TEAM` via environment variable instead of embedding a value in tracked files.
+- **Release script guardrails**: Updated `scripts/verify-release-signing.sh` and `scripts/release.sh` to fail fast with a clear message when `DEVELOPMENT_TEAM` is missing. Added parser coverage in `scripts/test-verify-release-signing.sh`.
+- **CI secret scanning**: Added `.github/workflows/secret-scan.yml` to run `gitleaks` against full git history on PRs and `main` pushes.
+- **Documentation**: Updated `CLAUDE.md` release signing command to include `DEVELOPMENT_TEAM=YOUR_TEAM_ID` and documented this hardening step in DEVLOG.
+- **History rewrite**: Rewrote repository history with `git filter-repo` to remove sensitive identifiers (team ID literal and personal alias) from blobs and commit/tag messages.
+- All 203 tests passing
