@@ -1,7 +1,7 @@
 import XCTest
 @testable import AgentBar
 
-final class CodexAlertEventDetectorTests: XCTestCase {
+final class CodexNotifyEventDetectorTests: XCTestCase {
     private var tempDir: URL!
 
     override func setUp() {
@@ -23,7 +23,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
         """
         try line.write(to: file, atomically: true, encoding: .utf8)
 
-        let detector = CodexAlertEventDetector(sessionsDir: tempDir)
+        let detector = CodexNotifyEventDetector(sessionsDir: tempDir)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertEqual(events.count, 1)
@@ -38,7 +38,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
         """#
         try line.write(to: file, atomically: true, encoding: .utf8)
 
-        let detector = CodexAlertEventDetector(sessionsDir: tempDir)
+        let detector = CodexNotifyEventDetector(sessionsDir: tempDir)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertEqual(events.count, 1)
@@ -52,7 +52,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
         """
         try line.write(to: file, atomically: true, encoding: .utf8)
 
-        let detector = CodexAlertEventDetector(sessionsDir: tempDir)
+        let detector = CodexNotifyEventDetector(sessionsDir: tempDir)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertEqual(events.count, 1)
@@ -71,7 +71,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
             return
         }
 
-        let detector = CodexAlertEventDetector(sessionsDir: tempDir)
+        let detector = CodexNotifyEventDetector(sessionsDir: tempDir)
         let events = await detector.detectEvents(since: watermark)
 
         XCTAssertTrue(events.isEmpty)
@@ -89,7 +89,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
             return
         }
 
-        let detector = CodexAlertEventDetector(sessionsDir: tempDir)
+        let detector = CodexNotifyEventDetector(sessionsDir: tempDir)
         let events = await detector.detectEvents(since: watermark, includeBoundary: true)
 
         XCTAssertEqual(events.count, 1)
@@ -103,7 +103,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
         """#
         try line.write(to: file, atomically: true, encoding: .utf8)
 
-        let detector = CodexAlertEventDetector(sessionsDir: tempDir)
+        let detector = CodexNotifyEventDetector(sessionsDir: tempDir)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertEqual(events.count, 1)
@@ -117,7 +117,7 @@ final class CodexAlertEventDetectorTests: XCTestCase {
         """#
         try line.write(to: file, atomically: true, encoding: .utf8)
 
-        let detector = CodexAlertEventDetector(sessionsDir: tempDir)
+        let detector = CodexNotifyEventDetector(sessionsDir: tempDir)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertTrue(events.isEmpty)
@@ -131,9 +131,9 @@ final class CodexAlertEventDetectorTests: XCTestCase {
 }
 
 @MainActor
-final class AgentAlertMonitorTests: XCTestCase {
+final class AgentNotifyMonitorTests: XCTestCase {
     func testProcessesNewEventWithSameTimestampAcrossPollingCycles() async throws {
-        let suiteName = "AgentBarTests.AgentAlertMonitor.SameTimestamp.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyMonitor.SameTimestamp.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -141,21 +141,21 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
 
         guard let timestamp = DateUtils.parseISO8601("2026-02-15T10:00:00Z") else {
             XCTFail("Failed to create timestamp")
             return
         }
 
-        let first = AgentAlertEvent(
+        let first = AgentNotifyEvent(
             service: .codex,
             type: .taskCompleted,
             timestamp: timestamp,
             message: nil,
             sessionID: "session-1"
         )
-        let second = AgentAlertEvent(
+        let second = AgentNotifyEvent(
             service: .codex,
             type: .permissionRequired,
             timestamp: timestamp,
@@ -163,9 +163,9 @@ final class AgentAlertMonitorTests: XCTestCase {
             sessionID: "session-1"
         )
 
-        let detector = TestAgentAlertDetector(batches: [[first], [first, second]])
-        let notificationService = TestAgentAlertNotificationService()
-        let monitor = AgentAlertMonitor(
+        let detector = TestAgentNotifyDetector(batches: [[first], [first, second]])
+        let notificationService = TestAgentNotifyNotificationService()
+        let monitor = AgentNotifyMonitor(
             detectors: [detector],
             notificationService: notificationService,
             defaults: defaults,
@@ -185,7 +185,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testDisabledEventStillAdvancesWatermarkAndAvoidsFutureDuplicateNotification() async throws {
-        let suiteName = "AgentBarTests.AgentAlertMonitor.DisabledSetting.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyMonitor.DisabledSetting.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -193,15 +193,15 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
-        defaults.set(false, forKey: AgentAlertEventType.decisionRequired.settingsKey)
+        defaults.set(true, forKey: "notificationsEnabled")
+        defaults.set(false, forKey: AgentNotifyEventType.decisionRequired.settingsKey)
 
         guard let timestamp = DateUtils.parseISO8601("2026-02-15T11:00:00Z") else {
             XCTFail("Failed to create timestamp")
             return
         }
 
-        let decisionEvent = AgentAlertEvent(
+        let decisionEvent = AgentNotifyEvent(
             service: .codex,
             type: .decisionRequired,
             timestamp: timestamp,
@@ -209,9 +209,9 @@ final class AgentAlertMonitorTests: XCTestCase {
             sessionID: "session-2"
         )
 
-        let detector = TestAgentAlertDetector(batches: [[decisionEvent], [decisionEvent]])
-        let notificationService = TestAgentAlertNotificationService()
-        let monitor = AgentAlertMonitor(
+        let detector = TestAgentNotifyDetector(batches: [[decisionEvent], [decisionEvent]])
+        let notificationService = TestAgentNotifyNotificationService()
+        let monitor = AgentNotifyMonitor(
             detectors: [detector],
             notificationService: notificationService,
             defaults: defaults,
@@ -219,7 +219,7 @@ final class AgentAlertMonitorTests: XCTestCase {
         )
 
         await monitor.processTick()
-        defaults.set(true, forKey: AgentAlertEventType.decisionRequired.settingsKey)
+        defaults.set(true, forKey: AgentNotifyEventType.decisionRequired.settingsKey)
         await monitor.processTick()
 
         let postedEvents = await notificationService.postedEvents()
@@ -227,7 +227,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testLegacyWatermarkWithoutEventIDsDoesNotReplayBoundaryEvents() async throws {
-        let suiteName = "AgentBarTests.AgentAlertMonitor.LegacyWatermarkMigration.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyMonitor.LegacyWatermarkMigration.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -235,7 +235,7 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
 
         guard let watermarkTimestamp = DateUtils.parseISO8601("2026-02-15T13:00:00Z") else {
             XCTFail("Failed to create watermark timestamp")
@@ -246,14 +246,14 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.set(watermarkTimestamp.timeIntervalSince1970, forKey: watermarkKey(for: .codex))
         defaults.removeObject(forKey: watermarkEventIDsKey(for: .codex))
 
-        let boundaryEvent = AgentAlertEvent(
+        let boundaryEvent = AgentNotifyEvent(
             service: .codex,
             type: .taskCompleted,
             timestamp: watermarkTimestamp,
             message: nil,
             sessionID: "legacy-session"
         )
-        let newerEvent = AgentAlertEvent(
+        let newerEvent = AgentNotifyEvent(
             service: .codex,
             type: .permissionRequired,
             timestamp: newerTimestamp,
@@ -261,9 +261,9 @@ final class AgentAlertMonitorTests: XCTestCase {
             sessionID: "legacy-session"
         )
 
-        let detector = BoundaryAwareTestAgentAlertDetector(events: [boundaryEvent, newerEvent])
-        let notificationService = TestAgentAlertNotificationService()
-        let monitor = AgentAlertMonitor(
+        let detector = BoundaryAwareTestAgentNotifyDetector(events: [boundaryEvent, newerEvent])
+        let notificationService = TestAgentNotifyNotificationService()
+        let monitor = AgentNotifyMonitor(
             detectors: [detector],
             notificationService: notificationService,
             defaults: defaults,
@@ -283,7 +283,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testLegacyCursorIDsDoNotReplayBoundaryEventsAfterUpgrade() async throws {
-        let suiteName = "AgentBarTests.AgentAlertMonitor.LegacyCursorMigration.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyMonitor.LegacyCursorMigration.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -291,14 +291,14 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
 
         guard let watermarkTimestamp = DateUtils.parseISO8601("2026-02-15T14:00:00Z") else {
             XCTFail("Failed to create watermark timestamp")
             return
         }
 
-        let boundaryEvent = AgentAlertEvent(
+        let boundaryEvent = AgentNotifyEvent(
             service: .codex,
             type: .permissionRequired,
             timestamp: watermarkTimestamp,
@@ -312,9 +312,9 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.set([boundaryEvent.legacyCursorID], forKey: watermarkEventIDsKey(for: .codex))
         defaults.set(1, forKey: watermarkSchemaVersionKey(for: .codex))
 
-        let detector = BoundaryAwareTestAgentAlertDetector(events: [boundaryEvent])
-        let notificationService = TestAgentAlertNotificationService()
-        let monitor = AgentAlertMonitor(
+        let detector = BoundaryAwareTestAgentNotifyDetector(events: [boundaryEvent])
+        let notificationService = TestAgentNotifyNotificationService()
+        let monitor = AgentNotifyMonitor(
             detectors: [detector],
             notificationService: notificationService,
             defaults: defaults,
@@ -336,7 +336,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testCooldownSuppressesRepeatedNotificationsForSameDedupeKey() async throws {
-        let suiteName = "AgentBarTests.AgentAlertMonitor.Cooldown.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyMonitor.Cooldown.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -344,7 +344,7 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
 
         guard let firstTime = DateUtils.parseISO8601("2026-02-15T12:00:00Z"),
               let secondTime = DateUtils.parseISO8601("2026-02-15T12:00:01Z") else {
@@ -352,14 +352,14 @@ final class AgentAlertMonitorTests: XCTestCase {
             return
         }
 
-        let first = AgentAlertEvent(
+        let first = AgentNotifyEvent(
             service: .codex,
             type: .taskCompleted,
             timestamp: firstTime,
             message: nil,
             sessionID: "session-3"
         )
-        let second = AgentAlertEvent(
+        let second = AgentNotifyEvent(
             service: .codex,
             type: .taskCompleted,
             timestamp: secondTime,
@@ -367,9 +367,9 @@ final class AgentAlertMonitorTests: XCTestCase {
             sessionID: "session-3"
         )
 
-        let detector = TestAgentAlertDetector(batches: [[first], [second]])
-        let notificationService = TestAgentAlertNotificationService()
-        let monitor = AgentAlertMonitor(
+        let detector = TestAgentNotifyDetector(batches: [[first], [second]])
+        let notificationService = TestAgentNotifyNotificationService()
+        let monitor = AgentNotifyMonitor(
             detectors: [detector],
             notificationService: notificationService,
             defaults: defaults,
@@ -388,7 +388,7 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 
     func testSkipsDetectorWhenSourceToggleDisabled() async throws {
-        let suiteName = "AgentBarTests.AgentAlertMonitor.SourceToggle.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyMonitor.SourceToggle.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
@@ -396,10 +396,10 @@ final class AgentAlertMonitorTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
-        defaults.set(false, forKey: "alertClaudeHookEventsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
+        defaults.set(false, forKey: "notificationClaudeHookEventsEnabled")
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .claude,
             type: .taskCompleted,
             timestamp: Date(timeIntervalSince1970: 1_739_616_000),
@@ -407,13 +407,13 @@ final class AgentAlertMonitorTests: XCTestCase {
             sessionID: "session-4"
         )
 
-        let detector = ToggleAwareTestAgentAlertDetector(
+        let detector = ToggleAwareTestAgentNotifyDetector(
             serviceType: .claude,
-            settingsEnabledKey: "alertClaudeHookEventsEnabled",
+            settingsEnabledKey: "notificationClaudeHookEventsEnabled",
             batches: [[event]]
         )
-        let notificationService = TestAgentAlertNotificationService()
-        let monitor = AgentAlertMonitor(
+        let notificationService = TestAgentNotifyNotificationService()
+        let monitor = AgentNotifyMonitor(
             detectors: [detector],
             notificationService: notificationService,
             defaults: defaults,
@@ -432,7 +432,7 @@ final class AgentAlertMonitorTests: XCTestCase {
         let normalized = service.rawValue
             .lowercased()
             .replacingOccurrences(of: " ", with: "_")
-        return "alertLastSeen_\(normalized)"
+        return "notificationLastSeen_\(normalized)"
     }
 
     private func watermarkEventIDsKey(for service: ServiceType) -> String {
@@ -444,17 +444,17 @@ final class AgentAlertMonitorTests: XCTestCase {
     }
 }
 
-private actor TestAgentAlertDetector: AgentAlertEventDetectorProtocol {
+private actor TestAgentNotifyDetector: AgentNotifyEventDetectorProtocol {
     nonisolated let serviceType: ServiceType = .codex
 
-    private var batches: [[AgentAlertEvent]]
+    private var batches: [[AgentNotifyEvent]]
     private var includeBoundaryHistory: [Bool] = []
 
-    init(batches: [[AgentAlertEvent]]) {
+    init(batches: [[AgentNotifyEvent]]) {
         self.batches = batches
     }
 
-    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentAlertEvent] {
+    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentNotifyEvent] {
         includeBoundaryHistory.append(includeBoundary)
         guard !batches.isEmpty else { return [] }
         return batches.removeFirst()
@@ -465,17 +465,17 @@ private actor TestAgentAlertDetector: AgentAlertEventDetectorProtocol {
     }
 }
 
-private actor BoundaryAwareTestAgentAlertDetector: AgentAlertEventDetectorProtocol {
+private actor BoundaryAwareTestAgentNotifyDetector: AgentNotifyEventDetectorProtocol {
     nonisolated let serviceType: ServiceType = .codex
 
-    private let events: [AgentAlertEvent]
+    private let events: [AgentNotifyEvent]
     private var includeBoundaryHistory: [Bool] = []
 
-    init(events: [AgentAlertEvent]) {
+    init(events: [AgentNotifyEvent]) {
         self.events = events
     }
 
-    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentAlertEvent] {
+    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentNotifyEvent] {
         includeBoundaryHistory.append(includeBoundary)
         return events.filter { event in
             includeBoundary ? event.timestamp >= since : event.timestamp > since
@@ -487,24 +487,24 @@ private actor BoundaryAwareTestAgentAlertDetector: AgentAlertEventDetectorProtoc
     }
 }
 
-private actor ToggleAwareTestAgentAlertDetector: AgentAlertEventDetectorProtocol {
+private actor ToggleAwareTestAgentNotifyDetector: AgentNotifyEventDetectorProtocol {
     nonisolated let serviceType: ServiceType
     nonisolated let settingsEnabledKey: String?
 
-    private var batches: [[AgentAlertEvent]]
+    private var batches: [[AgentNotifyEvent]]
     private var calls: Int = 0
 
     init(
         serviceType: ServiceType,
         settingsEnabledKey: String?,
-        batches: [[AgentAlertEvent]]
+        batches: [[AgentNotifyEvent]]
     ) {
         self.serviceType = serviceType
         self.settingsEnabledKey = settingsEnabledKey
         self.batches = batches
     }
 
-    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentAlertEvent] {
+    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentNotifyEvent] {
         calls += 1
         guard !batches.isEmpty else { return [] }
         return batches.removeFirst()
@@ -515,39 +515,39 @@ private actor ToggleAwareTestAgentAlertDetector: AgentAlertEventDetectorProtocol
     }
 }
 
-private actor TestAgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
-    private var events: [AgentAlertEvent] = []
+private actor TestAgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
+    private var events: [AgentNotifyEvent] = []
 
     func requestAuthorizationIfNeeded() async {}
 
-    func post(event: AgentAlertEvent) async {
+    func post(event: AgentNotifyEvent) async {
         events.append(event)
     }
 
-    func postedEvents() -> [AgentAlertEvent] {
+    func postedEvents() -> [AgentNotifyEvent] {
         events
     }
 }
 
-final class AgentAlertNotificationServiceTests: XCTestCase {
+final class AgentNotifyNotificationServiceTests: XCTestCase {
     func testPostUsesRedactedBodyWhenMessagePreviewDisabled() async throws {
-        let suiteName = "AgentBarTests.AgentAlertNotificationService.Redacted.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyNotificationService.Redacted.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
         }
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set(false, forKey: "alertShowMessagePreview")
+        defaults.set(false, forKey: "notificationShowMessagePreview")
 
         let recorder = NotificationBodyRecorder()
-        let service = AgentAlertNotificationService(
+        let service = AgentNotifyNotificationService(
             defaults: defaults,
             postBodyOverride: { body in
                 recorder.append(body)
             }
         )
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .codex,
             type: .decisionRequired,
             timestamp: Date(timeIntervalSince1970: 1),
@@ -560,23 +560,23 @@ final class AgentAlertNotificationServiceTests: XCTestCase {
     }
 
     func testPostUsesMessagePreviewWhenEnabled() async throws {
-        let suiteName = "AgentBarTests.AgentAlertNotificationService.Preview.\(UUID().uuidString)"
+        let suiteName = "AgentBarTests.AgentNotifyNotificationService.Preview.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
             return
         }
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set(true, forKey: "alertShowMessagePreview")
+        defaults.set(true, forKey: "notificationShowMessagePreview")
 
         let recorder = NotificationBodyRecorder()
-        let service = AgentAlertNotificationService(
+        let service = AgentNotifyNotificationService(
             defaults: defaults,
             postBodyOverride: { body in
                 recorder.append(body)
             }
         )
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .codex,
             type: .decisionRequired,
             timestamp: Date(timeIntervalSince1970: 1),
@@ -589,10 +589,10 @@ final class AgentAlertNotificationServiceTests: XCTestCase {
     }
 }
 
-final class AgentAlertEventTests: XCTestCase {
+final class AgentNotifyEventTests: XCTestCase {
     func testCursorIDDiffersWhenSourceRecordIDDiffers() {
         let timestamp = Date(timeIntervalSince1970: 1_739_616_000)
-        let first = AgentAlertEvent(
+        let first = AgentNotifyEvent(
             service: .codex,
             type: .permissionRequired,
             timestamp: timestamp,
@@ -600,7 +600,7 @@ final class AgentAlertEventTests: XCTestCase {
             sessionID: "session-1",
             sourceRecordID: "session-1#12"
         )
-        let second = AgentAlertEvent(
+        let second = AgentNotifyEvent(
             service: .codex,
             type: .permissionRequired,
             timestamp: timestamp,

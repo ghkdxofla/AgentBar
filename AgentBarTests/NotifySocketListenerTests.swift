@@ -2,71 +2,71 @@ import XCTest
 @testable import AgentBar
 import Darwin
 
-final class AlertSocketListenerTests: XCTestCase {
+final class NotifySocketListenerTests: XCTestCase {
     func testMapsStopEventToTaskCompleted() {
-        XCTAssertEqual(AlertSocketListener.mapEventType("stop"), .taskCompleted)
+        XCTAssertEqual(NotifySocketListener.mapEventType("stop"), .taskCompleted)
     }
 
     func testMapsSubagentStopEventToTaskCompleted() {
-        XCTAssertEqual(AlertSocketListener.mapEventType("subagent_stop"), .taskCompleted)
+        XCTAssertEqual(NotifySocketListener.mapEventType("subagent_stop"), .taskCompleted)
     }
 
     func testMapsPermissionEventToPermissionRequired() {
-        XCTAssertEqual(AlertSocketListener.mapEventType("permission"), .permissionRequired)
+        XCTAssertEqual(NotifySocketListener.mapEventType("permission"), .permissionRequired)
     }
 
     func testMapsDecisionEventToDecisionRequired() {
-        XCTAssertEqual(AlertSocketListener.mapEventType("decision"), .decisionRequired)
+        XCTAssertEqual(NotifySocketListener.mapEventType("decision"), .decisionRequired)
     }
 
     func testReturnsNilForUnknownEventType() {
-        XCTAssertNil(AlertSocketListener.mapEventType("unknown"))
+        XCTAssertNil(NotifySocketListener.mapEventType("unknown"))
     }
 
     func testMapsCaseInsensitiveEventType() {
-        XCTAssertEqual(AlertSocketListener.mapEventType("STOP"), .taskCompleted)
-        XCTAssertEqual(AlertSocketListener.mapEventType("Permission"), .permissionRequired)
+        XCTAssertEqual(NotifySocketListener.mapEventType("STOP"), .taskCompleted)
+        XCTAssertEqual(NotifySocketListener.mapEventType("Permission"), .permissionRequired)
     }
 
     func testMapsClaudeAgentToServiceType() {
-        XCTAssertEqual(AlertSocketListener.mapAgent("claude"), .claude)
+        XCTAssertEqual(NotifySocketListener.mapAgent("claude"), .claude)
     }
 
     func testMapsCodexAgentToServiceType() {
-        XCTAssertEqual(AlertSocketListener.mapAgent("codex"), .codex)
+        XCTAssertEqual(NotifySocketListener.mapAgent("codex"), .codex)
     }
 
     func testMapsGeminiAgentToServiceType() {
-        XCTAssertEqual(AlertSocketListener.mapAgent("gemini"), .gemini)
+        XCTAssertEqual(NotifySocketListener.mapAgent("gemini"), .gemini)
     }
 
     func testMapsCopilotAgentToServiceType() {
-        XCTAssertEqual(AlertSocketListener.mapAgent("copilot"), .copilot)
+        XCTAssertEqual(NotifySocketListener.mapAgent("copilot"), .copilot)
     }
 
     func testMapsCursorAgentToServiceType() {
-        XCTAssertEqual(AlertSocketListener.mapAgent("cursor"), .cursor)
+        XCTAssertEqual(NotifySocketListener.mapAgent("cursor"), .cursor)
     }
 
     func testMapsZaiAgentToServiceType() {
-        XCTAssertEqual(AlertSocketListener.mapAgent("zai"), .zai)
+        XCTAssertEqual(NotifySocketListener.mapAgent("zai"), .zai)
     }
 
     func testReturnsNilForUnknownAgent() {
-        XCTAssertNil(AlertSocketListener.mapAgent("unknown_agent"))
+        XCTAssertNil(NotifySocketListener.mapAgent("unknown_agent"))
     }
 
     func testMapsAgentCaseInsensitive() {
-        XCTAssertEqual(AlertSocketListener.mapAgent("Claude"), .claude)
-        XCTAssertEqual(AlertSocketListener.mapAgent("CODEX"), .codex)
+        XCTAssertEqual(NotifySocketListener.mapAgent("Claude"), .claude)
+        XCTAssertEqual(NotifySocketListener.mapAgent("CODEX"), .codex)
     }
 
-    func testSocketAlertEventDecoding() throws {
+    func testSocketNotifyEventDecoding() throws {
         let json = """
         {"agent":"claude","event":"stop","session_id":"sess-1","message":"done","timestamp":"2026-02-16T10:00:00Z"}
         """
         let data = json.data(using: .utf8)!
-        let event = try JSONDecoder().decode(SocketAlertEvent.self, from: data)
+        let event = try JSONDecoder().decode(SocketNotifyEvent.self, from: data)
 
         XCTAssertEqual(event.agent, "claude")
         XCTAssertEqual(event.event, "stop")
@@ -75,12 +75,12 @@ final class AlertSocketListenerTests: XCTestCase {
         XCTAssertEqual(event.timestamp, "2026-02-16T10:00:00Z")
     }
 
-    func testSocketAlertEventDecodingMinimalFields() throws {
+    func testSocketNotifyEventDecodingMinimalFields() throws {
         let json = """
         {"agent":"codex","event":"permission"}
         """
         let data = json.data(using: .utf8)!
-        let event = try JSONDecoder().decode(SocketAlertEvent.self, from: data)
+        let event = try JSONDecoder().decode(SocketNotifyEvent.self, from: data)
 
         XCTAssertEqual(event.agent, "codex")
         XCTAssertEqual(event.event, "permission")
@@ -92,12 +92,12 @@ final class AlertSocketListenerTests: XCTestCase {
     func testMalformedJSONDoesNotCrash() {
         let json = "not valid json at all"
         let data = json.data(using: .utf8)!
-        let event = try? JSONDecoder().decode(SocketAlertEvent.self, from: data)
+        let event = try? JSONDecoder().decode(SocketNotifyEvent.self, from: data)
         XCTAssertNil(event)
     }
 }
 
-final class AlertSocketListenerLifecycleTests: XCTestCase {
+final class NotifySocketListenerLifecycleTests: XCTestCase {
     private var tempDir: URL!
 
     private func waitUntil(
@@ -196,7 +196,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testStartSetsIsListeningAndStopClearsIt() {
         let sockPath = tempDir.appendingPathComponent("test.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         XCTAssertFalse(listener.isListening)
 
@@ -216,7 +216,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testRapidRestartDoesNotCorruptState() {
         let sockPath = tempDir.appendingPathComponent("restart.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         // Rapid start/stop cycles
         for _ in 0..<5 {
@@ -234,7 +234,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testStartTwiceWithoutStopRetainsSocketPathAndAcceptsConnections() throws {
         let sockPath = tempDir.appendingPathComponent("double-start.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         listener.start()
         XCTAssertTrue(listener.isListening)
@@ -269,7 +269,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testStartWhileRunningWithActiveClientAllowsNewConnections() throws {
         let sockPath = tempDir.appendingPathComponent("b.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         listener.start()
         XCTAssertTrue(listener.isListening)
@@ -320,7 +320,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testStopWithoutStartIsNoOp() {
         let sockPath = tempDir.appendingPathComponent("noop.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         // Should not crash
         listener.stop()
@@ -329,7 +329,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testDoubleStopIsNoOp() {
         let sockPath = tempDir.appendingPathComponent("double.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         listener.start()
         listener.stop()
@@ -339,7 +339,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testIsListeningIsFalseImmediatelyAfterStop() {
         let sockPath = tempDir.appendingPathComponent("immediate.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         listener.start()
         XCTAssertTrue(listener.isListening)
@@ -351,7 +351,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testStopWithActiveClientAllowsCleanRestart() throws {
         let sockPath = tempDir.appendingPathComponent("a.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         listener.start()
         XCTAssertTrue(listener.isListening)
@@ -376,7 +376,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
 
     func testRestartRetainsSocketPathAndAcceptsConnections() throws {
         let sockPath = tempDir.appendingPathComponent("r.sock").path
-        let listener = AlertSocketListener(socketPath: sockPath)
+        let listener = NotifySocketListener(socketPath: sockPath)
 
         listener.start()
         XCTAssertTrue(listener.isListening)
@@ -592,7 +592,7 @@ final class HookScriptFallbackTests: XCTestCase {
 }
 
 @MainActor
-final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
+final class AgentNotifyMonitorSocketReceiveTests: XCTestCase {
     func testReceivePostsNotificationForEnabledEvent() async throws {
         let suiteName = "AgentBarTests.MonitorReceive.Enabled.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
@@ -602,17 +602,17 @@ final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
 
-        let notificationService = TestSocketNotificationService()
-        let monitor = AgentAlertMonitor(
+        let notificationService = TestSocketNotifyService()
+        let monitor = AgentNotifyMonitor(
             detectors: [],
             notificationService: notificationService,
             defaults: defaults,
             cooldown: 0
         )
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .claude,
             type: .taskCompleted,
             timestamp: Date(),
@@ -636,18 +636,18 @@ final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
-        defaults.set(false, forKey: AgentAlertEventType.taskCompleted.settingsKey)
+        defaults.set(true, forKey: "notificationsEnabled")
+        defaults.set(false, forKey: AgentNotifyEventType.taskCompleted.settingsKey)
 
-        let notificationService = TestSocketNotificationService()
-        let monitor = AgentAlertMonitor(
+        let notificationService = TestSocketNotifyService()
+        let monitor = AgentNotifyMonitor(
             detectors: [],
             notificationService: notificationService,
             defaults: defaults,
             cooldown: 0
         )
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .claude,
             type: .taskCompleted,
             timestamp: Date(),
@@ -670,17 +670,17 @@ final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
 
-        let notificationService = TestSocketNotificationService()
-        let monitor = AgentAlertMonitor(
+        let notificationService = TestSocketNotifyService()
+        let monitor = AgentNotifyMonitor(
             detectors: [],
             notificationService: notificationService,
             defaults: defaults,
             cooldown: 90
         )
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .claude,
             type: .taskCompleted,
             timestamp: Date(),
@@ -704,18 +704,18 @@ final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(true, forKey: "alertsEnabled")
-        defaults.set(false, forKey: "alertClaudeHookEventsEnabled")
+        defaults.set(true, forKey: "notificationsEnabled")
+        defaults.set(false, forKey: "notificationClaudeHookEventsEnabled")
 
-        let notificationService = TestSocketNotificationService()
-        let monitor = AgentAlertMonitor(
+        let notificationService = TestSocketNotifyService()
+        let monitor = AgentNotifyMonitor(
             detectors: [],
             notificationService: notificationService,
             defaults: defaults,
             cooldown: 0
         )
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .claude,
             type: .taskCompleted,
             timestamp: Date(),
@@ -738,17 +738,17 @@ final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        defaults.set(false, forKey: "alertsEnabled")
+        defaults.set(false, forKey: "notificationsEnabled")
 
-        let notificationService = TestSocketNotificationService()
-        let monitor = AgentAlertMonitor(
+        let notificationService = TestSocketNotifyService()
+        let monitor = AgentNotifyMonitor(
             detectors: [],
             notificationService: notificationService,
             defaults: defaults,
             cooldown: 0
         )
 
-        let event = AgentAlertEvent(
+        let event = AgentNotifyEvent(
             service: .claude,
             type: .taskCompleted,
             timestamp: Date(),
@@ -763,16 +763,16 @@ final class AgentAlertMonitorSocketReceiveTests: XCTestCase {
     }
 }
 
-private actor TestSocketNotificationService: AgentAlertNotificationServiceProtocol {
-    private var events: [AgentAlertEvent] = []
+private actor TestSocketNotifyService: AgentNotifyNotificationServiceProtocol {
+    private var events: [AgentNotifyEvent] = []
 
     func requestAuthorizationIfNeeded() async {}
 
-    func post(event: AgentAlertEvent) async {
+    func post(event: AgentNotifyEvent) async {
         events.append(event)
     }
 
-    func postedEvents() -> [AgentAlertEvent] {
+    func postedEvents() -> [AgentNotifyEvent] {
         events
     }
 }

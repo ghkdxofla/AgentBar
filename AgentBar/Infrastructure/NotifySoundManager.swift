@@ -6,8 +6,8 @@ struct CESPManifest: Decodable, Sendable {
     let sounds: [String: [String]]?
 }
 
-final class AlertSoundManager: @unchecked Sendable {
-    static let shared = AlertSoundManager()
+final class NotifySoundManager: @unchecked Sendable {
+    static let shared = NotifySoundManager()
 
     private let defaults: UserDefaults
     private let fileManager: FileManager
@@ -27,7 +27,7 @@ final class AlertSoundManager: @unchecked Sendable {
     }
 
     private func restorePersistedPack() {
-        guard let path = defaults.string(forKey: "alertSoundPackPath"),
+        guard let path = defaults.string(forKey: "notificationSoundPackPath"),
               !path.isEmpty else { return }
         _ = loadPack(from: path)
     }
@@ -70,16 +70,16 @@ final class AlertSoundManager: @unchecked Sendable {
         lock.unlock()
     }
 
-    static func cespCategory(for eventType: AgentAlertEventType) -> String {
+    static func cespCategory(for eventType: AgentNotifyEventType) -> String {
         eventType.cespCategory
     }
 
-    func play(for eventType: AgentAlertEventType) -> Bool {
+    func play(for eventType: AgentNotifyEventType) -> Bool {
         let category = Self.cespCategory(for: eventType)
 
         guard isCategoryEnabled(category) else { return false }
 
-        guard let packPath = defaults.string(forKey: "alertSoundPackPath"),
+        guard let packPath = defaults.string(forKey: "notificationSoundPackPath"),
               !packPath.isEmpty else {
             return false
         }
@@ -128,7 +128,7 @@ final class AlertSoundManager: @unchecked Sendable {
     }
 
     func playTest(category: String) -> Bool {
-        guard let packPath = defaults.string(forKey: "alertSoundPackPath"),
+        guard let packPath = defaults.string(forKey: "notificationSoundPackPath"),
               !packPath.isEmpty else {
             return false
         }
@@ -161,8 +161,8 @@ final class AlertSoundManager: @unchecked Sendable {
     }
 
     private var currentVolume: Float {
-        defaults.object(forKey: "alertSoundVolume") != nil
-            ? Float(defaults.double(forKey: "alertSoundVolume"))
+        defaults.object(forKey: "notificationSoundVolume") != nil
+            ? Float(defaults.double(forKey: "notificationSoundVolume"))
             : 0.7
     }
 
@@ -170,9 +170,9 @@ final class AlertSoundManager: @unchecked Sendable {
         let key: String
         switch category {
         case "task.complete":
-            key = "alertSoundTaskCompleteEnabled"
+            key = "notificationSoundTaskCompleteEnabled"
         case "input.required":
-            key = "alertSoundInputRequiredEnabled"
+            key = "notificationSoundInputRequiredEnabled"
         default:
             return false
         }
@@ -181,7 +181,7 @@ final class AlertSoundManager: @unchecked Sendable {
     }
 
     private func loadLastPlayedState() {
-        if let saved = defaults.dictionary(forKey: "alertSoundLastPlayed") as? [String: String] {
+        if let saved = defaults.dictionary(forKey: "notificationSoundLastPlayed") as? [String: String] {
             lock.lock()
             lastPlayedPerCategory = saved
             lock.unlock()
@@ -192,6 +192,6 @@ final class AlertSoundManager: @unchecked Sendable {
         lock.lock()
         let state = lastPlayedPerCategory
         lock.unlock()
-        defaults.set(state, forKey: "alertSoundLastPlayed")
+        defaults.set(state, forKey: "notificationSoundLastPlayed")
     }
 }

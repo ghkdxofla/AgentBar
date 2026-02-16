@@ -7,13 +7,13 @@ private enum CursorSchema {
 }
 
 @MainActor
-final class AgentAlertMonitor {
-    private let detectors: [any AgentAlertEventDetectorProtocol]
-    private let notificationService: any AgentAlertNotificationServiceProtocol
+final class AgentNotifyMonitor {
+    private let detectors: [any AgentNotifyEventDetectorProtocol]
+    private let notificationService: any AgentNotifyNotificationServiceProtocol
     private let defaults: UserDefaults
     private let cooldown: TimeInterval
 
-    private let socketListener: AlertSocketListener
+    private let socketListener: NotifySocketListener
     private var timerCancellable: AnyCancellable?
     private var settingsCancellable: AnyCancellable?
     private var lastNotificationByKey: [String: Date] = [:]
@@ -22,24 +22,24 @@ final class AgentAlertMonitor {
     private static let fallbackPollingInterval: TimeInterval = 10
 
     init(
-        detectors: [any AgentAlertEventDetectorProtocol]? = nil,
-        notificationService: any AgentAlertNotificationServiceProtocol = AgentAlertNotificationService(),
+        detectors: [any AgentNotifyEventDetectorProtocol]? = nil,
+        notificationService: any AgentNotifyNotificationServiceProtocol = AgentNotifyNotificationService(),
         defaults: UserDefaults = .standard,
         cooldown: TimeInterval = 90,
-        socketListener: AlertSocketListener? = nil
+        socketListener: NotifySocketListener? = nil
     ) {
-        self.detectors = detectors ?? [CodexAlertEventDetector(), ClaudeHookAlertEventDetector()]
+        self.detectors = detectors ?? [CodexNotifyEventDetector(), ClaudeHookNotifyEventDetector()]
         self.notificationService = notificationService
         self.defaults = defaults
         self.cooldown = cooldown
-        self.socketListener = socketListener ?? AlertSocketListener()
+        self.socketListener = socketListener ?? NotifySocketListener()
     }
 
     func start() {
         ensureInitialWatermarks()
         observeSettingsChangesIfNeeded()
 
-        if isAlertsEnabled {
+        if isNotificationsEnabled {
             Task { await notificationService.requestAuthorizationIfNeeded() }
             startSocketListener()
             restartFallbackTimer()
@@ -59,8 +59,8 @@ final class AgentAlertMonitor {
         socketListener.isListening
     }
 
-    private var isAlertsEnabled: Bool {
-        defaults.bool(forKey: "alertsEnabled", defaultValue: false)
+    private var isNotificationsEnabled: Bool {
+        defaults.bool(forKey: "notificationsEnabled", defaultValue: false)
     }
 
     private func restartFallbackTimer() {
@@ -86,8 +86,8 @@ final class AgentAlertMonitor {
         socketListener.start()
     }
 
-    func receive(event: AgentAlertEvent) async {
-        guard isAlertsEnabled else { return }
+    func receive(event: AgentNotifyEvent) async {
+        guard isNotificationsEnabled else { return }
         guard isEventEnabled(event.type) else { return }
 
         let detectorKey = detectorSettingsKey(for: event.service)
@@ -104,9 +104,9 @@ final class AgentAlertMonitor {
     private func detectorSettingsKey(for service: ServiceType) -> String? {
         switch service {
         case .claude:
-            return "alertClaudeHookEventsEnabled"
+            return "notificationClaudeHookEventsEnabled"
         case .codex:
-            return "alertCodexEventsEnabled"
+            return "notificationCodexEventsEnabled"
         default:
             return nil
         }
@@ -136,11 +136,11 @@ final class AgentAlertMonitor {
         guard settingsCancellable == nil else { return }
 
         settingsCancellable = NotificationCenter.default
-            .publisher(for: .alertsSettingsChanged)
+            .publisher(for: .notificationsSettingsChanged)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                if self.isAlertsEnabled {
+                if self.isNotificationsEnabled {
                     if !self.socketListener.isListening {
                         self.startSocketListener()
                     }
@@ -156,7 +156,7 @@ final class AgentAlertMonitor {
     }
 
     func processTick() async {
-        guard isAlertsEnabled else { return }
+        guard isNotificationsEnabled else { return }
         guard !isProcessing else { return }
 
         isProcessing = true
@@ -198,7 +198,7 @@ final class AgentAlertMonitor {
         }
     }
 
-    private func shouldNotify(_ event: AgentAlertEvent) -> Bool {
+    private func shouldNotify(_ event: AgentNotifyEvent) -> Bool {
         if let previous = lastNotificationByKey[event.dedupeKey],
            Date().timeIntervalSince(previous) < cooldown {
             return false
@@ -206,11 +206,11 @@ final class AgentAlertMonitor {
         return true
     }
 
-    private func isEventEnabled(_ type: AgentAlertEventType) -> Bool {
+    private func isEventEnabled(_ type: AgentNotifyEventType) -> Bool {
         defaults.bool(forKey: type.settingsKey, defaultValue: true)
     }
 
-    private func isDetectorEnabled(_ detector: any AgentAlertEventDetectorProtocol) -> Bool {
+    private func isDetectorEnabled(_ detector: any AgentNotifyEventDetectorProtocol) -> Bool {
         guard let key = detector.settingsEnabledKey else { return true }
         return defaults.bool(forKey: key, defaultValue: true)
     }
@@ -219,7 +219,7 @@ final class AgentAlertMonitor {
         let normalized = service.rawValue
             .lowercased()
             .replacingOccurrences(of: " ", with: "_")
-        return "alertLastSeen_\(normalized)"
+        return "notificationLastSeen_\(normalized)"
     }
 
     private func watermarkEventIDsKey(for service: ServiceType) -> String {
@@ -254,7 +254,7 @@ final class AgentAlertMonitor {
         defaults.set(cursor.schemaVersion, forKey: watermarkSchemaVersionKey(for: service))
     }
 
-    private func isAlreadyProcessed(_ event: AgentAlertEvent, at watermark: WatermarkCursor) -> Bool {
+    private func isAlreadyProcessed(_ event: AgentNotifyEvent, at watermark: WatermarkCursor) -> Bool {
         guard areSameTimestamp(event.timestamp, watermark.date) else { return false }
 
         if watermark.eventIDsAtTimestamp.contains(event.cursorID) {
@@ -268,7 +268,7 @@ final class AgentAlertMonitor {
         return false
     }
 
-    private func updatedWatermarkCursor(from current: WatermarkCursor, with events: [AgentAlertEvent]) -> WatermarkCursor {
+    private func updatedWatermarkCursor(from current: WatermarkCursor, with events: [AgentNotifyEvent]) -> WatermarkCursor {
         guard let maxTimestamp = events.map(\.timestamp).max() else { return current }
 
         if areSameTimestamp(maxTimestamp, current.date) {
