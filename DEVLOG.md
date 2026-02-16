@@ -323,3 +323,12 @@
 - **Hook scripts hardened**: Rewrote both `agentbar-hook.sh` and `agentbar-codex-hook.sh` to construct all JSON via `python3 json.dumps` (prevents unescaped session_id injection).
 - **New tests**: `testAutoRestoresPersistedPackOnInit` and `testDoesNotCrashOnInitWithInvalidPersistedPath` added to `AlertSoundManagerTests`.
 - All 172 tests passing
+
+## Iteration 42: Review fixes — socket FD race, client tracking, EAGAIN handling
+- **Cancel handler FD race fixed**: Cancel handler now captures server FD value at creation time instead of reading `self.serverFD`, preventing a restart race where the old cancel handler could close the new listener's FD.
+- **Client connection tracking**: Active client `DispatchSourceRead` instances tracked in `clientSources` dictionary. `_stop()` cancels all client sources and closes FDs. Client cancel handler properly calls `close(clientFD)`.
+- **Synchronous `_isListening` reset**: `_isListening` set to `false` immediately in `_stop()` so `AgentAlertMonitor` sees correct state without waiting for async cancel handler.
+- **EAGAIN/EWOULDBLOCK handling**: Non-blocking `read()` now distinguishes `bytesRead == 0` (EOF) from `bytesRead < 0` with `errno == EAGAIN` (transient, retry) vs real error (close).
+- **Hook script python3 fallback**: Both hook scripts now fall back to safe printf-based JSON with quote-stripped values when `python3` is unavailable.
+- **Lifecycle tests**: Added 5 tests for socket listener start/stop, rapid restart, double stop, and synchronous `isListening` state.
+- All 177 tests passing

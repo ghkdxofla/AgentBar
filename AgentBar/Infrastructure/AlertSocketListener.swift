@@ -22,6 +22,7 @@ final class AlertSocketListener: @unchecked Sendable {
     private var serverFD: Int32 = -1
     private var acceptSource: DispatchSourceRead?
     private var _isListening = false
+    private var clientSources: [Int32: DispatchSourceRead] = [:]
 
     var isListening: Bool {
         queue.sync { _isListening }
@@ -100,21 +101,34 @@ final class AlertSocketListener: @unchecked Sendable {
         source.setEventHandler { [weak self] in
             self?.acceptConnection()
         }
-        source.setCancelHandler { [weak self] in
-            guard let self else { return }
-            if self.serverFD >= 0 {
-                close(self.serverFD)
-                self.serverFD = -1
-            }
-            try? self.fileManager.removeItem(atPath: self.socketPath)
-            self._isListening = false
+        // Capture the FD value at creation time so cancel handler
+        // always closes the correct FD, not a newer one from restart.
+        let capturedFD = fd
+        let path = socketPath
+        let fm = fileManager
+        source.setCancelHandler {
+            close(capturedFD)
+            try? fm.removeItem(atPath: path)
         }
         self.acceptSource = source
         source.resume()
     }
 
     private func _stop() {
+        // Cancel all active client connections first
+        for (clientFD, source) in clientSources {
+            source.cancel()
+            close(clientFD)
+        }
+        clientSources.removeAll()
+
+        // Mark as not listening immediately (synchronous)
+        _isListening = false
+
         if let source = acceptSource {
+            // Close/reset server FD synchronously before cancel handler fires
+            // to prevent the cancel handler from closing a new FD on restart.
+            serverFD = -1
             source.cancel()
             acceptSource = nil
         } else if serverFD >= 0 {
@@ -123,7 +137,6 @@ final class AlertSocketListener: @unchecked Sendable {
             if fileManager.fileExists(atPath: socketPath) {
                 try? fileManager.removeItem(atPath: socketPath)
             }
-            _isListening = false
         }
     }
 
@@ -141,17 +154,34 @@ final class AlertSocketListener: @unchecked Sendable {
             let bytesRead = read(clientFD, &buf, buf.count)
             if bytesRead > 0 {
                 buffer.append(contentsOf: buf[0..<bytesRead])
-            } else {
-                // EOF or error: process and close
+            } else if bytesRead == 0 {
+                // EOF: process and close
                 readSource.cancel()
                 self?.processBuffer(buffer)
-                close(clientFD)
+                self?.removeClient(clientFD)
+            } else {
+                // bytesRead < 0: check errno
+                if errno == EAGAIN || errno == EWOULDBLOCK {
+                    return // transient, wait for next read event
+                }
+                // Real error: close connection
+                readSource.cancel()
+                self?.processBuffer(buffer)
+                self?.removeClient(clientFD)
             }
         }
-        readSource.setCancelHandler {
-            // Ensure close on cancel
+        readSource.setCancelHandler { [weak self] in
+            close(clientFD)
+            self?.clientSources.removeValue(forKey: clientFD)
         }
+        clientSources[clientFD] = readSource
         readSource.resume()
+    }
+
+    private func removeClient(_ fd: Int32) {
+        if let source = clientSources.removeValue(forKey: fd) {
+            source.cancel()
+        }
     }
 
     private func processBuffer(_ data: Data) {
