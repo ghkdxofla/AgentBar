@@ -1,24 +1,5 @@
 # AgentBar Development Log
 
-## Iteration 41: Review fixes — socket rewrite, fallback timer, sound auto-restore
-- **AlertSocketListener rewritten**: Replaced NWListener/Network framework with POSIX sockets (`socket(AF_UNIX, SOCK_STREAM, 0)`) + `DispatchSource.makeReadSource`. Fixes POSIX error 22 at runtime and race conditions — all mutable state serialized on private `DispatchQueue` with `queue.sync` for public accessors.
-- **Fallback timer restored**: Reintroduced 10s fallback `Timer.publish` in `AgentAlertMonitor` for detector-based polling (Codex file watcher, Claude JSONL reader). Socket is primary, timer is secondary for users without hook configuration.
-- **ClaudeHookAlertEventDetector restored**: Re-added to default detector list so Claude JSONL fallback bridge events are still consumed.
-- **AlertSoundManager auto-restore**: Added `restorePersistedPack()` in `init()` so persisted sound pack path is reloaded after app restart.
-- **Hook scripts hardened**: Rewrote both `agentbar-hook.sh` and `agentbar-codex-hook.sh` to construct all JSON via `python3 json.dumps` (prevents unescaped session_id injection).
-- **New tests**: `testAutoRestoresPersistedPackOnInit` and `testDoesNotCrashOnInitWithInvalidPersistedPath` added to `AlertSoundManagerTests`.
-- All 172 tests passing
-
-## Iteration 40: Socket listener + custom sound support
-- **AlertSocketListener**: Unix domain socket at `~/.agentbar/events.sock` replaces Timer-based polling as primary event source. Accepts newline-delimited JSON with normalized agent/event/session_id/message/timestamp fields.
-- **AlertSoundManager**: CESP-compatible sound pack loader with `openpeon.json` manifest parsing, per-category enable/disable, no-repeat selection, and AVAudioPlayer playback with configurable volume.
-- **AgentAlertMonitor refactored**: Removed Timer.publish polling loop and pollingInterval property. Socket listener is primary event source; CodexAlertEventDetector retained as fallback for users without hook configuration. New `receive(event:)` method handles push-based events with same dedup/cooldown/settings filtering.
-- **AgentAlertNotificationService**: Integrated AlertSoundManager — custom sound plays instead of system default when sound pack configured.
-- **Hook scripts**: `scripts/agentbar-hook.sh` (Claude) and `scripts/agentbar-codex-hook.sh` (Codex) send normalized JSON to socket with JSONL file fallback.
-- **SettingsView**: Removed polling interval picker; added Alert Sounds subsection with pack directory browser, volume slider, per-category toggles, and test buttons. Updated help text for socket-based architecture.
-- **AgentAlertEvent**: Added `cespCategory` property for event-type-to-sound-category mapping.
-- All 170 tests passing
-
 ## Iteration 1: Project Scaffolding + Build Verification
 - Created `project.yml` for xcodegen (macOS 13.0, LSUIElement, entitlements)
 - Set up `AgentBar/Info.plist` with LSUIElement=true
@@ -311,6 +292,11 @@
 - **Test coverage**: Added `testUsesCachedValuesWhenResponsePayloadIsUnexpected` and retained idle-window cache preference tests for zero/null edge cases.
 - All 139 tests passing
 
+## Iteration 38: Fix Top-row clipping by correcting viewport and host alignment
+- **Viewport alignment fix**: `StackedBarView` now applies the 20px viewport frame with `.top` alignment instead of the default center alignment, so `offset 0` truly maps to the first row at the top edge without partial clipping.
+- **Status button host layout fix**: `StatusBarController` no longer overwrites the system-managed status button frame. The SwiftUI host view is now pinned to `button.bounds` (with horizontal inset) and autoresizes with the button, preventing vertical misalignment in the menu bar slot.
+- All 139 tests passing
+
 ## Iteration 39: Rename CCUsageBar to AgentBar
 - **Project-wide rename**: Replaced all occurrences of `CCUsageBar` → `AgentBar`, `ccusagebar` → `agentbar`, and `CCUSAGEBAR` → `AGENTBAR` across 28+ files including pbxproj, project.yml, Swift sources, tests, scripts, and docs
 - **File renames**: `CCUsageBarApp.swift` → `AgentBarApp.swift`, `CCUsageBar.entitlements` → `AgentBar.entitlements`
@@ -319,7 +305,21 @@
 - **Keychain service unchanged**: `com.agentbar.apikeys` was already the correct name
 - All 139 tests passing
 
-## Iteration 38: Fix Top-row clipping by correcting viewport and host alignment
-- **Viewport alignment fix**: `StackedBarView` now applies the 20px viewport frame with `.top` alignment instead of the default center alignment, so `offset 0` truly maps to the first row at the top edge without partial clipping.
-- **Status button host layout fix**: `StatusBarController` no longer overwrites the system-managed status button frame. The SwiftUI host view is now pinned to `button.bounds` (with horizontal inset) and autoresizes with the button, preventing vertical misalignment in the menu bar slot.
-- All 139 tests passing
+## Iteration 40: Socket listener + custom sound support
+- **AlertSocketListener**: Unix domain socket at `~/.agentbar/events.sock` replaces Timer-based polling as primary event source. Accepts newline-delimited JSON with normalized agent/event/session_id/message/timestamp fields.
+- **AlertSoundManager**: CESP-compatible sound pack loader with `openpeon.json` manifest parsing, per-category enable/disable, no-repeat selection, and AVAudioPlayer playback with configurable volume.
+- **AgentAlertMonitor refactored**: Removed Timer.publish polling loop and pollingInterval property. Socket listener is primary event source; CodexAlertEventDetector retained as fallback for users without hook configuration. New `receive(event:)` method handles push-based events with same dedup/cooldown/settings filtering.
+- **AgentAlertNotificationService**: Integrated AlertSoundManager — custom sound plays instead of system default when sound pack configured.
+- **Hook scripts**: `scripts/agentbar-hook.sh` (Claude) and `scripts/agentbar-codex-hook.sh` (Codex) send normalized JSON to socket with JSONL file fallback.
+- **SettingsView**: Removed polling interval picker; added Alert Sounds subsection with pack directory browser, volume slider, per-category toggles, and test buttons. Updated help text for socket-based architecture.
+- **AgentAlertEvent**: Added `cespCategory` property for event-type-to-sound-category mapping.
+- All 170 tests passing
+
+## Iteration 41: Review fixes — socket rewrite, fallback timer, sound auto-restore
+- **AlertSocketListener rewritten**: Replaced NWListener/Network framework with POSIX sockets (`socket(AF_UNIX, SOCK_STREAM, 0)`) + `DispatchSource.makeReadSource`. Fixes POSIX error 22 at runtime and race conditions — all mutable state serialized on private `DispatchQueue` with `queue.sync` for public accessors.
+- **Fallback timer restored**: Reintroduced 10s fallback `Timer.publish` in `AgentAlertMonitor` for detector-based polling (Codex file watcher, Claude JSONL reader). Socket is primary, timer is secondary for users without hook configuration.
+- **ClaudeHookAlertEventDetector restored**: Re-added to default detector list so Claude JSONL fallback bridge events are still consumed.
+- **AlertSoundManager auto-restore**: Added `restorePersistedPack()` in `init()` so persisted sound pack path is reloaded after app restart.
+- **Hook scripts hardened**: Rewrote both `agentbar-hook.sh` and `agentbar-codex-hook.sh` to construct all JSON via `python3 json.dumps` (prevents unescaped session_id injection).
+- **New tests**: `testAutoRestoresPersistedPackOnInit` and `testDoesNotCrashOnInitWithInvalidPersistedPath` added to `AlertSoundManagerTests`.
+- All 172 tests passing
