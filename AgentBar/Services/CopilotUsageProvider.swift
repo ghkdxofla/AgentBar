@@ -135,6 +135,8 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         // Reset = 1st of next month 00:00 UTC
         let resetTime = Self.firstOfNextMonthUTC()
 
+        let planName = apiResponse.copilot_plan.map { Self.capitalizedPlanName($0) }
+
         return UsageData(
             service: .copilot,
             fiveHourUsage: UsageMetric(
@@ -145,7 +147,8 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             ),
             weeklyUsage: nil,
             lastUpdated: Date(),
-            isAvailable: true
+            isAvailable: true,
+            planName: planName
         )
     }
 
@@ -193,6 +196,11 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
 
     // MARK: - Helpers
+
+    static func capitalizedPlanName(_ raw: String) -> String {
+        guard !raw.isEmpty else { return raw }
+        return raw.prefix(1).uppercased() + raw.dropFirst()
+    }
 
     static func firstOfNextMonthUTC(relativeTo now: Date = Date()) -> Date {
         var calendar = Calendar(identifier: .gregorian)

@@ -96,6 +96,11 @@ struct ServiceDetailRow: View {
                     .frame(width: 8, height: 8)
                 Text(data.service.rawValue)
                     .font(.subheadline.weight(.medium))
+                if let planName = data.planName {
+                    Text(planName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 MiniBarView(data: data)
                     .frame(width: 60, height: 8)

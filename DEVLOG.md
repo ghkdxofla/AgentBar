@@ -1,5 +1,16 @@
 # AgentBar Development Log
 
+## Iteration 45: Settings tab split, sound pack help, plan display in popover
+- **SettingsView TabView**: Split monolithic 8-section Form into two tabs — "Usage" (General + 6 service sections) and "Alerts" (alert toggles + sound pack). Frame reduced from 450×920 to 450×750
+- **ClaudePlan enum**: Added `ClaudePlan` (Free/Pro/Max/Team) to `SubscriptionPlan.swift` with `@AppStorage("claudePlan")` picker in Claude Code settings section
+- **CodexPlan.plus**: Added `case plus = "Plus"` with 1M/5h and 10M/7d token limits before `pro`
+- **planName on UsageData**: New `let planName: String?` field with default `nil` — all existing call sites unchanged
+- **Provider planName population**: Claude/Codex/Cursor read from UserDefaults; Copilot reads `copilot_plan` from API response with `capitalizedPlanName()` helper
+- **Popover plan display**: `ServiceDetailRow` shows plan name as caption-sized secondary text next to service name (e.g. "Claude Code Pro")
+- **SoundPackHelpSheet**: `questionmark.circle` button on "Alert Sounds" DisclosureGroup label opens `.sheet` with CESP directory structure, manifest JSON schema, supported audio formats (WAV/MP3/AIFF/M4A/CAF), and category explanations
+- **Tests added**: `CodexPlan.plus` limits, `ClaudePlan` enum validity/round-trip, `CopilotUsageProvider.capitalizedPlanName`, Copilot planName assertions
+- All 184 tests passing
+
 ## Iteration 44: Codebase cleanup — remove dead code, consolidate duplicates
 - **Dead code removed**: `APIClient.getRawData`, `APIError.timeout`/`.networkError`, `UsageViewModel.consecutiveFailures`, `DateUtils.isWithinFiveHourWindow`/`isWithinWeeklyWindow`/`nextResetTime`/`nextResetAligned`, `CopilotPlan.monthlyPremiumRequests`, `CursorPlan.monthlyCreditDollars`
 - **Shared UserDefaultsExtensions.swift**: Consolidated 3 identical `bool(forKey:defaultValue:)` definitions (AgentAlertMonitor, UsageViewModel, AgentAlertNotificationService) into one `internal` extension
