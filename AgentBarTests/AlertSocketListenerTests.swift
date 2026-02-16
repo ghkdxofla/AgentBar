@@ -203,6 +203,12 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         listener.start()
         XCTAssertTrue(listener.isListening)
         XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                canConnectAndDisconnect(to: sockPath)
+            },
+            "Socket path did not become connectable after start()"
+        )
 
         listener.stop()
         XCTAssertFalse(listener.isListening)
@@ -294,6 +300,12 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
                 canConnectAndDisconnect(to: sockPath)
             },
             "Socket path did not stay connectable for a full stability window after restart with active client"
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                listener.activeClientCountForTesting == 0
+            },
+            "Listener still had active probe clients before second acceptance check"
         )
 
         let secondClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
