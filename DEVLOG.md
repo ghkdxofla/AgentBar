@@ -336,3 +336,7 @@
 ## Iteration 43: Brighten Codex bar text color
 - **Codex darkColor brightened**: Changed from emerald-600 `(0.020, 0.588, 0.412)` to emerald-500 `(0.063, 0.725, 0.506)` for better readability of the "CX" label and bar fill in the menu bar.
 - All 183 tests passing
+
+## Iteration 44: Remove focus ring from Quit button in popover
+- **Focus ring removed**: Added `.focusable(false)` to the Quit button in `DetailPopoverView`. macOS was auto-focusing the last focusable button when the popover opened, causing a blue border to appear around Quit (or sometimes the gear icon). The gear button already had `.focusable(false)`.
+- All 183 tests passing
