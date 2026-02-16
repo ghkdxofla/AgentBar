@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-enum AgentAlertEventType: String, CaseIterable, Sendable {
+enum AgentNotifyEventType: String, CaseIterable, Sendable {
     case taskCompleted
     case permissionRequired
     case decisionRequired
@@ -20,11 +20,11 @@ enum AgentAlertEventType: String, CaseIterable, Sendable {
     var settingsKey: String {
         switch self {
         case .taskCompleted:
-            return "alertTaskCompletedEnabled"
+            return "notificationTaskCompletedEnabled"
         case .permissionRequired:
-            return "alertPermissionRequiredEnabled"
+            return "notificationPermissionRequiredEnabled"
         case .decisionRequired:
-            return "alertDecisionRequiredEnabled"
+            return "notificationDecisionRequiredEnabled"
         }
     }
 
@@ -38,9 +38,9 @@ enum AgentAlertEventType: String, CaseIterable, Sendable {
     }
 }
 
-struct AgentAlertEvent: Sendable, Equatable {
+struct AgentNotifyEvent: Sendable, Equatable {
     let service: ServiceType
-    let type: AgentAlertEventType
+    let type: AgentNotifyEventType
     let timestamp: Date
     let message: String?
     let sessionID: String?
@@ -48,7 +48,7 @@ struct AgentAlertEvent: Sendable, Equatable {
 
     init(
         service: ServiceType,
-        type: AgentAlertEventType,
+        type: AgentNotifyEventType,
         timestamp: Date,
         message: String?,
         sessionID: String?,

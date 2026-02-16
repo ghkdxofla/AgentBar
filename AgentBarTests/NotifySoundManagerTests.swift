@@ -1,7 +1,7 @@
 import XCTest
 @testable import AgentBar
 
-final class AlertSoundManagerTests: XCTestCase {
+final class NotifySoundManagerTests: XCTestCase {
     private var tempDir: URL!
 
     override func setUp() {
@@ -36,7 +36,7 @@ final class AlertSoundManagerTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
         let result = manager.loadPack(from: tempDir.path)
 
         XCTAssertTrue(result)
@@ -49,7 +49,7 @@ final class AlertSoundManagerTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
         let result = manager.loadPack(from: tempDir.path)
 
         XCTAssertFalse(result)
@@ -67,7 +67,7 @@ final class AlertSoundManagerTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
         let result = manager.loadPack(from: tempDir.path)
 
         XCTAssertFalse(result)
@@ -88,7 +88,7 @@ final class AlertSoundManagerTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
         _ = manager.loadPack(from: tempDir.path)
         XCTAssertTrue(manager.isPackLoaded)
 
@@ -98,9 +98,9 @@ final class AlertSoundManagerTests: XCTestCase {
     }
 
     func testCESPCategoryMapping() {
-        XCTAssertEqual(AlertSoundManager.cespCategory(for: .taskCompleted), "task.complete")
-        XCTAssertEqual(AlertSoundManager.cespCategory(for: .permissionRequired), "input.required")
-        XCTAssertEqual(AlertSoundManager.cespCategory(for: .decisionRequired), "input.required")
+        XCTAssertEqual(NotifySoundManager.cespCategory(for: .taskCompleted), "task.complete")
+        XCTAssertEqual(NotifySoundManager.cespCategory(for: .permissionRequired), "input.required")
+        XCTAssertEqual(NotifySoundManager.cespCategory(for: .decisionRequired), "input.required")
     }
 
     func testPlayReturnsFalseWhenNoPackConfigured() {
@@ -109,7 +109,7 @@ final class AlertSoundManagerTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
         let result = manager.play(for: .taskCompleted)
         XCTAssertFalse(result)
     }
@@ -127,11 +127,11 @@ final class AlertSoundManagerTests: XCTestCase {
         let suiteName = "AgentBarTests.SoundManager.Disabled.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set(tempDir.path, forKey: "alertSoundPackPath")
-        defaults.set(false, forKey: "alertSoundTaskCompleteEnabled")
+        defaults.set(tempDir.path, forKey: "notificationSoundPackPath")
+        defaults.set(false, forKey: "notificationSoundTaskCompleteEnabled")
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
         _ = manager.loadPack(from: tempDir.path)
 
         let result = manager.play(for: .taskCompleted)
@@ -151,10 +151,10 @@ final class AlertSoundManagerTests: XCTestCase {
         let suiteName = "AgentBarTests.SoundManager.EmptyCategory.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set(tempDir.path, forKey: "alertSoundPackPath")
+        defaults.set(tempDir.path, forKey: "notificationSoundPackPath")
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
         _ = manager.loadPack(from: tempDir.path)
 
         let result = manager.play(for: .taskCompleted)
@@ -162,9 +162,9 @@ final class AlertSoundManagerTests: XCTestCase {
     }
 
     func testCESPCategoryMatchesEventTypeProperty() {
-        for eventType in AgentAlertEventType.allCases {
+        for eventType in AgentNotifyEventType.allCases {
             XCTAssertEqual(
-                AlertSoundManager.cespCategory(for: eventType),
+                NotifySoundManager.cespCategory(for: eventType),
                 eventType.cespCategory
             )
         }
@@ -183,10 +183,10 @@ final class AlertSoundManagerTests: XCTestCase {
         let suiteName = "AgentBarTests.SoundManager.AutoRestore.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set(tempDir.path, forKey: "alertSoundPackPath")
+        defaults.set(tempDir.path, forKey: "notificationSoundPackPath")
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
 
         XCTAssertTrue(manager.isPackLoaded)
         XCTAssertEqual(manager.packName, "Persisted Pack")
@@ -196,10 +196,10 @@ final class AlertSoundManagerTests: XCTestCase {
         let suiteName = "AgentBarTests.SoundManager.InvalidPath.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set("/nonexistent/path/to/pack", forKey: "alertSoundPackPath")
+        defaults.set("/nonexistent/path/to/pack", forKey: "notificationSoundPackPath")
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let manager = AlertSoundManager(defaults: defaults)
+        let manager = NotifySoundManager(defaults: defaults)
 
         XCTAssertFalse(manager.isPackLoaded)
         XCTAssertNil(manager.packName)

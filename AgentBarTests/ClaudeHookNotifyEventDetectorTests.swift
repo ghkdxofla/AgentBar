@@ -1,7 +1,7 @@
 import XCTest
 @testable import AgentBar
 
-final class ClaudeHookAlertEventDetectorTests: XCTestCase {
+final class ClaudeHookNotifyEventDetectorTests: XCTestCase {
     private var tempDir: URL!
     private var hookFile: URL!
 
@@ -29,7 +29,7 @@ final class ClaudeHookAlertEventDetectorTests: XCTestCase {
         )
         try line.write(to: hookFile, atomically: true, encoding: .utf8)
 
-        let detector = ClaudeHookAlertEventDetector(hookEventsFile: hookFile)
+        let detector = ClaudeHookNotifyEventDetector(hookEventsFile: hookFile)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertEqual(events.count, 1)
@@ -49,7 +49,7 @@ final class ClaudeHookAlertEventDetectorTests: XCTestCase {
         )
         try line.write(to: hookFile, atomically: true, encoding: .utf8)
 
-        let detector = ClaudeHookAlertEventDetector(hookEventsFile: hookFile)
+        let detector = ClaudeHookNotifyEventDetector(hookEventsFile: hookFile)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertEqual(events.count, 1)
@@ -67,7 +67,7 @@ final class ClaudeHookAlertEventDetectorTests: XCTestCase {
         )
         try line.write(to: hookFile, atomically: true, encoding: .utf8)
 
-        let detector = ClaudeHookAlertEventDetector(hookEventsFile: hookFile)
+        let detector = ClaudeHookNotifyEventDetector(hookEventsFile: hookFile)
         let events = await detector.detectEvents(since: Date(timeIntervalSince1970: 0))
 
         XCTAssertEqual(events.count, 1)
@@ -90,7 +90,7 @@ final class ClaudeHookAlertEventDetectorTests: XCTestCase {
             return
         }
 
-        let detector = ClaudeHookAlertEventDetector(hookEventsFile: hookFile)
+        let detector = ClaudeHookNotifyEventDetector(hookEventsFile: hookFile)
         let exclusive = await detector.detectEvents(since: watermark)
         let inclusive = await detector.detectEvents(since: watermark, includeBoundary: true)
 

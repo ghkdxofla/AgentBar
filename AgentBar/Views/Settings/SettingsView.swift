@@ -3,23 +3,23 @@ import ServiceManagement
 
 extension Notification.Name {
     static let limitsChanged = Notification.Name("AgentBarLimitsChanged")
-    static let alertsSettingsChanged = Notification.Name("AgentBarAlertsSettingsChanged")
+    static let notificationsSettingsChanged = Notification.Name("AgentBarNotificationsSettingsChanged")
 }
 
 struct SettingsView: View {
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("refreshInterval") private var refreshInterval: Double = 60
-    @AppStorage("alertsEnabled") private var alertsEnabled = false
-    @AppStorage("alertTaskCompletedEnabled") private var alertTaskCompletedEnabled = true
-    @AppStorage("alertPermissionRequiredEnabled") private var alertPermissionRequiredEnabled = true
-    @AppStorage("alertDecisionRequiredEnabled") private var alertDecisionRequiredEnabled = true
-    @AppStorage("alertCodexEventsEnabled") private var alertCodexEventsEnabled = true
-    @AppStorage("alertClaudeHookEventsEnabled") private var alertClaudeHookEventsEnabled = true
-    @AppStorage("alertShowMessagePreview") private var alertShowMessagePreview = false
-    @AppStorage("alertSoundPackPath") private var alertSoundPackPath: String = ""
-    @AppStorage("alertSoundVolume") private var alertSoundVolume: Double = 0.7
-    @AppStorage("alertSoundTaskCompleteEnabled") private var alertSoundTaskCompleteEnabled = true
-    @AppStorage("alertSoundInputRequiredEnabled") private var alertSoundInputRequiredEnabled = true
+    @AppStorage("notificationsEnabled") private var notificationsEnabled = false
+    @AppStorage("notificationTaskCompletedEnabled") private var notificationTaskCompletedEnabled = true
+    @AppStorage("notificationPermissionRequiredEnabled") private var notificationPermissionRequiredEnabled = true
+    @AppStorage("notificationDecisionRequiredEnabled") private var notificationDecisionRequiredEnabled = true
+    @AppStorage("notificationCodexEventsEnabled") private var notificationCodexEventsEnabled = true
+    @AppStorage("notificationClaudeHookEventsEnabled") private var notificationClaudeHookEventsEnabled = true
+    @AppStorage("notificationShowMessagePreview") private var notificationShowMessagePreview = false
+    @AppStorage("notificationSoundPackPath") private var notificationSoundPackPath: String = ""
+    @AppStorage("notificationSoundVolume") private var notificationSoundVolume: Double = 0.7
+    @AppStorage("notificationSoundTaskCompleteEnabled") private var notificationSoundTaskCompleteEnabled = true
+    @AppStorage("notificationSoundInputRequiredEnabled") private var notificationSoundInputRequiredEnabled = true
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
     @AppStorage("claudePlan") private var claudePlan: String = ClaudePlan.pro.rawValue
@@ -63,9 +63,9 @@ struct SettingsView: View {
                 .tabItem { Label("Usage", systemImage: "chart.bar") }
                 .tag(SettingsTab.usage)
 
-            alertsTab
-                .tabItem { Label("Alerts", systemImage: "bell") }
-                .tag(SettingsTab.alerts)
+            notificationsTab
+                .tabItem { Label("Notifications", systemImage: "bell") }
+                .tag(SettingsTab.notifications)
         }
         .frame(width: 450, height: 750)
         .onAppear {
@@ -310,56 +310,56 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    // MARK: - Alerts Tab
+    // MARK: - Notifications Tab
 
-    private var alertsTab: some View {
+    private var notificationsTab: some View {
         Form {
-            Section("Agent Alerts (Beta)") {
-                Toggle("Enable alerts", isOn: $alertsEnabled)
-                    .onChange(of: alertsEnabled) { _ in
-                        notifyAlertSettingsChanged()
+            Section("Agent Notifications (Beta)") {
+                Toggle("Enable notifications", isOn: $notificationsEnabled)
+                    .onChange(of: notificationsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Task completed", isOn: $alertTaskCompletedEnabled)
-                    .disabled(!alertsEnabled)
-                    .onChange(of: alertTaskCompletedEnabled) { _ in
-                        notifyAlertSettingsChanged()
+                Toggle("Task completed", isOn: $notificationTaskCompletedEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationTaskCompletedEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Permission required", isOn: $alertPermissionRequiredEnabled)
-                    .disabled(!alertsEnabled)
-                    .onChange(of: alertPermissionRequiredEnabled) { _ in
-                        notifyAlertSettingsChanged()
+                Toggle("Permission required", isOn: $notificationPermissionRequiredEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationPermissionRequiredEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Decision required", isOn: $alertDecisionRequiredEnabled)
-                    .disabled(!alertsEnabled)
-                    .onChange(of: alertDecisionRequiredEnabled) { _ in
-                        notifyAlertSettingsChanged()
+                Toggle("Decision required", isOn: $notificationDecisionRequiredEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationDecisionRequiredEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Codex file watcher (fallback)", isOn: $alertCodexEventsEnabled)
-                    .disabled(!alertsEnabled)
-                    .onChange(of: alertCodexEventsEnabled) { _ in
-                        notifyAlertSettingsChanged()
+                Toggle("Codex file watcher (fallback)", isOn: $notificationCodexEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationCodexEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Claude hook (socket)", isOn: $alertClaudeHookEventsEnabled)
-                    .disabled(!alertsEnabled)
-                    .onChange(of: alertClaudeHookEventsEnabled) { _ in
-                        notifyAlertSettingsChanged()
+                Toggle("Claude hook (socket)", isOn: $notificationClaudeHookEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationClaudeHookEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Show message preview in notifications", isOn: $alertShowMessagePreview)
-                    .disabled(!alertsEnabled)
-                    .onChange(of: alertShowMessagePreview) { _ in
-                        notifyAlertSettingsChanged()
+                Toggle("Show message preview in notifications", isOn: $notificationShowMessagePreview)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationShowMessagePreview) { _ in
+                        notifyNotificationsSettingsChanged()
                     }
 
                 Button("Request Notification Permission") {
-                    AgentAlertNotificationService.requestAuthorizationPrompt()
+                    AgentNotifyNotificationService.requestAuthorizationPrompt()
                 }
-                .disabled(!alertsEnabled)
+                .disabled(!notificationsEnabled)
 
                 Text("Events are received via Unix socket at ~/.agentbar/events.sock.")
                     .font(.caption)
@@ -378,45 +378,45 @@ struct SettingsView: View {
                 DisclosureGroup {
                     HStack {
                         Text("Sound pack:")
-                        Text(alertSoundPackPath.isEmpty ? "No pack loaded" : (URL(fileURLWithPath: alertSoundPackPath).lastPathComponent))
+                        Text(notificationSoundPackPath.isEmpty ? "No pack loaded" : (URL(fileURLWithPath: notificationSoundPackPath).lastPathComponent))
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button("Browse...") {
                             chooseSoundPackDirectory()
                         }
                     }
-                    .disabled(!alertsEnabled)
+                    .disabled(!notificationsEnabled)
 
                     HStack {
                         Text("Volume:")
-                        Slider(value: $alertSoundVolume, in: 0...1, step: 0.1)
+                        Slider(value: $notificationSoundVolume, in: 0...1, step: 0.1)
                             .frame(width: 150)
-                        Text(String(format: "%.0f%%", alertSoundVolume * 100))
+                        Text(String(format: "%.0f%%", notificationSoundVolume * 100))
                             .foregroundStyle(.secondary)
                             .frame(width: 40, alignment: .trailing)
                     }
-                    .disabled(!alertsEnabled)
+                    .disabled(!notificationsEnabled)
 
-                    Toggle("Task complete sounds", isOn: $alertSoundTaskCompleteEnabled)
-                        .disabled(!alertsEnabled)
+                    Toggle("Task complete sounds", isOn: $notificationSoundTaskCompleteEnabled)
+                        .disabled(!notificationsEnabled)
 
-                    Toggle("Input required sounds", isOn: $alertSoundInputRequiredEnabled)
-                        .disabled(!alertsEnabled)
+                    Toggle("Input required sounds", isOn: $notificationSoundInputRequiredEnabled)
+                        .disabled(!notificationsEnabled)
 
                     HStack {
                         Button("Test task.complete") {
-                            _ = AlertSoundManager.shared.playTest(category: "task.complete")
+                            _ = NotifySoundManager.shared.playTest(category: "task.complete")
                         }
-                        .disabled(!alertsEnabled || alertSoundPackPath.isEmpty)
+                        .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
 
                         Button("Test input.required") {
-                            _ = AlertSoundManager.shared.playTest(category: "input.required")
+                            _ = NotifySoundManager.shared.playTest(category: "input.required")
                         }
-                        .disabled(!alertsEnabled || alertSoundPackPath.isEmpty)
+                        .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
                     }
                 } label: {
                     HStack {
-                        Text("Alert Sounds")
+                        Text("Notification Sounds")
                         Spacer()
                         Button {
                             showingSoundPackHelp = true
@@ -466,11 +466,9 @@ struct SettingsView: View {
     }
 
     private func migrateLegacyClaudePlanIfNeeded() {
-        // Migrate "Max" from before Max 5x/20x split
         if claudePlan == "Max" {
             claudePlan = ClaudePlan.max5x.rawValue
         }
-        // Validate stored value; fall back to Pro if unrecognized
         if ClaudePlan(rawValue: claudePlan) == nil {
             claudePlan = ClaudePlan.pro.rawValue
         }
@@ -493,8 +491,8 @@ struct SettingsView: View {
         zaiAPIKey = ""
     }
 
-    private func notifyAlertSettingsChanged() {
-        NotificationCenter.default.post(name: .alertsSettingsChanged, object: nil)
+    private func notifyNotificationsSettingsChanged() {
+        NotificationCenter.default.post(name: .notificationsSettingsChanged, object: nil)
     }
 
     private func chooseSoundPackDirectory() {
@@ -504,8 +502,8 @@ struct SettingsView: View {
         panel.allowsMultipleSelection = false
         panel.message = "Select a CESP-compatible sound pack directory containing openpeon.json"
         if panel.runModal() == .OK, let url = panel.url {
-            alertSoundPackPath = url.path
-            _ = AlertSoundManager.shared.loadPack(from: url.path)
+            notificationSoundPackPath = url.path
+            _ = NotifySoundManager.shared.loadPack(from: url.path)
         }
     }
 
@@ -632,7 +630,7 @@ struct SettingsView: View {
 
 enum SettingsTab: String {
     case usage
-    case alerts
+    case notifications
 }
 
 private struct SoundPackHelpSheet: View {

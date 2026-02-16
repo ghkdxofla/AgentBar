@@ -22,9 +22,9 @@ private struct ClaudeHookPayload: Decodable, Sendable {
     }
 }
 
-final class ClaudeHookAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked Sendable {
+final class ClaudeHookNotifyEventDetector: AgentNotifyEventDetectorProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .claude
-    let settingsEnabledKey: String? = "alertClaudeHookEventsEnabled"
+    let settingsEnabledKey: String? = "notificationClaudeHookEventsEnabled"
 
     private let hookEventsFile: URL
     private let fileManager: FileManager
@@ -38,13 +38,13 @@ final class ClaudeHookAlertEventDetector: AgentAlertEventDetectorProtocol, @unch
         self.fileManager = fileManager
     }
 
-    func detectEvents(since: Date, includeBoundary: Bool = false) async -> [AgentAlertEvent] {
+    func detectEvents(since: Date, includeBoundary: Bool = false) async -> [AgentNotifyEvent] {
         guard fileManager.fileExists(atPath: hookEventsFile.path) else { return [] }
         guard let records = try? JSONLParser.parseFile(hookEventsFile, as: ClaudeHookBridgeRecord.self) else {
             return []
         }
 
-        var events: [AgentAlertEvent] = []
+        var events: [AgentNotifyEvent] = []
 
         for (index, record) in records.enumerated() {
             guard let capturedAt = DateUtils.parseISO8601(record.capturedAt),
@@ -65,12 +65,12 @@ final class ClaudeHookAlertEventDetector: AgentAlertEventDetectorProtocol, @unch
         _ payload: ClaudeHookPayload,
         capturedAt: Date,
         lineIndex: Int
-    ) -> AgentAlertEvent? {
+    ) -> AgentNotifyEvent? {
         let eventName = payload.hookEventName ?? ""
         let sourceRecordID = "claude-hook#\(lineIndex)"
 
         if eventName == "Stop" || eventName == "SubagentStop" {
-            return AgentAlertEvent(
+            return AgentNotifyEvent(
                 service: .claude,
                 type: .taskCompleted,
                 timestamp: capturedAt,
@@ -82,7 +82,7 @@ final class ClaudeHookAlertEventDetector: AgentAlertEventDetectorProtocol, @unch
 
         guard eventName == "Notification" else { return nil }
         let message = payload.message ?? ""
-        let type: AgentAlertEventType
+        let type: AgentNotifyEventType
 
         if looksLikePermissionPrompt(message) {
             type = .permissionRequired
@@ -94,7 +94,7 @@ final class ClaudeHookAlertEventDetector: AgentAlertEventDetectorProtocol, @unch
             return nil
         }
 
-        return AgentAlertEvent(
+        return AgentNotifyEvent(
             service: .claude,
             type: type,
             timestamp: capturedAt,

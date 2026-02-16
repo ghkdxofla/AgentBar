@@ -14,27 +14,27 @@
 		1BF0C2AF5610ABE2175EECF6 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF43A9A907A07FA97597D17 /* SettingsWindowController.swift */; };
 		1D93EBFD3F9DBFBA9A8DB838 /* AgentBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 839B65F7BFDF68D9CD45759F /* AgentBarApp.swift */; };
 		1DA18911B15C647A07E053BA /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CB2B0C74F5C7915A59313BD /* libsqlite3.tbd */; };
-		2097600D5C7367C6943F06EF /* CodexAlertEventDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8530FA15630B8A9DC1855C63 /* CodexAlertEventDetectorTests.swift */; };
+		2097600D5C7367C6943F06EF /* CodexNotifyEventDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8530FA15630B8A9DC1855C63 /* CodexNotifyEventDetectorTests.swift */; };
 		315876A2599B7FB58B829F97 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DBA8CA846BE4355088282BA /* APIError.swift */; };
 		33248339D6F2D441BEDCD94E /* StatusBarDisplayPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8E7F0124CD70EB2B4B0A4BC /* StatusBarDisplayPlanner.swift */; };
 		3A2CEE3C393EC18609C77CD7 /* DateUtilsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D911B0F91A9BDC9D96D43E04 /* DateUtilsTests.swift */; };
 		428FDA138F86AC7E8BE9337F /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F4F8BB1B8DB673A324997D5 /* StatusBarController.swift */; };
 		4B10B876FF9B76F56A519DE0 /* UsageProviderProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E27036ECB86702128AA6D3 /* UsageProviderProtocol.swift */; };
 		4B78E6C443EC76078F335B1A /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0461F197E4054ABCB2211D0C /* UsageViewModel.swift */; };
-		56DFA771608D6A15AE080C3F /* AgentAlertNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBEF9DD6ACD858A989E7BFD6 /* AgentAlertNotificationService.swift */; };
+		56DFA771608D6A15AE080C3F /* AgentNotifyNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBEF9DD6ACD858A989E7BFD6 /* AgentNotifyNotificationService.swift */; };
 		58756EC2FE2D900C54DB04B5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EACB9DB1B32890931175D34 /* AppDelegate.swift */; };
 		5E6CFA4E881FB00B8AA7CABF /* ZaiUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1FB31121023D31B03192E8D /* ZaiUsageProvider.swift */; };
 		5ECBC08D32D32D320690B85E /* CodexUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C26432E64BEE8682B2310F /* CodexUsageProvider.swift */; };
 		629719FD125A2B8503256068 /* DetailPopoverViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70CAD4662B121330FB491297 /* DetailPopoverViewTests.swift */; };
 		66884E75B56B0E8CF4B469FF /* UsageViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C71DEB58BAFF6812EE7BE9 /* UsageViewModelTests.swift */; };
-		7003E59E8334A9C56CA9C285 /* ClaudeHookAlertEventDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A00624C4111E5F30845D2EA /* ClaudeHookAlertEventDetectorTests.swift */; };
+		7003E59E8334A9C56CA9C285 /* ClaudeHookNotifyEventDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A00624C4111E5F30845D2EA /* ClaudeHookNotifyEventDetectorTests.swift */; };
 		74C2CD46BBF38C8C24B027E7 /* UsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4484D47B92CC64CCBCB9E2BE /* UsageData.swift */; };
 		74C8A25DF623AC03180FE1EA /* CursorUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02C941251DC645EFA668AB2 /* CursorUsageProvider.swift */; };
-		7A31B183B9A3DD21C4B81C94 /* AgentAlertEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D325A266A121E7F2CC92B5D /* AgentAlertEvent.swift */; };
+		7A31B183B9A3DD21C4B81C94 /* AgentNotifyEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D325A266A121E7F2CC92B5D /* AgentNotifyEvent.swift */; };
 		8152CAEF7A8938129D224AEC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B78D5762D94E2F5D603423 /* SettingsView.swift */; };
 		88E45D6CA95D8C14D193ACDF /* DateUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A14C1DC334C42F8E42A6B58 /* DateUtils.swift */; };
 		8AE6C3C343EC9292DEF3D7AF /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CB2B0C74F5C7915A59313BD /* libsqlite3.tbd */; };
-		8DACD34B48C7C7EE094A0015 /* CodexAlertEventDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82974DB7B8E34AE7F855229 /* CodexAlertEventDetector.swift */; };
+		8DACD34B48C7C7EE094A0015 /* CodexNotifyEventDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82974DB7B8E34AE7F855229 /* CodexNotifyEventDetector.swift */; };
 		98320BB0B11B3CA3DEDEB408 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A67A0A1ABE84AB13B576CE1D /* APIClient.swift */; };
 		9D1B9D474501792B72857498 /* JSONLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0820898C10976D02ADA88790 /* JSONLParser.swift */; };
 		9E75B2672B52194DFE8854CB /* LoginItemManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBF18F69EEAB5FA2F0F71C51 /* LoginItemManager.swift */; };
@@ -48,13 +48,13 @@
 		CEFC7110A4578E345D3E4DF9 /* GeminiUsageProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6DD91C992EE023192692187 /* GeminiUsageProviderTests.swift */; };
 		D4EF0F0C77765A70D9348ECF /* CopilotUsageProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6F6B73553CC3A668FD49F47 /* CopilotUsageProviderTests.swift */; };
 		DF5E8615E2C35FE6A55DCB4F /* CodexUsageProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE68B5EB680088E72F1EB523 /* CodexUsageProviderTests.swift */; };
-		E06F8D718A20503782B9E5CE /* AgentAlertMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDEE1BCA1B5C7EA30906CEB /* AgentAlertMonitor.swift */; };
-		E8B1DFB6B5B8AAF9E782995E /* ClaudeHookAlertEventDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793B8B27034FF2E5F368B93B /* ClaudeHookAlertEventDetector.swift */; };
-		E9076A7E04516EC78730A56F /* AgentAlertEventDetectorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4353236CBB8AFE7BB776F8 /* AgentAlertEventDetectorProtocol.swift */; };
-		AA11BB22CC33DD44EE550001 /* AlertSocketListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660001 /* AlertSocketListener.swift */; };
-		AA11BB22CC33DD44EE550002 /* AlertSoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */; };
-		AA11BB22CC33DD44EE550003 /* AlertSocketListenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */; };
-		AA11BB22CC33DD44EE550004 /* AlertSoundManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */; };
+		E06F8D718A20503782B9E5CE /* AgentNotifyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDEE1BCA1B5C7EA30906CEB /* AgentNotifyMonitor.swift */; };
+		E8B1DFB6B5B8AAF9E782995E /* ClaudeHookNotifyEventDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 793B8B27034FF2E5F368B93B /* ClaudeHookNotifyEventDetector.swift */; };
+		E9076A7E04516EC78730A56F /* AgentNotifyEventDetectorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4353236CBB8AFE7BB776F8 /* AgentNotifyEventDetectorProtocol.swift */; };
+		AA11BB22CC33DD44EE550001 /* NotifySocketListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660001 /* NotifySocketListener.swift */; };
+		AA11BB22CC33DD44EE550002 /* NotifySoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660002 /* NotifySoundManager.swift */; };
+		AA11BB22CC33DD44EE550003 /* NotifySocketListenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660003 /* NotifySocketListenerTests.swift */; };
+		AA11BB22CC33DD44EE550004 /* NotifySoundManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660004 /* NotifySoundManagerTests.swift */; };
 		BB11AA22DD33EE44FF550001 /* UserDefaultsExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11AA22DD33EE44FF660001 /* UserDefaultsExtensions.swift */; };
 		BB11AA22DD33EE44FF550002 /* DynamicCodingKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11AA22DD33EE44FF660002 /* DynamicCodingKey.swift */; };
 		F2839E6C0ED51B67719A8DCE /* ClaudeUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B733F774C2C2F1CD302B7C44 /* ClaudeUsageProvider.swift */; };
@@ -81,20 +81,20 @@
 		235684BAC287B856AD6F8DAD /* MockUsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockUsageProvider.swift; sourceTree = "<group>"; };
 		2935C4B1D2B1F700274B5048 /* PopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverController.swift; sourceTree = "<group>"; };
 		2A14C1DC334C42F8E42A6B58 /* DateUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateUtils.swift; sourceTree = "<group>"; };
-		2D4353236CBB8AFE7BB776F8 /* AgentAlertEventDetectorProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAlertEventDetectorProtocol.swift; sourceTree = "<group>"; };
+		2D4353236CBB8AFE7BB776F8 /* AgentNotifyEventDetectorProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifyEventDetectorProtocol.swift; sourceTree = "<group>"; };
 		2EACB9DB1B32890931175D34 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		4484D47B92CC64CCBCB9E2BE /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
-		4D325A266A121E7F2CC92B5D /* AgentAlertEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAlertEvent.swift; sourceTree = "<group>"; };
+		4D325A266A121E7F2CC92B5D /* AgentNotifyEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifyEvent.swift; sourceTree = "<group>"; };
 		4DBA8CA846BE4355088282BA /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
 		5EF749802D4B89F4014CD95D /* CopilotUsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotUsageProvider.swift; sourceTree = "<group>"; };
-		6A00624C4111E5F30845D2EA /* ClaudeHookAlertEventDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookAlertEventDetectorTests.swift; sourceTree = "<group>"; };
+		6A00624C4111E5F30845D2EA /* ClaudeHookNotifyEventDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNotifyEventDetectorTests.swift; sourceTree = "<group>"; };
 		70CAD4662B121330FB491297 /* DetailPopoverViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailPopoverViewTests.swift; sourceTree = "<group>"; };
 		747C8C7A5532168F5A60B2AA /* AgentBar.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentBar.entitlements; sourceTree = "<group>"; };
 		785EE56F911793A50F8D47A3 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
-		793B8B27034FF2E5F368B93B /* ClaudeHookAlertEventDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookAlertEventDetector.swift; sourceTree = "<group>"; };
+		793B8B27034FF2E5F368B93B /* ClaudeHookNotifyEventDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNotifyEventDetector.swift; sourceTree = "<group>"; };
 		7F4F8BB1B8DB673A324997D5 /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		839B65F7BFDF68D9CD45759F /* AgentBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBarApp.swift; sourceTree = "<group>"; };
-		8530FA15630B8A9DC1855C63 /* CodexAlertEventDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAlertEventDetectorTests.swift; sourceTree = "<group>"; };
+		8530FA15630B8A9DC1855C63 /* CodexNotifyEventDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexNotifyEventDetectorTests.swift; sourceTree = "<group>"; };
 		85C26432E64BEE8682B2310F /* CodexUsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageProvider.swift; sourceTree = "<group>"; };
 		8D8594B201C52CFEB94AE2A7 /* AgentBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgentBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		91C71DEB58BAFF6812EE7BE9 /* UsageViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModelTests.swift; sourceTree = "<group>"; };
@@ -105,9 +105,9 @@
 		A2B78D5762D94E2F5D603423 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A67A0A1ABE84AB13B576CE1D /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A6DD91C992EE023192692187 /* GeminiUsageProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiUsageProviderTests.swift; sourceTree = "<group>"; };
-		A82974DB7B8E34AE7F855229 /* CodexAlertEventDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAlertEventDetector.swift; sourceTree = "<group>"; };
+		A82974DB7B8E34AE7F855229 /* CodexNotifyEventDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexNotifyEventDetector.swift; sourceTree = "<group>"; };
 		A8E7F0124CD70EB2B4B0A4BC /* StatusBarDisplayPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarDisplayPlanner.swift; sourceTree = "<group>"; };
-		AEDEE1BCA1B5C7EA30906CEB /* AgentAlertMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAlertMonitor.swift; sourceTree = "<group>"; };
+		AEDEE1BCA1B5C7EA30906CEB /* AgentNotifyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifyMonitor.swift; sourceTree = "<group>"; };
 		B02897E667DDA39783096842 /* StackedBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StackedBarView.swift; sourceTree = "<group>"; };
 		B02C941251DC645EFA668AB2 /* CursorUsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorUsageProvider.swift; sourceTree = "<group>"; };
 		B1B4A7DE5AF49395863DF0D0 /* StatusBarDisplayPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarDisplayPlannerTests.swift; sourceTree = "<group>"; };
@@ -122,11 +122,11 @@
 		E7B37753F62413F688AB6A4F /* ClaudeUsageProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageProviderTests.swift; sourceTree = "<group>"; };
 		F6F6B73553CC3A668FD49F47 /* CopilotUsageProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotUsageProviderTests.swift; sourceTree = "<group>"; };
 		F7E27036ECB86702128AA6D3 /* UsageProviderProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageProviderProtocol.swift; sourceTree = "<group>"; };
-		FBEF9DD6ACD858A989E7BFD6 /* AgentAlertNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentAlertNotificationService.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE660001 /* AlertSocketListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSocketListener.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSoundManager.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSocketListenerTests.swift; sourceTree = "<group>"; };
-		AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSoundManagerTests.swift; sourceTree = "<group>"; };
+		FBEF9DD6ACD858A989E7BFD6 /* AgentNotifyNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifyNotificationService.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660001 /* NotifySocketListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotifySocketListener.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660002 /* NotifySoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotifySoundManager.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660003 /* NotifySocketListenerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotifySocketListenerTests.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE660004 /* NotifySoundManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotifySoundManagerTests.swift; sourceTree = "<group>"; };
 		BB11AA22DD33EE44FF660001 /* UserDefaultsExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsExtensions.swift; sourceTree = "<group>"; };
 		BB11AA22DD33EE44FF660002 /* DynamicCodingKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicCodingKey.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -154,11 +154,11 @@
 		0069C812341347AEA0A781AC /* AgentBarTests */ = {
 			isa = PBXGroup;
 			children = (
-				AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */,
-				AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */,
-				6A00624C4111E5F30845D2EA /* ClaudeHookAlertEventDetectorTests.swift */,
+				AA11BB22CC33DD44EE660003 /* NotifySocketListenerTests.swift */,
+				AA11BB22CC33DD44EE660004 /* NotifySoundManagerTests.swift */,
+				6A00624C4111E5F30845D2EA /* ClaudeHookNotifyEventDetectorTests.swift */,
 				E7B37753F62413F688AB6A4F /* ClaudeUsageProviderTests.swift */,
-				8530FA15630B8A9DC1855C63 /* CodexAlertEventDetectorTests.swift */,
+				8530FA15630B8A9DC1855C63 /* CodexNotifyEventDetectorTests.swift */,
 				DE68B5EB680088E72F1EB523 /* CodexUsageProviderTests.swift */,
 				F6F6B73553CC3A668FD49F47 /* CopilotUsageProviderTests.swift */,
 				976F86677453BEB7F988D20B /* CursorUsageProviderTests.swift */,
@@ -233,10 +233,10 @@
 		9D283663DF3D221478236E79 /* Infrastructure */ = {
 			isa = PBXGroup;
 			children = (
-				AEDEE1BCA1B5C7EA30906CEB /* AgentAlertMonitor.swift */,
-				FBEF9DD6ACD858A989E7BFD6 /* AgentAlertNotificationService.swift */,
-				AA11BB22CC33DD44EE660001 /* AlertSocketListener.swift */,
-				AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */,
+				AEDEE1BCA1B5C7EA30906CEB /* AgentNotifyMonitor.swift */,
+				FBEF9DD6ACD858A989E7BFD6 /* AgentNotifyNotificationService.swift */,
+				AA11BB22CC33DD44EE660001 /* NotifySocketListener.swift */,
+				AA11BB22CC33DD44EE660002 /* NotifySoundManager.swift */,
 				785EE56F911793A50F8D47A3 /* KeychainManager.swift */,
 				BBF18F69EEAB5FA2F0F71C51 /* LoginItemManager.swift */,
 			);
@@ -263,10 +263,10 @@
 		C99C9704BC6031E9BD2A363E /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				2D4353236CBB8AFE7BB776F8 /* AgentAlertEventDetectorProtocol.swift */,
-				793B8B27034FF2E5F368B93B /* ClaudeHookAlertEventDetector.swift */,
+				2D4353236CBB8AFE7BB776F8 /* AgentNotifyEventDetectorProtocol.swift */,
+				793B8B27034FF2E5F368B93B /* ClaudeHookNotifyEventDetector.swift */,
 				B733F774C2C2F1CD302B7C44 /* ClaudeUsageProvider.swift */,
-				A82974DB7B8E34AE7F855229 /* CodexAlertEventDetector.swift */,
+				A82974DB7B8E34AE7F855229 /* CodexNotifyEventDetector.swift */,
 				85C26432E64BEE8682B2310F /* CodexUsageProvider.swift */,
 				5EF749802D4B89F4014CD95D /* CopilotUsageProvider.swift */,
 				B02C941251DC645EFA668AB2 /* CursorUsageProvider.swift */,
@@ -289,7 +289,7 @@
 		D3F2B55723DA23FCA4BBCB51 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				4D325A266A121E7F2CC92B5D /* AgentAlertEvent.swift */,
+				4D325A266A121E7F2CC92B5D /* AgentNotifyEvent.swift */,
 				D3EACF104278E40D145A8F15 /* ServiceType.swift */,
 				E3BBA9782FECB5BFB83FC382 /* SubscriptionPlan.swift */,
 				4484D47B92CC64CCBCB9E2BE /* UsageData.swift */,
@@ -414,17 +414,17 @@
 			files = (
 				98320BB0B11B3CA3DEDEB408 /* APIClient.swift in Sources */,
 				315876A2599B7FB58B829F97 /* APIError.swift in Sources */,
-				7A31B183B9A3DD21C4B81C94 /* AgentAlertEvent.swift in Sources */,
-				E9076A7E04516EC78730A56F /* AgentAlertEventDetectorProtocol.swift in Sources */,
-				E06F8D718A20503782B9E5CE /* AgentAlertMonitor.swift in Sources */,
-				56DFA771608D6A15AE080C3F /* AgentAlertNotificationService.swift in Sources */,
-				AA11BB22CC33DD44EE550001 /* AlertSocketListener.swift in Sources */,
-				AA11BB22CC33DD44EE550002 /* AlertSoundManager.swift in Sources */,
+				7A31B183B9A3DD21C4B81C94 /* AgentNotifyEvent.swift in Sources */,
+				E9076A7E04516EC78730A56F /* AgentNotifyEventDetectorProtocol.swift in Sources */,
+				E06F8D718A20503782B9E5CE /* AgentNotifyMonitor.swift in Sources */,
+				56DFA771608D6A15AE080C3F /* AgentNotifyNotificationService.swift in Sources */,
+				AA11BB22CC33DD44EE550001 /* NotifySocketListener.swift in Sources */,
+				AA11BB22CC33DD44EE550002 /* NotifySoundManager.swift in Sources */,
 				58756EC2FE2D900C54DB04B5 /* AppDelegate.swift in Sources */,
 				1D93EBFD3F9DBFBA9A8DB838 /* AgentBarApp.swift in Sources */,
-				E8B1DFB6B5B8AAF9E782995E /* ClaudeHookAlertEventDetector.swift in Sources */,
+				E8B1DFB6B5B8AAF9E782995E /* ClaudeHookNotifyEventDetector.swift in Sources */,
 				F2839E6C0ED51B67719A8DCE /* ClaudeUsageProvider.swift in Sources */,
-				8DACD34B48C7C7EE094A0015 /* CodexAlertEventDetector.swift in Sources */,
+				8DACD34B48C7C7EE094A0015 /* CodexNotifyEventDetector.swift in Sources */,
 				5ECBC08D32D32D320690B85E /* CodexUsageProvider.swift in Sources */,
 				AA98AA4299441FF3A1A1EC03 /* CopilotUsageProvider.swift in Sources */,
 				74C8A25DF623AC03180FE1EA /* CursorUsageProvider.swift in Sources */,
@@ -455,11 +455,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA11BB22CC33DD44EE550003 /* AlertSocketListenerTests.swift in Sources */,
-				AA11BB22CC33DD44EE550004 /* AlertSoundManagerTests.swift in Sources */,
-				7003E59E8334A9C56CA9C285 /* ClaudeHookAlertEventDetectorTests.swift in Sources */,
+				AA11BB22CC33DD44EE550003 /* NotifySocketListenerTests.swift in Sources */,
+				AA11BB22CC33DD44EE550004 /* NotifySoundManagerTests.swift in Sources */,
+				7003E59E8334A9C56CA9C285 /* ClaudeHookNotifyEventDetectorTests.swift in Sources */,
 				FE0F1D61470670565A9138AB /* ClaudeUsageProviderTests.swift in Sources */,
-				2097600D5C7367C6943F06EF /* CodexAlertEventDetectorTests.swift in Sources */,
+				2097600D5C7367C6943F06EF /* CodexNotifyEventDetectorTests.swift in Sources */,
 				DF5E8615E2C35FE6A55DCB4F /* CodexUsageProviderTests.swift in Sources */,
 				D4EF0F0C77765A70D9348ECF /* CopilotUsageProviderTests.swift in Sources */,
 				0900D1133AA607DF435F3546 /* CursorUsageProviderTests.swift in Sources */,

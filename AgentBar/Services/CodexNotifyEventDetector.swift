@@ -1,20 +1,20 @@
 import Foundation
 
-private struct CodexAlertSessionRecord: Decodable, Sendable {
+private struct CodexNotifySessionRecord: Decodable, Sendable {
     let timestamp: String?
     let type: String?
-    let payload: CodexAlertPayload?
+    let payload: CodexNotifyPayload?
 }
 
-private struct CodexAlertPayload: Decodable, Sendable {
+private struct CodexNotifyPayload: Decodable, Sendable {
     let type: String?
     let message: String?
     let arguments: String?
 }
 
-final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked Sendable {
+final class CodexNotifyEventDetector: AgentNotifyEventDetectorProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .codex
-    let settingsEnabledKey: String? = "alertCodexEventsEnabled"
+    let settingsEnabledKey: String? = "notificationCodexEventsEnabled"
 
     private let sessionsDir: URL
     private let fileManager: FileManager
@@ -28,13 +28,13 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         self.fileManager = fileManager
     }
 
-    func detectEvents(since: Date, includeBoundary: Bool = false) async -> [AgentAlertEvent] {
+    func detectEvents(since: Date, includeBoundary: Bool = false) async -> [AgentNotifyEvent] {
         guard fileManager.fileExists(atPath: sessionsDir.path) else { return [] }
 
         let files = findRecentSessionFiles(since: since)
         guard !files.isEmpty else { return [] }
 
-        var events: [AgentAlertEvent] = []
+        var events: [AgentNotifyEvent] = []
         for file in files {
             events.append(contentsOf: extractEvents(from: file, since: since, includeBoundary: includeBoundary))
         }
@@ -42,13 +42,13 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         return events.sorted { $0.timestamp < $1.timestamp }
     }
 
-    private func extractEvents(from file: URL, since: Date, includeBoundary: Bool) -> [AgentAlertEvent] {
+    private func extractEvents(from file: URL, since: Date, includeBoundary: Bool) -> [AgentNotifyEvent] {
         let sessionID = file.deletingPathExtension().lastPathComponent
-        guard let records = try? JSONLParser.parseFile(file, as: CodexAlertSessionRecord.self) else {
+        guard let records = try? JSONLParser.parseFile(file, as: CodexNotifySessionRecord.self) else {
             return []
         }
 
-        var events: [AgentAlertEvent] = []
+        var events: [AgentNotifyEvent] = []
 
         for (index, record) in records.enumerated() {
             guard let timestamp = record.timestamp,
@@ -73,14 +73,14 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
 
     private func mapRecord(
         recordType: String?,
-        payload: CodexAlertPayload,
+        payload: CodexNotifyPayload,
         date: Date,
         sessionID: String,
         sourceRecordID: String
-    ) -> AgentAlertEvent? {
+    ) -> AgentNotifyEvent? {
         if recordType == "event_msg" {
             if payload.type == "task_complete" {
-                return AgentAlertEvent(
+                return AgentNotifyEvent(
                     service: .codex,
                     type: .taskCompleted,
                     timestamp: date,
@@ -93,7 +93,7 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
             if payload.type == "agent_message",
                let message = payload.message,
                looksLikeDecisionPrompt(message) {
-                return AgentAlertEvent(
+                return AgentNotifyEvent(
                     service: .codex,
                     type: .decisionRequired,
                     timestamp: date,
@@ -107,7 +107,7 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         if recordType == "response_item",
            payload.type == "function_call",
            isEscalationRequired(payload.arguments) {
-            return AgentAlertEvent(
+            return AgentNotifyEvent(
                 service: .codex,
                 type: .permissionRequired,
                 timestamp: date,

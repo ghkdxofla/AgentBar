@@ -1,12 +1,12 @@
 import Foundation
 import UserNotifications
 
-protocol AgentAlertNotificationServiceProtocol: Sendable {
+protocol AgentNotifyNotificationServiceProtocol: Sendable {
     func requestAuthorizationIfNeeded() async
-    func post(event: AgentAlertEvent) async
+    func post(event: AgentNotifyEvent) async
 }
 
-actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
+actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
     private let center: UNUserNotificationCenter
     private let defaults: UserDefaults
     private let postBodyOverride: (@Sendable (String) async throws -> Void)?
@@ -35,18 +35,18 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
         _ = await requestAuthorization()
     }
 
-    func post(event: AgentAlertEvent) async {
+    func post(event: AgentNotifyEvent) async {
         let content = UNMutableNotificationContent()
         content.title = event.type.notificationTitle
-        let showMessagePreview = defaults.bool(forKey: "alertShowMessagePreview", defaultValue: false)
+        let showMessagePreview = defaults.bool(forKey: "notificationShowMessagePreview", defaultValue: false)
         let body = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
         content.body = "[\(event.service.rawValue)] \(body)"
 
-        let didPlayCustomSound = AlertSoundManager.shared.play(for: event.type)
+        let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type)
         content.sound = didPlayCustomSound ? nil : .default
 
         let request = UNNotificationRequest(
-            identifier: "agentbar-agent-alert-\(UUID().uuidString)",
+            identifier: "agentbar-agent-notify-\(UUID().uuidString)",
             content: content,
             trigger: nil
         )
@@ -58,7 +58,6 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
                 try await add(request)
             }
         } catch {
-            // Ignore posting failures so monitoring loop can continue.
         }
     }
 
@@ -89,5 +88,4 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
             }
         }
     }
-
 }

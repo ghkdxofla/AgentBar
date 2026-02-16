@@ -1,6 +1,6 @@
 import Foundation
 
-struct SocketAlertEvent: Decodable, Sendable {
+struct SocketNotifyEvent: Decodable, Sendable {
     let agent: String
     let event: String
     let sessionID: String?
@@ -13,11 +13,11 @@ struct SocketAlertEvent: Decodable, Sendable {
     }
 }
 
-final class AlertSocketListener: @unchecked Sendable {
+final class NotifySocketListener: @unchecked Sendable {
     private let socketPath: String
     private let fileManager: FileManager
     private let queue = DispatchQueue(label: "com.agentbar.socket-listener")
-    var onEvent: (@Sendable (AgentAlertEvent) -> Void)?
+    var onEvent: (@Sendable (AgentNotifyEvent) -> Void)?
 
     private var serverFD: Int32 = -1
     private var acceptSource: DispatchSourceRead?
@@ -28,8 +28,6 @@ final class AlertSocketListener: @unchecked Sendable {
         queue.sync { _isListening }
     }
 
-    // Exposed for deterministic lifecycle tests that need to verify a client
-    // has been accepted before issuing a restart.
     var activeClientCountForTesting: Int {
         queue.sync { clientSources.count }
     }
@@ -96,7 +94,6 @@ final class AlertSocketListener: @unchecked Sendable {
             return
         }
 
-        // Set non-blocking
         let flags = fcntl(fd, F_GETFL)
         _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
 
@@ -107,8 +104,6 @@ final class AlertSocketListener: @unchecked Sendable {
         source.setEventHandler { [weak self] in
             self?.acceptConnection()
         }
-        // Capture the FD value at creation time so cancel handler
-        // always closes the correct FD, not a newer one from restart.
         let capturedFD = fd
         source.setCancelHandler {
             close(capturedFD)
@@ -118,18 +113,14 @@ final class AlertSocketListener: @unchecked Sendable {
     }
 
     private func _stop() {
-        // Cancel all active client connections first
         for (_, source) in clientSources {
             source.cancel()
         }
         clientSources.removeAll()
 
-        // Mark as not listening immediately (synchronous)
         _isListening = false
 
         if let source = acceptSource {
-            // Close/reset server FD synchronously before cancel handler fires
-            // to prevent the cancel handler from closing a new FD on restart.
             serverFD = -1
             source.cancel()
             acceptSource = nil
@@ -163,16 +154,13 @@ final class AlertSocketListener: @unchecked Sendable {
             if bytesRead > 0 {
                 buffer.append(contentsOf: buf[0..<bytesRead])
             } else if bytesRead == 0 {
-                // EOF: process and close
                 readSource.cancel()
                 self?.processBuffer(buffer)
                 self?.removeClient(clientFD)
             } else {
-                // bytesRead < 0: check errno
                 if errno == EAGAIN || errno == EWOULDBLOCK {
-                    return // transient, wait for next read event
+                    return
                 }
-                // Real error: close connection
                 readSource.cancel()
                 self?.processBuffer(buffer)
                 self?.removeClient(clientFD)
@@ -201,16 +189,16 @@ final class AlertSocketListener: @unchecked Sendable {
             guard !trimmed.isEmpty else { continue }
 
             guard let jsonData = trimmed.data(using: .utf8),
-                  let socketEvent = try? JSONDecoder().decode(SocketAlertEvent.self, from: jsonData) else {
+                  let socketEvent = try? JSONDecoder().decode(SocketNotifyEvent.self, from: jsonData) else {
                 continue
             }
 
-            guard let alertEvent = mapSocketEvent(socketEvent) else { continue }
-            onEvent?(alertEvent)
+            guard let notifyEvent = mapSocketEvent(socketEvent) else { continue }
+            onEvent?(notifyEvent)
         }
     }
 
-    static func mapEventType(_ event: String) -> AgentAlertEventType? {
+    static func mapEventType(_ event: String) -> AgentNotifyEventType? {
         switch event.lowercased() {
         case "stop", "subagent_stop":
             return .taskCompleted
@@ -242,7 +230,7 @@ final class AlertSocketListener: @unchecked Sendable {
         }
     }
 
-    private func mapSocketEvent(_ socketEvent: SocketAlertEvent) -> AgentAlertEvent? {
+    private func mapSocketEvent(_ socketEvent: SocketNotifyEvent) -> AgentNotifyEvent? {
         guard let service = Self.mapAgent(socketEvent.agent),
               let eventType = Self.mapEventType(socketEvent.event) else {
             return nil
@@ -255,7 +243,7 @@ final class AlertSocketListener: @unchecked Sendable {
             timestamp = Date()
         }
 
-        return AgentAlertEvent(
+        return AgentNotifyEvent(
             service: service,
             type: eventType,
             timestamp: timestamp,

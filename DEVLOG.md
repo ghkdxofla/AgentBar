@@ -418,3 +418,15 @@
 - **Copilot nil fallback**: When API returns `copilot_plan: null`, defaults to "Free" instead of showing nothing
 - **Gemini unchanged**: No plan concept — planName stays nil (no label shown)
 - All 186 tests passing
+
+
+## Iteration 49: Rename Alert → Notification terminology
+- **Renamed models**: `AgentAlertEvent` → `AgentNotifyEvent`, `AgentAlertEventType` → `AgentNotifyEventType`
+- **Renamed infrastructure**: `AgentAlertMonitor` → `AgentNotifyMonitor`, `AgentAlertNotificationService` → `AgentNotifyNotificationService`, `AlertSocketListener` → `NotifySocketListener`, `AlertSoundManager` → `NotifySoundManager`
+- **Renamed detectors**: `AgentAlertEventDetectorProtocol` → `AgentNotifyEventDetectorProtocol`, `CodexAlertEventDetector` → `CodexNotifyEventDetector`, `ClaudeHookAlertEventDetector` → `ClaudeHookNotifyEventDetector`
+- **Renamed tests**: All 4 alert-related test files renamed to `*Notify*` equivalents
+- **UI text updates**: "Agent Alerts (Beta)" → "Agent Notifications (Beta)", "Alerts" tab → "Notifications" tab, "Enable alerts" → "Enable notifications", "Alert Sounds" → "Notification Sounds"
+- **UserDefaults keys**: All `alert*` keys renamed to `notification*` (e.g., `alertsEnabled` → `notificationsEnabled`, `alertSoundPackPath` → `notificationSoundPackPath`)
+- **Notification.Name**: `.alertsSettingsChanged` → `.notificationsSettingsChanged`
+- **AppDelegate**: `alertMonitor` → `notifyMonitor`
+- All 186 tests passing

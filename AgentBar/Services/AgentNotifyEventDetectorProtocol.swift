@@ -1,17 +1,17 @@
 import Foundation
 
-protocol AgentAlertEventDetectorProtocol: Sendable {
+protocol AgentNotifyEventDetectorProtocol: Sendable {
     var serviceType: ServiceType { get }
     var settingsEnabledKey: String? { get }
-    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentAlertEvent]
+    func detectEvents(since: Date, includeBoundary: Bool) async -> [AgentNotifyEvent]
 }
 
-extension AgentAlertEventDetectorProtocol {
+extension AgentNotifyEventDetectorProtocol {
     var settingsEnabledKey: String? {
         nil
     }
 
-    func detectEvents(since: Date) async -> [AgentAlertEvent] {
+    func detectEvents(since: Date) async -> [AgentNotifyEvent] {
         await detectEvents(since: since, includeBoundary: false)
     }
 
