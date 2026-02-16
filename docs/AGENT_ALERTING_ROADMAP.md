@@ -136,6 +136,31 @@ Operational notes:
 - Event source is event-driven at Claude hook execution time; monitor polling remains as a resilient local ingestion loop.
 - If hooks are not configured, Codex polling alerts continue to work unchanged.
 
+## 3.10 Phase 1.7 Addendum (Socket + Custom Sound)
+
+Goal:
+- Replace polling with Unix domain socket listener for push-based event delivery
+- Add custom sound playback with CESP-compatible sound pack support
+
+Architecture changes:
+- New: `AlertSocketListener` (NWListener on `~/.agentbar/events.sock`)
+- New: `AlertSoundManager` (CESP manifest parser + AVAudioPlayer)
+- Modified: `AgentAlertMonitor` — socket-first, Codex file watcher as fallback only
+- Modified: `AgentAlertNotificationService` — custom sound integration
+- New hook scripts: `agentbar-hook.sh` (Claude), `agentbar-codex-hook.sh` (Codex)
+
+Socket protocol:
+- Newline-delimited JSON over Unix domain socket
+- Format: `{"agent":"claude","event":"stop","session_id":"...","message":"...","timestamp":"..."}`
+- Event mapping: `stop`/`subagent_stop` -> taskCompleted, `permission` -> permissionRequired, `decision` -> decisionRequired
+
+Sound pack format (CESP):
+- Directory with `openpeon.json` manifest
+- Categories: `task.complete`, `input.required`
+- Per-category enable/disable, volume control, no-repeat selection
+
+Status: **Completed** (Iteration 40)
+
 ## 4. Phase 2 (iPhone Delivery)
 
 ### 4.1 Goal

@@ -13,7 +13,7 @@ final class AgentAlertMonitor {
     private let defaults: UserDefaults
     private let cooldown: TimeInterval
 
-    private var timerCancellable: AnyCancellable?
+    private let socketListener: AlertSocketListener
     private var settingsCancellable: AnyCancellable?
     private var lastNotificationByKey: [String: Date] = [:]
     private var isProcessing = false
@@ -22,39 +22,74 @@ final class AgentAlertMonitor {
         detectors: [any AgentAlertEventDetectorProtocol]? = nil,
         notificationService: any AgentAlertNotificationServiceProtocol = AgentAlertNotificationService(),
         defaults: UserDefaults = .standard,
-        cooldown: TimeInterval = 90
+        cooldown: TimeInterval = 90,
+        socketListener: AlertSocketListener? = nil
     ) {
-        self.detectors = detectors ?? [CodexAlertEventDetector(), ClaudeHookAlertEventDetector()]
+        self.detectors = detectors ?? [CodexAlertEventDetector()]
         self.notificationService = notificationService
         self.defaults = defaults
         self.cooldown = cooldown
+        self.socketListener = socketListener ?? AlertSocketListener()
     }
 
     func start() {
         ensureInitialWatermarks()
         observeSettingsChangesIfNeeded()
-        restartPollingTimer()
 
         if isAlertsEnabled {
             Task { await notificationService.requestAuthorizationIfNeeded() }
+            startSocketListener()
             Task { await processTick() }
         }
     }
 
     func stop() {
-        timerCancellable?.cancel()
-        timerCancellable = nil
+        socketListener.stop()
         settingsCancellable?.cancel()
         settingsCancellable = nil
+    }
+
+    var isSocketListening: Bool {
+        socketListener.isListening
     }
 
     private var isAlertsEnabled: Bool {
         defaults.bool(forKey: "alertsEnabled", defaultValue: false)
     }
 
-    private var pollingInterval: TimeInterval {
-        let stored = defaults.double(forKey: "alertPollingSeconds")
-        return stored > 0 ? stored : 5
+    private func startSocketListener() {
+        socketListener.onEvent = { [weak self] event in
+            Task { @MainActor [weak self] in
+                await self?.receive(event: event)
+            }
+        }
+        socketListener.start()
+    }
+
+    func receive(event: AgentAlertEvent) async {
+        guard isAlertsEnabled else { return }
+        guard isEventEnabled(event.type) else { return }
+
+        let detectorKey = detectorSettingsKey(for: event.service)
+        if let key = detectorKey {
+            guard defaults.bool(forKey: key, defaultValue: true) else { return }
+        }
+
+        guard shouldNotify(event) else { return }
+
+        await notificationService.post(event: event)
+        lastNotificationByKey[event.dedupeKey] = Date()
+    }
+
+    private func detectorSettingsKey(for service: ServiceType) -> String? {
+        switch service {
+        case .claude:
+            return "alertClaudeHookEventsEnabled"
+        case .codex:
+            return "alertCodexEventsEnabled"
+        default:
+            return nil
+        }
     }
 
     private func ensureInitialWatermarks() {
@@ -65,7 +100,6 @@ final class AgentAlertMonitor {
             let schemaVersionKey = watermarkSchemaVersionKey(for: detector.serviceType)
 
             if defaults.object(forKey: key) == nil {
-                // New installs start with both timestamp and boundary IDs initialized.
                 defaults.set(now, forKey: key)
                 defaults.set([String](), forKey: eventIDsKey)
                 defaults.set(CursorSchema.currentVersion, forKey: schemaVersionKey)
@@ -73,7 +107,6 @@ final class AgentAlertMonitor {
             }
 
             if defaults.object(forKey: schemaVersionKey) == nil {
-                // Existing installs without version metadata are treated as legacy.
                 defaults.set(CursorSchema.legacyVersion, forKey: schemaVersionKey)
             }
         }
@@ -87,23 +120,15 @@ final class AgentAlertMonitor {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                self.restartPollingTimer()
                 if self.isAlertsEnabled {
+                    if !self.socketListener.isListening {
+                        self.startSocketListener()
+                    }
                     Task { await self.notificationService.requestAuthorizationIfNeeded() }
                     Task { await self.processTick() }
+                } else {
+                    self.socketListener.stop()
                 }
-            }
-    }
-
-    private func restartPollingTimer() {
-        timerCancellable?.cancel()
-        timerCancellable = nil
-
-        timerCancellable = Timer.publish(every: pollingInterval, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self else { return }
-                Task { await self.processTick() }
             }
     }
 
@@ -120,7 +145,6 @@ final class AgentAlertMonitor {
 
             let serviceType = detector.serviceType
             let watermark = watermarkCursor(for: serviceType)
-            // Legacy installs may have a timestamp but no ID set; stay boundary-exclusive until the cursor advances.
             let includeBoundary = hasStoredWatermarkEventIDs(for: serviceType)
             let events = await Task.detached(priority: .utility) {
                 await detector.detectEvents(since: watermark.date, includeBoundary: includeBoundary)

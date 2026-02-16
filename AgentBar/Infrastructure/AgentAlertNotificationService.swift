@@ -41,7 +41,9 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
         let showMessagePreview = bool(forKey: "alertShowMessagePreview", defaultValue: false)
         let body = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
         content.body = "[\(event.service.rawValue)] \(body)"
-        content.sound = .default
+
+        let didPlayCustomSound = AlertSoundManager.shared.play(for: event.type)
+        content.sound = didPlayCustomSound ? nil : .default
 
         let request = UNNotificationRequest(
             identifier: "agentbar-agent-alert-\(UUID().uuidString)",

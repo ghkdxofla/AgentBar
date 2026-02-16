@@ -27,6 +27,15 @@ enum AgentAlertEventType: String, CaseIterable, Sendable {
             return "alertDecisionRequiredEnabled"
         }
     }
+
+    var cespCategory: String {
+        switch self {
+        case .taskCompleted:
+            return "task.complete"
+        case .permissionRequired, .decisionRequired:
+            return "input.required"
+        }
+    }
 }
 
 struct AgentAlertEvent: Sendable, Equatable {
