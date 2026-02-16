@@ -460,3 +460,18 @@
 - **Error-path coverage**: Added tests for missing API key (`APIError.unauthorized`) and malformed quota payload without limits (`APIError.noData`)
 - **Cache behavior checks**: Added tests that verify `cachedIfFresh` expiration and `fetchUsage` short-circuiting to cache without network calls
 - All 194 tests passing
+
+## Iteration 54: Agent notification hook reliability + OpenCode first-class source
+- **Legacy settings migration on launch**: Added `AgentNotifySettingsMigrator` and wired `AgentNotifySettingsMigrator.migrateIfNeeded()` in `AppDelegate.applicationDidFinishLaunching`. Migrates `alert*` keys to `notification*` keys and removes old keys after migration.
+- **Codex hook config detection hardening**: Added `AgentHookConfigurationChecker` and settings status UI. Codex `notify` is now validated only at TOML top-level (table-local `notify` is treated as unconfigured).
+- **Agent Sources UI upgrade**: Added hook status rows + manual re-check action, OpenCode source toggle (`notificationOpencodeHookEventsEnabled`), and help sheet sections for OpenCode + safe installer usage.
+- **Socket/monitor observability**: Added structured `os.log` diagnostics across `NotifySocketListener`, `AgentNotifyMonitor`, and `AgentNotifyNotificationService` for drop reasons, lifecycle, posting, and auth checks.
+- **Deduplication robustness**: `AgentNotifyEvent.dedupeKey` now prefers normalized `sessionID`, falls back to normalized message hash, then timestamp bucket when both are missing.
+- **OpenCode first-class service type**: Added `ServiceType.opencode` (name/color/shortName/keychain account), switched socket mapping from Cursor alias to dedicated OpenCode service, and included OpenCode in ordering (`UsageViewModel`, `StatusBarDisplayPlanner`).
+- **New/updated hook scripts**:
+- `scripts/agentbar-gemini-hook.sh`: Improved event normalization (`AfterAgent`/`SessionEnd`, `Notification + ToolPermission`, `prompt_response` support).
+- `scripts/agentbar-opencode-hook.sh`: New OpenCode JSON hook adapter (`session.idle`/`session.completed`/`permission.asked`/`question.asked`/`session.error`).
+- `scripts/install-agent-hooks.sh`: New safe installer for Codex/Claude/Gemini/OpenCode with pre-write backup to `~/.agentbar/backups/<UTC timestamp>/`, merge-based updates, and OpenCode plugin generation.
+- **OpenCode plugin event coverage**: Installer-generated plugin now forwards `session.completed` in addition to idle/permission/question/error events.
+- **Tests**: Added `AgentHookConfigurationCheckerTests` + `AgentNotifySettingsMigratorTests`; expanded `AgentNotifyEventTests` (dedupe fallbacks) and `NotifySocketListenerTests` (OpenCode mapping + source toggle behavior).
+- **Verification**: Targeted suite run passed (`AgentHookConfigurationCheckerTests`, `AgentNotifySettingsMigratorTests`, `AgentNotifyEventTests`, `NotifySocketListenerTests`, `StatusBarDisplayPlannerTests`) — 32 tests, 0 failures.

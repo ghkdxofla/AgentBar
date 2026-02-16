@@ -16,8 +16,10 @@
 		16963C83D91BAA228B350A7C /* DetailPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76C98DBC0AEE77B27EA3D54A /* DetailPopoverView.swift */; };
 		190B68D15B2BA5B0B4B9E8A1 /* DynamicCodingKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E4AE976AEC0981AED5186D /* DynamicCodingKey.swift */; };
 		19A32F993FE669E27F658B12 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCCC943FDF80266E8F2A5F64 /* SettingsWindowController.swift */; };
+		35B32C5044F29686750F36E8 /* AgentHookConfigurationChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6097B9B3E012839E15FF7E0A /* AgentHookConfigurationChecker.swift */; };
 		3761D447CE922B92BC1E820C /* JSONLParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B96865FEB478446EB8EBD2A /* JSONLParserTests.swift */; };
 		38CE09D9014E986F75D0B8AA /* DateUtilsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04C1E41FDB05FE948BD0482C /* DateUtilsTests.swift */; };
+		39C1DDDCF77B0F2D0438C588 /* AgentNotifySettingsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81EE4A4776CC18CCAA8A5E38 /* AgentNotifySettingsMigrationTests.swift */; };
 		3B71B41FB07369356167BA8F /* ClaudeUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B7EEA37A7EFFF2C3A0B4A1B /* ClaudeUsageProvider.swift */; };
 		3DC8AC0C7189CC2E326C6EB3 /* CursorUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8CE2D6F4A6ABDA2B44C2DEB /* CursorUsageProvider.swift */; };
 		3EB7983C4CE520C1C2470EC1 /* NotifySoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CACABC16CB1546B3A6BE16C /* NotifySoundManager.swift */; };
@@ -37,6 +39,7 @@
 		77EA755F11D57405FCAF3535 /* UsageProviderProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5EA30148527620F8F736B8 /* UsageProviderProtocol.swift */; };
 		7820704EDC195F0FD78C0B5F /* AgentNotifyNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F48F25460C2DC5C7773C63D /* AgentNotifyNotificationService.swift */; };
 		78B55F10346A71DE9B455590 /* NotifySoundManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48FC8B202CA33D689860FAE5 /* NotifySoundManagerTests.swift */; };
+		84C78252350FB71225C81B0C /* AgentNotifySettingsMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE9AEDC7AABDFEDA82EEFAFE /* AgentNotifySettingsMigrator.swift */; };
 		880A05A4E11F32E7274856AF /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = F17BA952C208A2A34C428D88 /* libsqlite3.tbd */; };
 		8BE689C023415F0474D77FA1 /* JSONLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1127309F4FA3F73A4684352 /* JSONLParser.swift */; };
 		8D605A7D5A16AE0686002B22 /* CodexNotifyEventDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3ED42D28F4B85660CCC365 /* CodexNotifyEventDetector.swift */; };
@@ -96,6 +99,7 @@
 		5AF9840FACAD2645C86D775B /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
 		5B7EEA37A7EFFF2C3A0B4A1B /* ClaudeUsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageProvider.swift; sourceTree = "<group>"; };
 		5D5E3DC0E6D1633377C0B57D /* NotifySocketListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotifySocketListener.swift; sourceTree = "<group>"; };
+		6097B9B3E012839E15FF7E0A /* AgentHookConfigurationChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookConfigurationChecker.swift; sourceTree = "<group>"; };
 		6992AA8505D71EC3A51E135A /* GeminiUsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiUsageProvider.swift; sourceTree = "<group>"; };
 		6C5EA30148527620F8F736B8 /* UsageProviderProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageProviderProtocol.swift; sourceTree = "<group>"; };
 		6C5F7A9F14F77AE444864261 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -106,6 +110,7 @@
 		78E4AE976AEC0981AED5186D /* DynamicCodingKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicCodingKey.swift; sourceTree = "<group>"; };
 		7F48F25460C2DC5C7773C63D /* AgentNotifyNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifyNotificationService.swift; sourceTree = "<group>"; };
 		7FBF196EA50B4AC289CA4175 /* AgentNotifyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifyMonitor.swift; sourceTree = "<group>"; };
+		81EE4A4776CC18CCAA8A5E38 /* AgentNotifySettingsMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifySettingsMigrationTests.swift; sourceTree = "<group>"; };
 		8259B8727B73CB3C81B552FC /* AgentBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBarApp.swift; sourceTree = "<group>"; };
 		88838ECA081C1546A135EF48 /* UsageViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModelTests.swift; sourceTree = "<group>"; };
 		88CFC40962A3ABE5A9569B4E /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
@@ -119,6 +124,7 @@
 		B008B90F341B23AF377ED19C /* SubscriptionPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionPlan.swift; sourceTree = "<group>"; };
 		B1127309F4FA3F73A4684352 /* JSONLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONLParser.swift; sourceTree = "<group>"; };
 		BE24CE6D683CB2F9886366CE /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		BE9AEDC7AABDFEDA82EEFAFE /* AgentNotifySettingsMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotifySettingsMigrator.swift; sourceTree = "<group>"; };
 		BF522722A2C522DD00B92DC4 /* ClaudeHookNotifyEventDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNotifyEventDetector.swift; sourceTree = "<group>"; };
 		C185C7038B525BD4E3A2B944 /* StatusBarDisplayPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarDisplayPlannerTests.swift; sourceTree = "<group>"; };
 		C8CE2D6F4A6ABDA2B44C2DEB /* CursorUsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorUsageProvider.swift; sourceTree = "<group>"; };
@@ -303,8 +309,10 @@
 		BE6D4902BB6AEB4E12E15984 /* Infrastructure */ = {
 			isa = PBXGroup;
 			children = (
+				6097B9B3E012839E15FF7E0A /* AgentHookConfigurationChecker.swift */,
 				7FBF196EA50B4AC289CA4175 /* AgentNotifyMonitor.swift */,
 				7F48F25460C2DC5C7773C63D /* AgentNotifyNotificationService.swift */,
+				BE9AEDC7AABDFEDA82EEFAFE /* AgentNotifySettingsMigrator.swift */,
 				88CFC40962A3ABE5A9569B4E /* KeychainManager.swift */,
 				E582C14968381B7CE3436577 /* LoginItemManager.swift */,
 				5D5E3DC0E6D1633377C0B57D /* NotifySocketListener.swift */,
@@ -316,6 +324,7 @@
 		F46F14D7729B5E5B8B2C3422 /* AgentBarTests */ = {
 			isa = PBXGroup;
 			children = (
+				81EE4A4776CC18CCAA8A5E38 /* AgentNotifySettingsMigrationTests.swift */,
 				F5E8FE4C68C3CE713FD06DB8 /* ClaudeHookNotifyEventDetectorTests.swift */,
 				4C6571F420208CAEE28D0D6C /* ClaudeUsageProviderTests.swift */,
 				20A6ABE351ED25CC0D1A595D /* CodexNotifyEventDetectorTests.swift */,
@@ -415,6 +424,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				39C1DDDCF77B0F2D0438C588 /* AgentNotifySettingsMigrationTests.swift in Sources */,
 				522555AED1FB1419AA6E574B /* ClaudeHookNotifyEventDetectorTests.swift in Sources */,
 				3EE38AF1E8FFB7BF1329041C /* ClaudeUsageProviderTests.swift in Sources */,
 				FCE5028EE8EE278731C8DA7E /* CodexNotifyEventDetectorTests.swift in Sources */,
@@ -441,10 +451,12 @@
 				E2D6E436D984441A668CE21D /* APIClient.swift in Sources */,
 				5587C14E35D8C542CA8606B5 /* APIError.swift in Sources */,
 				B76250CE8900A1026B63AB92 /* AgentBarApp.swift in Sources */,
+				35B32C5044F29686750F36E8 /* AgentHookConfigurationChecker.swift in Sources */,
 				B6914F1BDBD0282CF2FBA0E3 /* AgentNotifyEvent.swift in Sources */,
 				02C36CF564D6D60CD07E560A /* AgentNotifyEventDetectorProtocol.swift in Sources */,
 				533357367AE4447BE2722CA3 /* AgentNotifyMonitor.swift in Sources */,
 				7820704EDC195F0FD78C0B5F /* AgentNotifyNotificationService.swift in Sources */,
+				84C78252350FB71225C81B0C /* AgentNotifySettingsMigrator.swift in Sources */,
 				D1B35677C48C7DB7027F547D /* AppDelegate.swift in Sources */,
 				53B73069DACD3549EF96640D /* ClaudeHookNotifyEventDetector.swift in Sources */,
 				3B71B41FB07369356167BA8F /* ClaudeUsageProvider.swift in Sources */,

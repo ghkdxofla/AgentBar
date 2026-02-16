@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import os.log
 
 private enum CursorSchema {
     static let legacyVersion = 1
@@ -8,6 +9,10 @@ private enum CursorSchema {
 
 @MainActor
 final class AgentNotifyMonitor {
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.agentbar.app",
+        category: "AgentNotifyMonitor"
+    )
     private let detectors: [any AgentNotifyEventDetectorProtocol]
     private let notificationService: any AgentNotifyNotificationServiceProtocol
     private let defaults: UserDefaults
@@ -40,14 +45,18 @@ final class AgentNotifyMonitor {
         observeSettingsChangesIfNeeded()
 
         if isNotificationsEnabled {
+            logger.info("Starting notify monitor.")
             Task { await notificationService.requestAuthorizationIfNeeded() }
             startSocketListener()
             restartFallbackTimer()
             Task { await processTick() }
+        } else {
+            logger.info("Notify monitor remains idle because notifications are disabled.")
         }
     }
 
     func stop() {
+        logger.info("Stopping notify monitor.")
         socketListener.stop()
         timerCancellable?.cancel()
         timerCancellable = nil
@@ -87,17 +96,32 @@ final class AgentNotifyMonitor {
     }
 
     func receive(event: AgentNotifyEvent) async {
-        guard isNotificationsEnabled else { return }
-        guard isEventEnabled(event.type) else { return }
+        guard isNotificationsEnabled else {
+            logger.debug("Dropped socket event: notifications disabled.")
+            return
+        }
+        guard isEventEnabled(event.type) else {
+            logger.debug("Dropped socket event: disabled type \(event.type.rawValue, privacy: .public).")
+            return
+        }
 
         let detectorKey = detectorSettingsKey(for: event.service)
         if let key = detectorKey {
-            guard defaults.bool(forKey: key, defaultValue: true) else { return }
+            guard defaults.bool(forKey: key, defaultValue: true) else {
+                logger.debug("Dropped socket event: source disabled key=\(key, privacy: .public).")
+                return
+            }
         }
 
-        guard shouldNotify(event) else { return }
+        guard shouldNotify(event) else {
+            logger.debug("Suppressed by cooldown: \(event.dedupeKey, privacy: .public).")
+            return
+        }
 
         await notificationService.post(event: event)
+        logger.debug(
+            "Posted socket event service=\(event.service.rawValue, privacy: .public) type=\(event.type.rawValue, privacy: .public)."
+        )
         lastNotificationByKey[event.dedupeKey] = Date()
     }
 
@@ -107,6 +131,8 @@ final class AgentNotifyMonitor {
             return "notificationClaudeHookEventsEnabled"
         case .codex:
             return "notificationCodexEventsEnabled"
+        case .opencode:
+            return "notificationOpencodeHookEventsEnabled"
         default:
             return nil
         }
@@ -147,24 +173,37 @@ final class AgentNotifyMonitor {
                     self.restartFallbackTimer()
                     Task { await self.notificationService.requestAuthorizationIfNeeded() }
                     Task { await self.processTick() }
+                    self.logger.info("Notifications enabled via settings.")
                 } else {
                     self.socketListener.stop()
                     self.timerCancellable?.cancel()
                     self.timerCancellable = nil
+                    self.logger.info("Notifications disabled via settings.")
                 }
             }
     }
 
     func processTick() async {
-        guard isNotificationsEnabled else { return }
-        guard !isProcessing else { return }
+        guard isNotificationsEnabled else {
+            logger.debug("Skipped polling tick: notifications disabled.")
+            return
+        }
+        guard !isProcessing else {
+            logger.debug("Skipped polling tick: previous tick still running.")
+            return
+        }
 
         isProcessing = true
         defer { isProcessing = false }
         ensureInitialWatermarks()
 
         for detector in detectors {
-            guard isDetectorEnabled(detector) else { continue }
+            guard isDetectorEnabled(detector) else {
+                logger.debug(
+                    "Skipped detector \(detector.serviceType.rawValue, privacy: .public): source disabled."
+                )
+                continue
+            }
 
             let serviceType = detector.serviceType
             let watermark = watermarkCursor(for: serviceType)
@@ -174,14 +213,28 @@ final class AgentNotifyMonitor {
             }.value
 
             guard !events.isEmpty else { continue }
+            logger.debug(
+                "Detector \(serviceType.rawValue, privacy: .public) produced \(events.count, privacy: .public) events."
+            )
             let unseenEvents = events.filter { !isAlreadyProcessed($0, at: watermark) }
 
             if !unseenEvents.isEmpty {
                 for event in unseenEvents {
-                    guard isEventEnabled(event.type) else { continue }
-                    guard shouldNotify(event) else { continue }
+                    guard isEventEnabled(event.type) else {
+                        logger.debug(
+                            "Dropped polled event: type disabled \(event.type.rawValue, privacy: .public)."
+                        )
+                        continue
+                    }
+                    guard shouldNotify(event) else {
+                        logger.debug("Suppressed by cooldown: \(event.dedupeKey, privacy: .public).")
+                        continue
+                    }
 
                     await notificationService.post(event: event)
+                    logger.debug(
+                        "Posted polled event service=\(event.service.rawValue, privacy: .public) type=\(event.type.rawValue, privacy: .public)."
+                    )
                     lastNotificationByKey[event.dedupeKey] = Date()
                 }
             }

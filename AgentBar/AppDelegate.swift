@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController = StatusBarController(viewModel: viewModel)
         statusBarController?.setup()
         viewModel.startMonitoring()
+        AgentNotifySettingsMigrator.migrateIfNeeded()
         notifyMonitor.start()
         registerLoginItemIfNeeded()
     }

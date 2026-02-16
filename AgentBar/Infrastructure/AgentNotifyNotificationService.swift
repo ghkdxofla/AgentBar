@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import os.log
 
 protocol AgentNotifyNotificationServiceProtocol: Sendable {
     func requestAuthorizationIfNeeded() async
@@ -7,6 +8,10 @@ protocol AgentNotifyNotificationServiceProtocol: Sendable {
 }
 
 actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.agentbar.app",
+        category: "AgentNotifyNotificationService"
+    )
     private let center: UNUserNotificationCenter
     private let defaults: UserDefaults
     private let postBodyOverride: (@Sendable (String) async throws -> Void)?
@@ -27,12 +32,19 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
     }
 
     func requestAuthorizationIfNeeded() async {
-        guard !didCheckAuthorization else { return }
+        guard !didCheckAuthorization else {
+            logger.debug("Skipping authorization check: already performed.")
+            return
+        }
         didCheckAuthorization = true
 
         let statusRawValue = await authorizationStatusRawValue()
-        guard statusRawValue == UNAuthorizationStatus.notDetermined.rawValue else { return }
-        _ = await requestAuthorization()
+        guard statusRawValue == UNAuthorizationStatus.notDetermined.rawValue else {
+            logger.debug("Authorization status already determined: \(statusRawValue, privacy: .public).")
+            return
+        }
+        let granted = await requestAuthorization()
+        logger.info("Notification permission prompt completed. granted=\(granted, privacy: .public).")
     }
 
     func post(event: AgentNotifyEvent) async {
@@ -57,7 +69,13 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
             } else {
                 try await add(request)
             }
+            logger.debug(
+                "Posted notification service=\(event.service.rawValue, privacy: .public) type=\(event.type.rawValue, privacy: .public)."
+            )
         } catch {
+            logger.error(
+                "Failed to post notification service=\(event.service.rawValue, privacy: .public) type=\(event.type.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 

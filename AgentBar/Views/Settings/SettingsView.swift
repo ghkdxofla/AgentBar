@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("notificationDecisionRequiredEnabled") private var notificationDecisionRequiredEnabled = true
     @AppStorage("notificationCodexEventsEnabled") private var notificationCodexEventsEnabled = true
     @AppStorage("notificationClaudeHookEventsEnabled") private var notificationClaudeHookEventsEnabled = true
+    @AppStorage("notificationOpencodeHookEventsEnabled") private var notificationOpencodeHookEventsEnabled = true
     @AppStorage("notificationShowMessagePreview") private var notificationShowMessagePreview = false
     @AppStorage("notificationSoundPackPath") private var notificationSoundPackPath: String = ""
     @AppStorage("notificationSoundVolume") private var notificationSoundVolume: Double = 0.7
@@ -47,6 +48,7 @@ struct SettingsView: View {
     @State private var hasSavedCopilotPAT = false
     @State private var zaiAPIKey: String = ""
     @State private var hasSavedZaiAPIKey = false
+    @State private var hookConfigurationStatus: AgentHookConfigurationStatus = .unknown
     @State private var activeTokenSaveAlert: TokenSaveAlert?
     private let keychainSaveAction: @Sendable (String, String) throws -> Void
 
@@ -73,6 +75,7 @@ struct SettingsView: View {
             migrateLegacyClaudePlanIfNeeded()
             migrateLegacyCursorPlanIfNeeded()
             loadAPIKeys()
+            refreshHookConfigurationStatus()
         }
         .alert(item: $activeTokenSaveAlert) { alert in
             switch alert {
@@ -366,6 +369,34 @@ struct SettingsView: View {
                     .onChange(of: notificationClaudeHookEventsEnabled) { _ in
                         notifyNotificationsSettingsChanged()
                     }
+
+                Toggle("OpenCode hook", isOn: $notificationOpencodeHookEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationOpencodeHookEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
+                    }
+
+                HookConfigurationStatusRow(
+                    title: "Codex notify hook",
+                    status: hookConfigurationStatus.codex
+                )
+
+                HookConfigurationStatusRow(
+                    title: "Claude hook command",
+                    status: hookConfigurationStatus.claude
+                )
+
+                HStack {
+                    Button("Re-check hook configuration") {
+                        refreshHookConfigurationStatus()
+                    }
+                    Spacer()
+                    if hookConfigurationStatus.checkedAt != .distantPast {
+                        Text(hookConfigurationStatus.checkedAt.formatted(date: .omitted, time: .shortened))
+                            .foregroundStyle(.secondary)
+                            .font(.caption2)
+                    }
+                }
             } header: {
                 HStack {
                     Text("Agent Sources")
@@ -495,6 +526,11 @@ struct SettingsView: View {
         hasSavedZaiAPIKey = KeychainManager.load(account: ServiceType.zai.keychainAccount) != nil
         copilotPAT = ""
         zaiAPIKey = ""
+    }
+
+    private func refreshHookConfigurationStatus() {
+        let checker = AgentHookConfigurationChecker()
+        hookConfigurationStatus = checker.check()
     }
 
     private func notifyNotificationsSettingsChanged() {
@@ -734,6 +770,26 @@ private struct AgentSourcesHelpSheet: View {
                 .padding(4)
             }
 
+            GroupBox("OpenCode Hook") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Receives OpenCode events via plugin and forwards to **~/.agentbar/events.sock**.")
+                    Text("Install with **scripts/install-agent-hooks.sh** (creates **~/.config/opencode/plugins/agentbar-notify.js**).")
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+
+            GroupBox("Safe Hook Install") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Run **scripts/install-agent-hooks.sh** to configure Codex/Claude/Gemini/OpenCode hooks.")
+                    Text("The installer never overwrites configs without backup. Copies are saved under **~/.agentbar/backups/**.")
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+
             HStack {
                 Spacer()
                 Button("Done") {
@@ -744,6 +800,26 @@ private struct AgentSourcesHelpSheet: View {
         }
         .padding(20)
         .frame(width: 420)
+    }
+}
+
+private struct HookConfigurationStatusRow: View {
+    let title: String
+    let status: AgentHookSourceStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(status.isConfigured ? "Configured" : "Not configured")
+                    .font(.caption)
+                    .foregroundStyle(status.isConfigured ? .green : .secondary)
+            }
+            Text(status.detail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

@@ -84,8 +84,8 @@ final class UsageViewModel: ObservableObject {
             }
         }
 
-        // Sort by service order: claude, codex, gemini, copilot, cursor, zai
-        let order: [ServiceType] = [.claude, .codex, .gemini, .copilot, .cursor, .zai]
+        // Sort by service order: claude, codex, gemini, copilot, cursor, opencode, zai
+        let order: [ServiceType] = [.claude, .codex, .gemini, .copilot, .cursor, .opencode, .zai]
         results.sort { a, b in
             (order.firstIndex(of: a.service) ?? 0) < (order.firstIndex(of: b.service) ?? 0)
         }
@@ -168,4 +168,3 @@ private extension Double {
         self > 0 ? self : nil
     }
 }
-

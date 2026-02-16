@@ -6,6 +6,7 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
     case gemini  = "Google Gemini"
     case copilot = "GitHub Copilot"
     case cursor  = "Cursor"
+    case opencode = "OpenCode"
     case zai     = "Z.ai Coding Plan"
 
     var darkColor: Color {
@@ -15,6 +16,7 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
         case .gemini:  Color(red: 0.102, green: 0.431, blue: 0.882) // blue-600
         case .copilot: Color(red: 0.09, green: 0.47, blue: 0.95)    // blue-600
         case .cursor:  Color(red: 0.15, green: 0.68, blue: 0.38)    // green-600
+        case .opencode: Color(red: 0.0, green: 0.62, blue: 0.74)    // cyan-600
         case .zai:     Color(red: 0.486, green: 0.227, blue: 0.929) // violet-600
         }
     }
@@ -26,6 +28,7 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
         case .gemini:  Color(red: 0.576, green: 0.773, blue: 0.992) // blue-300
         case .copilot: Color(red: 0.53, green: 0.75, blue: 0.99)    // blue-300
         case .cursor:  Color(red: 0.49, green: 0.89, blue: 0.64)    // green-300
+        case .opencode: Color(red: 0.57, green: 0.89, blue: 0.95)   // cyan-300
         case .zai:     Color(red: 0.769, green: 0.710, blue: 0.992) // violet-300
         }
     }
@@ -37,6 +40,7 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
         case .gemini:  "GM"
         case .copilot: "CP"
         case .cursor:  "CR"
+        case .opencode: "OC"
         case .zai:     "Z"
         }
     }
@@ -63,6 +67,7 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
         case .gemini:  "gemini"
         case .copilot: "copilot"
         case .cursor:  "cursor"
+        case .opencode: "opencode"
         case .zai:     "zai"
         }
     }

@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 struct SocketNotifyEvent: Decodable, Sendable {
     let agent: String
@@ -14,6 +15,10 @@ struct SocketNotifyEvent: Decodable, Sendable {
 }
 
 final class NotifySocketListener: @unchecked Sendable {
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.agentbar.app",
+        category: "NotifySocketListener"
+    )
     private let socketPath: String
     private let fileManager: FileManager
     private let queue = DispatchQueue(label: "com.agentbar.socket-listener")
@@ -60,7 +65,10 @@ final class NotifySocketListener: @unchecked Sendable {
         }
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { return }
+        guard fd >= 0 else {
+            logger.error("Failed to create socket fd.")
+            return
+        }
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
@@ -84,11 +92,13 @@ final class NotifySocketListener: @unchecked Sendable {
             }
         }
         guard bindResult == 0 else {
+            logger.error("Failed to bind socket at \(self.socketPath, privacy: .public). errno=\(errno, privacy: .public)")
             close(fd)
             return
         }
 
         guard listen(fd, 5) == 0 else {
+            logger.error("Failed to listen on socket at \(self.socketPath, privacy: .public). errno=\(errno, privacy: .public)")
             close(fd)
             try? fileManager.removeItem(atPath: socketPath)
             return
@@ -110,6 +120,7 @@ final class NotifySocketListener: @unchecked Sendable {
         }
         self.acceptSource = source
         source.resume()
+        logger.info("Socket listener started at \(self.socketPath, privacy: .public).")
     }
 
     private func _stop() {
@@ -137,11 +148,15 @@ final class NotifySocketListener: @unchecked Sendable {
         } else if fileManager.fileExists(atPath: socketPath) {
             try? fileManager.removeItem(atPath: socketPath)
         }
+        logger.info("Socket listener stopped.")
     }
 
     private func acceptConnection() {
         let clientFD = accept(serverFD, nil, nil)
-        guard clientFD >= 0 else { return }
+        guard clientFD >= 0 else {
+            logger.error("Failed to accept client. errno=\(errno, privacy: .public)")
+            return
+        }
 
         let flags = fcntl(clientFD, F_GETFL)
         _ = fcntl(clientFD, F_SETFL, flags | O_NONBLOCK)
@@ -190,10 +205,14 @@ final class NotifySocketListener: @unchecked Sendable {
 
             guard let jsonData = trimmed.data(using: .utf8),
                   let socketEvent = try? JSONDecoder().decode(SocketNotifyEvent.self, from: jsonData) else {
+                logger.debug("Dropped malformed socket line.")
                 continue
             }
 
-            guard let notifyEvent = mapSocketEvent(socketEvent) else { continue }
+            guard let notifyEvent = mapSocketEvent(socketEvent) else {
+                logger.debug("Dropped unmapped socket event agent=\(socketEvent.agent, privacy: .public) event=\(socketEvent.event, privacy: .public).")
+                continue
+            }
             onEvent?(notifyEvent)
         }
     }
@@ -223,6 +242,8 @@ final class NotifySocketListener: @unchecked Sendable {
             return .copilot
         case "cursor":
             return .cursor
+        case "opencode", "open-code", "open_code":
+            return .opencode
         case "zai":
             return .zai
         default:

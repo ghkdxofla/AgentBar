@@ -48,6 +48,10 @@ final class NotifySocketListenerTests: XCTestCase {
         XCTAssertEqual(NotifySocketListener.mapAgent("cursor"), .cursor)
     }
 
+    func testMapsOpencodeAgentAliasToServiceType() {
+        XCTAssertEqual(NotifySocketListener.mapAgent("opencode"), .opencode)
+    }
+
     func testMapsZaiAgentToServiceType() {
         XCTAssertEqual(NotifySocketListener.mapAgent("zai"), .zai)
     }
@@ -717,6 +721,40 @@ final class AgentNotifyMonitorSocketReceiveTests: XCTestCase {
 
         let event = AgentNotifyEvent(
             service: .claude,
+            type: .taskCompleted,
+            timestamp: Date(),
+            message: "Task done",
+            sessionID: "session-1"
+        )
+
+        await monitor.receive(event: event)
+
+        let postedEvents = await notificationService.postedEvents()
+        XCTAssertTrue(postedEvents.isEmpty)
+    }
+
+    func testReceiveRespectsOpencodeSourceToggle() async throws {
+        let suiteName = "AgentBarTests.MonitorReceive.OpencodeSourceToggle.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(true, forKey: "notificationsEnabled")
+        defaults.set(false, forKey: "notificationOpencodeHookEventsEnabled")
+
+        let notificationService = TestSocketNotifyService()
+        let monitor = AgentNotifyMonitor(
+            detectors: [],
+            notificationService: notificationService,
+            defaults: defaults,
+            cooldown: 0
+        )
+
+        let event = AgentNotifyEvent(
+            service: .opencode,
             type: .taskCompleted,
             timestamp: Date(),
             message: "Task done",

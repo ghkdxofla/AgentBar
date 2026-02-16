@@ -611,6 +611,53 @@ final class AgentNotifyEventTests: XCTestCase {
 
         XCTAssertNotEqual(first.cursorID, second.cursorID)
     }
+
+    func testDedupeKeyUsesMessageHashWhenSessionIsMissing() {
+        let timestamp = Date(timeIntervalSince1970: 1_739_616_000)
+        let first = AgentNotifyEvent(
+            service: .claude,
+            type: .decisionRequired,
+            timestamp: timestamp,
+            message: "Need your input now",
+            sessionID: nil
+        )
+        let second = AgentNotifyEvent(
+            service: .claude,
+            type: .decisionRequired,
+            timestamp: timestamp.addingTimeInterval(2),
+            message: "need your input now",
+            sessionID: nil
+        )
+
+        XCTAssertEqual(first.dedupeKey, second.dedupeKey)
+    }
+
+    func testDedupeKeyFallsBackToTimestampBucketWhenSessionAndMessageAreMissing() {
+        let first = AgentNotifyEvent(
+            service: .codex,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 1_739_616_000.1),
+            message: nil,
+            sessionID: nil
+        )
+        let second = AgentNotifyEvent(
+            service: .codex,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 1_739_616_000.9),
+            message: nil,
+            sessionID: nil
+        )
+        let third = AgentNotifyEvent(
+            service: .codex,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 1_739_616_001.1),
+            message: nil,
+            sessionID: nil
+        )
+
+        XCTAssertEqual(first.dedupeKey, second.dedupeKey)
+        XCTAssertNotEqual(first.dedupeKey, third.dedupeKey)
+    }
 }
 
 private final class NotificationBodyRecorder: @unchecked Sendable {

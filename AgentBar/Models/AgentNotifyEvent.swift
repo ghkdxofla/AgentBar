@@ -63,8 +63,18 @@ struct AgentNotifyEvent: Sendable, Equatable {
     }
 
     var dedupeKey: String {
-        let session = sessionID ?? "no-session"
-        return "\(service.rawValue)|\(type.rawValue)|\(session)"
+        if let normalizedSessionID {
+            return "\(service.rawValue)|\(type.rawValue)|session:\(normalizedSessionID)"
+        }
+
+        if let normalizedMessageForDedupe {
+            let digest = SHA256.hash(data: Data(normalizedMessageForDedupe.utf8))
+            let token = digest.map { String(format: "%02x", $0) }.joined().prefix(16)
+            return "\(service.rawValue)|\(type.rawValue)|message:\(token)"
+        }
+
+        let secondBucket = Int(timestamp.timeIntervalSince1970.rounded(.down))
+        return "\(service.rawValue)|\(type.rawValue)|ts:\(secondBucket)"
     }
 
     var cursorID: String {
@@ -81,6 +91,20 @@ struct AgentNotifyEvent: Sendable, Equatable {
         let raw = includeSourceRecordID ? "\(base)|\(sourceRecordID ?? "")" : base
         let digest = SHA256.hash(data: Data(raw.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private var normalizedSessionID: String? {
+        guard let sessionID else { return nil }
+        let trimmed = sessionID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var normalizedMessageForDedupe: String? {
+        guard let message else { return nil }
+        let normalized = message
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        return normalized.isEmpty ? nil : normalized.lowercased()
     }
 
     var notificationBody: String {
