@@ -104,11 +104,8 @@ final class AlertSocketListener: @unchecked Sendable {
         // Capture the FD value at creation time so cancel handler
         // always closes the correct FD, not a newer one from restart.
         let capturedFD = fd
-        let path = socketPath
-        let fm = fileManager
         source.setCancelHandler {
             close(capturedFD)
-            try? fm.removeItem(atPath: path)
         }
         self.acceptSource = source
         source.resume()
@@ -116,9 +113,8 @@ final class AlertSocketListener: @unchecked Sendable {
 
     private func _stop() {
         // Cancel all active client connections first
-        for (clientFD, source) in clientSources {
+        for (_, source) in clientSources {
             source.cancel()
-            close(clientFD)
         }
         clientSources.removeAll()
 
@@ -131,12 +127,18 @@ final class AlertSocketListener: @unchecked Sendable {
             serverFD = -1
             source.cancel()
             acceptSource = nil
+
+            if fileManager.fileExists(atPath: socketPath) {
+                try? fileManager.removeItem(atPath: socketPath)
+            }
         } else if serverFD >= 0 {
             close(serverFD)
             serverFD = -1
             if fileManager.fileExists(atPath: socketPath) {
                 try? fileManager.removeItem(atPath: socketPath)
             }
+        } else if fileManager.fileExists(atPath: socketPath) {
+            try? fileManager.removeItem(atPath: socketPath)
         }
     }
 
