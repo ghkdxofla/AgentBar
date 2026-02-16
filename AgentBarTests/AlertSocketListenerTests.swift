@@ -149,8 +149,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
     }
 
     private func canConnectAndDisconnect(to socketPath: String) -> Bool {
-        guard FileManager.default.fileExists(atPath: socketPath),
-              let clientFD = openClientSocket(to: socketPath) else {
+        guard let clientFD = openClientSocket(to: socketPath) else {
             return false
         }
         close(clientFD)
@@ -237,7 +236,19 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
             "Socket path did not remain connectable after start() while already running"
         )
 
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                listener.activeClientCountForTesting == 0
+            },
+            "Listener still had active probe clients before final acceptance check"
+        )
         let clientFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                listener.activeClientCountForTesting >= 1
+            },
+            "Listener did not accept client after start() while already running"
+        )
         close(clientFD)
     }
 
@@ -262,6 +273,12 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         // Restart while a client is still connected.
         listener.start()
         XCTAssertTrue(listener.isListening)
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                listener.activeClientCountForTesting == 0
+            },
+            "Listener did not clear prior clients during restart"
+        )
 
         XCTAssertTrue(
             waitUntil(timeout: 1) {
@@ -275,6 +292,12 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         )
 
         let secondClientFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        XCTAssertTrue(
+            waitUntil(timeout: 1) {
+                listener.activeClientCountForTesting >= 1
+            },
+            "Listener did not accept second client after restart"
+        )
         close(secondClientFD)
     }
 
