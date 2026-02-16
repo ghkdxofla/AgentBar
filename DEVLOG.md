@@ -420,6 +420,11 @@
 - All 186 tests passing
 
 
+## Iteration 51: Enable launch at login by default
+- **Default changed**: `launchAtLogin` default value from `false` → `true`
+- **First-launch registration**: Added `registerLoginItemIfNeeded()` in `AppDelegate` — on first launch (when UserDefaults key is absent), writes the default and calls `LoginItemManager.setEnabled(true)` to actually register the login item
+- All 186 tests passing
+
 ## Iteration 50: Split agent sources into separate section, add help sheet, Z.ai cache TTL
 - **Agent Sources section**: Moved Codex file watcher and Claude hook toggles from "Agent Notifications (Beta)" into a dedicated "Agent Sources" section, since they are agent-specific configuration
 - **Help sheet**: Removed inline description captions (socket path, hook script setup, codex fallback) from the notifications UI and added a `?` button on the Agent Sources header that opens `AgentSourcesHelpSheet` with full documentation

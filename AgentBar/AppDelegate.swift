@@ -11,6 +11,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController?.setup()
         viewModel.startMonitoring()
         notifyMonitor.start()
+        registerLoginItemIfNeeded()
+    }
+
+    /// On first launch, register as a login item when the default is enabled.
+    private func registerLoginItemIfNeeded() {
+        let defaults = UserDefaults.standard
+        let key = "launchAtLogin"
+        // Only act on first launch (key not yet written by user)
+        guard defaults.object(forKey: key) == nil else { return }
+        defaults.set(true, forKey: key)
+        try? LoginItemManager.setEnabled(true)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
