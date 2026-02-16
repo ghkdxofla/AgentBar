@@ -1,5 +1,13 @@
 # AgentBar Development Log
 
+## Iteration 46: Z.ai plan auto-detect, Claude Max 5x/20x split
+- **Z.ai auto-detection**: Wired existing `ZaiQuotaData.level` field (already decoded but unused) to `UsageData.planName` via `capitalizedPlanName()` helper — plan now appears in popover automatically from API
+- **Claude Max 5x/20x split**: Changed `ClaudePlan.max` to `.max5x = "Max 5x"` and `.max20x = "Max 20x"` for distinct tier selection. Added `migrateLegacyClaudePlanIfNeeded()` to convert stored "Max" → "Max 5x"
+- **Settings help text**: Updated Copilot ("Plan is auto-detected from GitHub API") and Z.ai ("Plan and limits are auto-detected from Z.ai API") section captions
+- **Auto-detect summary**: Copilot and Z.ai are fully automatic; Claude/Codex/Cursor remain manual pickers (APIs don't expose plan info)
+- **Tests added**: `testZaiCapitalizedPlanName`, `testClaudePlanLegacyMaxMigratesTo5x`, updated `testClaudePlanEnumHasExpectedCases` for 5 cases
+- All 186 tests passing
+
 ## Iteration 45: Settings tab split, sound pack help, plan display in popover
 - **SettingsView TabView**: Split monolithic 8-section Form into two tabs — "Usage" (General + 6 service sections) and "Alerts" (alert toggles + sound pack). Frame reduced from 450×920 to 450×750
 - **ClaudePlan enum**: Added `ClaudePlan` (Free/Pro/Max/Team) to `SubscriptionPlan.swift` with `@AppStorage("claudePlan")` picker in Claude Code settings section

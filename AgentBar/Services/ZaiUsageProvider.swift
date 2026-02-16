@@ -75,6 +75,8 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             Date(timeIntervalSince1970: $0 / 1000)
         }
 
+        let planName = data.level.map { Self.capitalizedPlanName($0) }
+
         return UsageData(
             service: .zai,
             fiveHourUsage: UsageMetric(
@@ -90,8 +92,16 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
                 resetTime: mcpReset
             ),
             lastUpdated: now,
-            isAvailable: true
+            isAvailable: true,
+            planName: planName
         )
+    }
+
+    // MARK: - Helpers
+
+    static func capitalizedPlanName(_ raw: String) -> String {
+        guard !raw.isEmpty else { return raw }
+        return raw.prefix(1).uppercased() + raw.dropFirst()
     }
 
     // MARK: - Private

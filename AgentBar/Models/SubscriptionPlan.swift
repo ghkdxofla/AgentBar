@@ -25,7 +25,8 @@ enum CodexPlan: String, CaseIterable, Codable, Sendable {
 enum ClaudePlan: String, CaseIterable, Codable, Sendable {
     case free = "Free"
     case pro = "Pro"
-    case max = "Max"
+    case max5x = "Max 5x"
+    case max20x = "Max 20x"
     case team = "Team"
 }
 
