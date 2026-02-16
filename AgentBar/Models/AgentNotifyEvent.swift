@@ -10,10 +10,8 @@ enum AgentNotifyEventType: String, CaseIterable, Sendable {
         switch self {
         case .taskCompleted:
             return "Agent task completed"
-        case .permissionRequired:
-            return "Agent permission required"
-        case .decisionRequired:
-            return "Agent decision required"
+        case .permissionRequired, .decisionRequired:
+            return "Agent input required"
         }
     }
 
@@ -21,10 +19,8 @@ enum AgentNotifyEventType: String, CaseIterable, Sendable {
         switch self {
         case .taskCompleted:
             return "notificationTaskCompletedEnabled"
-        case .permissionRequired:
-            return "notificationPermissionRequiredEnabled"
-        case .decisionRequired:
-            return "notificationDecisionRequiredEnabled"
+        case .permissionRequired, .decisionRequired:
+            return "notificationInputRequiredEnabled"
         }
     }
 
@@ -107,6 +103,17 @@ struct AgentNotifyEvent: Sendable, Equatable {
         return normalized.isEmpty ? nil : normalized.lowercased()
     }
 
+    private var displaySessionLabel: String? {
+        guard let normalizedSessionID else { return nil }
+        if normalizedSessionID.count <= 32 {
+            return normalizedSessionID
+        }
+
+        let prefix = normalizedSessionID.prefix(12)
+        let suffix = normalizedSessionID.suffix(8)
+        return "\(prefix)...\(suffix)"
+    }
+
     var notificationBody: String {
         guard let message else {
             return defaultBody
@@ -127,6 +134,13 @@ struct AgentNotifyEvent: Sendable, Equatable {
 
     var redactedNotificationBody: String {
         defaultBody
+    }
+
+    var notificationSourceTag: String {
+        guard let session = displaySessionLabel else {
+            return "[\(service.rawValue)]"
+        }
+        return "[\(service.rawValue) | \(session)]"
     }
 
     private var defaultBody: String {

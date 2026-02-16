@@ -11,8 +11,7 @@ struct SettingsView: View {
     @AppStorage("refreshInterval") private var refreshInterval: Double = 60
     @AppStorage("notificationsEnabled") private var notificationsEnabled = false
     @AppStorage("notificationTaskCompletedEnabled") private var notificationTaskCompletedEnabled = true
-    @AppStorage("notificationPermissionRequiredEnabled") private var notificationPermissionRequiredEnabled = true
-    @AppStorage("notificationDecisionRequiredEnabled") private var notificationDecisionRequiredEnabled = true
+    @AppStorage("notificationInputRequiredEnabled") private var notificationInputRequiredEnabled = true
     @AppStorage("notificationCodexEventsEnabled") private var notificationCodexEventsEnabled = true
     @AppStorage("notificationClaudeHookEventsEnabled") private var notificationClaudeHookEventsEnabled = true
     @AppStorage("notificationOpencodeHookEventsEnabled") private var notificationOpencodeHookEventsEnabled = true
@@ -333,15 +332,9 @@ struct SettingsView: View {
                         notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Permission required", isOn: $notificationPermissionRequiredEnabled)
+                Toggle("Input required", isOn: $notificationInputRequiredEnabled)
                     .disabled(!notificationsEnabled)
-                    .onChange(of: notificationPermissionRequiredEnabled) { _ in
-                        notifyNotificationsSettingsChanged()
-                    }
-
-                Toggle("Decision required", isOn: $notificationDecisionRequiredEnabled)
-                    .disabled(!notificationsEnabled)
-                    .onChange(of: notificationDecisionRequiredEnabled) { _ in
+                    .onChange(of: notificationInputRequiredEnabled) { _ in
                         notifyNotificationsSettingsChanged()
                     }
 
@@ -350,6 +343,11 @@ struct SettingsView: View {
                     .onChange(of: notificationShowMessagePreview) { _ in
                         notifyNotificationsSettingsChanged()
                     }
+
+                Text("Preview shows message text with agent and session context when available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .disabled(!notificationsEnabled)
 
                 Button("Request Notification Permission") {
                     AgentNotifyNotificationService.requestAuthorizationPrompt()

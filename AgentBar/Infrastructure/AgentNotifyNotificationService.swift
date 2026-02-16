@@ -52,7 +52,7 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         content.title = event.type.notificationTitle
         let showMessagePreview = defaults.bool(forKey: "notificationShowMessagePreview", defaultValue: false)
         let body = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
-        content.body = "[\(event.service.rawValue)] \(body)"
+        content.body = "\(event.notificationSourceTag) \(body)"
 
         let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type)
         content.sound = didPlayCustomSound ? nil : .default

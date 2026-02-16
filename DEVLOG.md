@@ -483,3 +483,11 @@
 - **Documentation**: Updated `CLAUDE.md` release signing command to include `DEVELOPMENT_TEAM=YOUR_TEAM_ID` and documented this hardening step in DEVLOG.
 - **History rewrite**: Rewrote repository history with `git filter-repo` to remove sensitive identifiers (team ID literal and personal alias) from blobs and commit/tag messages.
 - All 203 tests passing
+
+## Iteration 56: Agent notification settings simplification + source-aware preview
+- **Notification event toggles simplified**: Settings now expose two event toggles only: `Task completed` and `Input required`. `permissionRequired` and `decisionRequired` remain distinct event types internally but share one title and one settings key.
+- **Unified settings key migration**: Added migration to map legacy input toggles (`notificationPermissionRequiredEnabled`, `notificationDecisionRequiredEnabled`, `alertPermissionRequiredEnabled`, `alertDecisionRequiredEnabled`) into `notificationInputRequiredEnabled`, then delete old keys.
+- **Message source identification improved**: Notification body prefix now uses a source tag with agent and optional session context (e.g. `[OpenAI Codex | session-1]`). Long session IDs are compacted for readability.
+- **Settings UX alignment**: Notifications section now focuses on `Enable notifications`, `Task completed`, `Input required`, and `Show message preview`, while `Agent Sources` and `Notification Sounds` sections remain source/sound-specific.
+- **Tests**: Updated notification body assertions to use source tags and added migration coverage for alert-era input keys.
+- All 208 tests passing

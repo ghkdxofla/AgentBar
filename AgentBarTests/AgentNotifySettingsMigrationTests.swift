@@ -80,6 +80,64 @@ final class AgentHookConfigurationCheckerTests: XCTestCase {
 }
 
 final class AgentNotifySettingsMigratorTests: XCTestCase {
+    func testMergesLegacyInputToggleKeysIntoUnifiedSetting() {
+        let suiteName = "AgentBarTests.AgentNotifySettingsMigrator.InputMerge.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(false, forKey: "notificationPermissionRequiredEnabled")
+        defaults.set(true, forKey: "notificationDecisionRequiredEnabled")
+
+        AgentNotifySettingsMigrator.migrateIfNeeded(defaults: defaults)
+
+        XCTAssertEqual(defaults.object(forKey: "notificationInputRequiredEnabled") as? Bool, true)
+        XCTAssertNil(defaults.object(forKey: "notificationPermissionRequiredEnabled"))
+        XCTAssertNil(defaults.object(forKey: "notificationDecisionRequiredEnabled"))
+    }
+
+    func testMergesAlertLegacyInputToggleKeysIntoUnifiedSetting() {
+        let suiteName = "AgentBarTests.AgentNotifySettingsMigrator.AlertInputMerge.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(false, forKey: "alertPermissionRequiredEnabled")
+        defaults.set(true, forKey: "alertDecisionRequiredEnabled")
+
+        AgentNotifySettingsMigrator.migrateIfNeeded(defaults: defaults)
+
+        XCTAssertEqual(defaults.object(forKey: "notificationInputRequiredEnabled") as? Bool, true)
+        XCTAssertNil(defaults.object(forKey: "alertPermissionRequiredEnabled"))
+        XCTAssertNil(defaults.object(forKey: "alertDecisionRequiredEnabled"))
+    }
+
+    func testDoesNotOverwriteUnifiedInputSetting() {
+        let suiteName = "AgentBarTests.AgentNotifySettingsMigrator.InputNoOverwrite.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(false, forKey: "notificationInputRequiredEnabled")
+        defaults.set(true, forKey: "notificationPermissionRequiredEnabled")
+        defaults.set(true, forKey: "notificationDecisionRequiredEnabled")
+
+        AgentNotifySettingsMigrator.migrateIfNeeded(defaults: defaults)
+
+        XCTAssertEqual(defaults.object(forKey: "notificationInputRequiredEnabled") as? Bool, false)
+        XCTAssertNil(defaults.object(forKey: "notificationPermissionRequiredEnabled"))
+        XCTAssertNil(defaults.object(forKey: "notificationDecisionRequiredEnabled"))
+    }
+
     func testMigratesLegacyKeysAndRemovesOldKeys() {
         let suiteName = "AgentBarTests.AgentNotifySettingsMigrator.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {

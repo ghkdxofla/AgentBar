@@ -556,7 +556,7 @@ final class AgentNotifyNotificationServiceTests: XCTestCase {
         )
         await service.post(event: event)
 
-        XCTAssertEqual(recorder.bodies(), ["[\(event.service.rawValue)] Agent is waiting for your input."])
+        XCTAssertEqual(recorder.bodies(), ["\(event.notificationSourceTag) Agent is waiting for your input."])
     }
 
     func testPostUsesMessagePreviewWhenEnabled() async throws {
@@ -585,11 +585,35 @@ final class AgentNotifyNotificationServiceTests: XCTestCase {
         )
         await service.post(event: event)
 
-        XCTAssertEqual(recorder.bodies(), ["[\(event.service.rawValue)] Should I proceed with the schema migration?"])
+        XCTAssertEqual(recorder.bodies(), ["\(event.notificationSourceTag) Should I proceed with the schema migration?"])
     }
 }
 
 final class AgentNotifyEventTests: XCTestCase {
+    func testNotificationSourceTagIncludesSessionWhenPresent() {
+        let event = AgentNotifyEvent(
+            service: .codex,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 1),
+            message: nil,
+            sessionID: "session-1"
+        )
+
+        XCTAssertEqual(event.notificationSourceTag, "[OpenAI Codex | session-1]")
+    }
+
+    func testNotificationSourceTagFallsBackToServiceWhenSessionMissing() {
+        let event = AgentNotifyEvent(
+            service: .codex,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 1),
+            message: nil,
+            sessionID: nil
+        )
+
+        XCTAssertEqual(event.notificationSourceTag, "[OpenAI Codex]")
+    }
+
     func testCursorIDDiffersWhenSourceRecordIDDiffers() {
         let timestamp = Date(timeIntervalSince1970: 1_739_616_000)
         let first = AgentNotifyEvent(
