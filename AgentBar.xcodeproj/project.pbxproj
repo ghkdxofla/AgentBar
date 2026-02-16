@@ -55,6 +55,8 @@
 		AA11BB22CC33DD44EE550002 /* AlertSoundManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */; };
 		AA11BB22CC33DD44EE550003 /* AlertSocketListenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */; };
 		AA11BB22CC33DD44EE550004 /* AlertSoundManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */; };
+		BB11AA22DD33EE44FF550001 /* UserDefaultsExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11AA22DD33EE44FF660001 /* UserDefaultsExtensions.swift */; };
+		BB11AA22DD33EE44FF550002 /* DynamicCodingKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11AA22DD33EE44FF660002 /* DynamicCodingKey.swift */; };
 		F2839E6C0ED51B67719A8DCE /* ClaudeUsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B733F774C2C2F1CD302B7C44 /* ClaudeUsageProvider.swift */; };
 		F3A2828533B7A7BED0B07B05 /* DetailPopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958043861908BC4336BBBA33 /* DetailPopoverView.swift */; };
 		FE0F1D61470670565A9138AB /* ClaudeUsageProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7B37753F62413F688AB6A4F /* ClaudeUsageProviderTests.swift */; };
@@ -125,6 +127,8 @@
 		AA11BB22CC33DD44EE660002 /* AlertSoundManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSoundManager.swift; sourceTree = "<group>"; };
 		AA11BB22CC33DD44EE660003 /* AlertSocketListenerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSocketListenerTests.swift; sourceTree = "<group>"; };
 		AA11BB22CC33DD44EE660004 /* AlertSoundManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertSoundManagerTests.swift; sourceTree = "<group>"; };
+		BB11AA22DD33EE44FF660001 /* UserDefaultsExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsExtensions.swift; sourceTree = "<group>"; };
+		BB11AA22DD33EE44FF660002 /* DynamicCodingKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DynamicCodingKey.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -193,7 +197,9 @@
 			isa = PBXGroup;
 			children = (
 				2A14C1DC334C42F8E42A6B58 /* DateUtils.swift */,
+				BB11AA22DD33EE44FF660002 /* DynamicCodingKey.swift */,
 				0820898C10976D02ADA88790 /* JSONLParser.swift */,
+				BB11AA22DD33EE44FF660001 /* UserDefaultsExtensions.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -423,6 +429,7 @@
 				AA98AA4299441FF3A1A1EC03 /* CopilotUsageProvider.swift in Sources */,
 				74C8A25DF623AC03180FE1EA /* CursorUsageProvider.swift in Sources */,
 				88E45D6CA95D8C14D193ACDF /* DateUtils.swift in Sources */,
+				BB11AA22DD33EE44FF550002 /* DynamicCodingKey.swift in Sources */,
 				F3A2828533B7A7BED0B07B05 /* DetailPopoverView.swift in Sources */,
 				AB41AF0AADB19FB6FA4AE402 /* GeminiUsageProvider.swift in Sources */,
 				9D1B9D474501792B72857498 /* JSONLParser.swift in Sources */,
@@ -438,6 +445,7 @@
 				CD00405D368CD969A0AC4A7C /* SubscriptionPlan.swift in Sources */,
 				74C2CD46BBF38C8C24B027E7 /* UsageData.swift in Sources */,
 				4B10B876FF9B76F56A519DE0 /* UsageProviderProtocol.swift in Sources */,
+				BB11AA22DD33EE44FF550001 /* UserDefaultsExtensions.swift in Sources */,
 				4B78E6C443EC76078F335B1A /* UsageViewModel.swift in Sources */,
 				5E6CFA4E881FB00B8AA7CABF /* ZaiUsageProvider.swift in Sources */,
 			);

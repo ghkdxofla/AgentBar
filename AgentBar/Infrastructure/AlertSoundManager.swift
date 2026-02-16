@@ -71,12 +71,7 @@ final class AlertSoundManager: @unchecked Sendable {
     }
 
     static func cespCategory(for eventType: AgentAlertEventType) -> String {
-        switch eventType {
-        case .taskCompleted:
-            return "task.complete"
-        case .permissionRequired, .decisionRequired:
-            return "input.required"
-        }
+        eventType.cespCategory
     }
 
     func play(for eventType: AgentAlertEventType) -> Bool {
@@ -120,10 +115,7 @@ final class AlertSoundManager: @unchecked Sendable {
 
         do {
             let audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
-            let volume = defaults.object(forKey: "alertSoundVolume") != nil
-                ? Float(defaults.double(forKey: "alertSoundVolume"))
-                : 0.7
-            audioPlayer.volume = volume
+            audioPlayer.volume = currentVolume
             audioPlayer.play()
 
             lock.lock()
@@ -156,10 +148,7 @@ final class AlertSoundManager: @unchecked Sendable {
 
         do {
             let audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
-            let volume = defaults.object(forKey: "alertSoundVolume") != nil
-                ? Float(defaults.double(forKey: "alertSoundVolume"))
-                : 0.7
-            audioPlayer.volume = volume
+            audioPlayer.volume = currentVolume
             audioPlayer.play()
 
             lock.lock()
@@ -169,6 +158,12 @@ final class AlertSoundManager: @unchecked Sendable {
         } catch {
             return false
         }
+    }
+
+    private var currentVolume: Float {
+        defaults.object(forKey: "alertSoundVolume") != nil
+            ? Float(defaults.double(forKey: "alertSoundVolume"))
+            : 0.7
     }
 
     private func isCategoryEnabled(_ category: String) -> Bool {

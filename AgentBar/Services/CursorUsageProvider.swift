@@ -7,21 +7,6 @@ struct CursorUsageResponse: Decodable, Sendable {
     let startOfMonth: String?
     let modelUsages: [String: CursorModelUsage]
 
-    private struct DynamicCodingKey: CodingKey {
-        var stringValue: String
-        var intValue: Int?
-
-        init?(stringValue: String) {
-            self.stringValue = stringValue
-            self.intValue = nil
-        }
-
-        init?(intValue: Int) {
-            self.stringValue = String(intValue)
-            self.intValue = intValue
-        }
-    }
-
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKey.self)
         let startOfMonthKey = DynamicCodingKey(stringValue: "startOfMonth")!

@@ -44,24 +44,4 @@ actor APIClient {
             throw APIError.httpError(httpResponse.statusCode)
         }
     }
-
-    func getRawData(
-        url: URL,
-        headers: [String: String] = [:],
-        timeout: TimeInterval = 10
-    ) async throws -> (Data, Int) {
-        var request = URLRequest(url: url, timeoutInterval: timeout)
-        request.httpMethod = "GET"
-        for (key, value) in headers {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-
-        return (data, httpResponse.statusCode)
-    }
 }

@@ -309,10 +309,3 @@ private struct WatermarkCursor: Sendable {
         Date(timeIntervalSince1970: timestamp)
     }
 }
-
-private extension UserDefaults {
-    func bool(forKey key: String, defaultValue: Bool) -> Bool {
-        guard object(forKey: key) != nil else { return defaultValue }
-        return bool(forKey: key)
-    }
-}

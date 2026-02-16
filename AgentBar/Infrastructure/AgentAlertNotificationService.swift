@@ -38,7 +38,7 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
     func post(event: AgentAlertEvent) async {
         let content = UNMutableNotificationContent()
         content.title = event.type.notificationTitle
-        let showMessagePreview = bool(forKey: "alertShowMessagePreview", defaultValue: false)
+        let showMessagePreview = defaults.bool(forKey: "alertShowMessagePreview", defaultValue: false)
         let body = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
         content.body = "[\(event.service.rawValue)] \(body)"
 
@@ -90,8 +90,4 @@ actor AgentAlertNotificationService: AgentAlertNotificationServiceProtocol {
         }
     }
 
-    private func bool(forKey key: String, defaultValue: Bool) -> Bool {
-        guard defaults.object(forKey: key) != nil else { return defaultValue }
-        return defaults.bool(forKey: key)
-    }
 }

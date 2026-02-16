@@ -137,10 +137,6 @@ final class CodexAlertEventDetector: AgentAlertEventDetectorProtocol, @unchecked
         return permission == "require_escalated"
     }
 
-    private func passesBoundary(_ date: Date, since: Date, includeBoundary: Bool) -> Bool {
-        includeBoundary ? date >= since : date > since
-    }
-
     private func looksLikeDecisionPrompt(_ message: String) -> Bool {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }

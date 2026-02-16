@@ -104,10 +104,6 @@ final class ClaudeHookAlertEventDetector: AgentAlertEventDetectorProtocol, @unch
         )
     }
 
-    private func passesBoundary(_ date: Date, since: Date, includeBoundary: Bool) -> Bool {
-        includeBoundary ? date >= since : date > since
-    }
-
     private func looksLikePermissionPrompt(_ message: String) -> Bool {
         let lower = message.lowercased()
         let englishMarkers = [
