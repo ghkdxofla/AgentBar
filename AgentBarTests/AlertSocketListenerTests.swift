@@ -156,17 +156,27 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         return true
     }
 
+    private func conditionRemainsTrue(
+        duration: TimeInterval,
+        pollInterval: TimeInterval = 0.02,
+        condition: () -> Bool
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(duration)
+        while Date() < deadline {
+            guard condition() else { return false }
+            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(pollInterval))
+        }
+        return condition()
+    }
+
     private func socketRemainsConnectable(
         at socketPath: String,
         duration: TimeInterval,
         pollInterval: TimeInterval = 0.02
     ) -> Bool {
-        let deadline = Date().addingTimeInterval(duration)
-        while Date() < deadline {
-            guard canConnectAndDisconnect(to: socketPath) else { return false }
-            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(pollInterval))
+        conditionRemainsTrue(duration: duration, pollInterval: pollInterval) {
+            canConnectAndDisconnect(to: socketPath)
         }
-        return canConnectAndDisconnect(to: socketPath)
     }
 
     override func setUp() {
@@ -232,7 +242,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
             "Socket path did not become connectable after start() while already running"
         )
         XCTAssertTrue(
-            socketRemainsConnectable(at: sockPath, duration: 0.25),
+            socketRemainsConnectable(at: sockPath, duration: 1),
             "Socket path did not remain connectable after start() while already running"
         )
 
@@ -269,6 +279,12 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
             },
             "Listener did not accept first client before restart"
         )
+        XCTAssertTrue(
+            conditionRemainsTrue(duration: 0.2) {
+                listener.activeClientCountForTesting >= 1
+            },
+            "Listener did not keep first client active before restart"
+        )
 
         // Restart while a client is still connected.
         listener.start()
@@ -287,7 +303,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
             "Socket path did not become connectable after restart with active client"
         )
         XCTAssertTrue(
-            socketRemainsConnectable(at: sockPath, duration: 0.25),
+            socketRemainsConnectable(at: sockPath, duration: 1),
             "Socket path did not remain connectable after restart with active client"
         )
 
@@ -374,7 +390,7 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
             "Socket path did not become connectable after restart"
         )
         XCTAssertTrue(
-            socketRemainsConnectable(at: sockPath, duration: 0.25),
+            socketRemainsConnectable(at: sockPath, duration: 1),
             "Socket path did not remain connectable after restart"
         )
         listener.stop()
