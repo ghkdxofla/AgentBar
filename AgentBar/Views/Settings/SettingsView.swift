@@ -42,6 +42,7 @@ struct SettingsView: View {
 
     @State private var selectedTab: SettingsTab = .usage
     @State private var showingSoundPackHelp = false
+    @State private var showingAgentSourcesHelp = false
     @State private var copilotPAT: String = ""
     @State private var hasSavedCopilotPAT = false
     @State private var zaiAPIKey: String = ""
@@ -90,6 +91,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingSoundPackHelp) {
             SoundPackHelpSheet()
+        }
+        .sheet(isPresented: $showingAgentSourcesHelp) {
+            AgentSourcesHelpSheet()
         }
     }
 
@@ -338,19 +342,7 @@ struct SettingsView: View {
                         notifyNotificationsSettingsChanged()
                     }
 
-                Toggle("Codex file watcher (fallback)", isOn: $notificationCodexEventsEnabled)
-                    .disabled(!notificationsEnabled)
-                    .onChange(of: notificationCodexEventsEnabled) { _ in
-                        notifyNotificationsSettingsChanged()
-                    }
-
-                Toggle("Claude hook (socket)", isOn: $notificationClaudeHookEventsEnabled)
-                    .disabled(!notificationsEnabled)
-                    .onChange(of: notificationClaudeHookEventsEnabled) { _ in
-                        notifyNotificationsSettingsChanged()
-                    }
-
-                Toggle("Show message preview in notifications", isOn: $notificationShowMessagePreview)
+                Toggle("Show message preview", isOn: $notificationShowMessagePreview)
                     .disabled(!notificationsEnabled)
                     .onChange(of: notificationShowMessagePreview) { _ in
                         notifyNotificationsSettingsChanged()
@@ -360,18 +352,32 @@ struct SettingsView: View {
                     AgentNotifyNotificationService.requestAuthorizationPrompt()
                 }
                 .disabled(!notificationsEnabled)
+            }
 
-                Text("Events are received via Unix socket at ~/.agentbar/events.sock.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            Section {
+                Toggle("Codex file watcher", isOn: $notificationCodexEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationCodexEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
+                    }
 
-                Text("Register hooks with scripts/agentbar-hook.sh (Claude) or scripts/agentbar-codex-hook.sh (Codex).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text("Codex fallback watcher monitors ~/.codex/sessions for users without hook configuration.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Toggle("Claude hook", isOn: $notificationClaudeHookEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationClaudeHookEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
+                    }
+            } header: {
+                HStack {
+                    Text("Agent Sources")
+                    Spacer()
+                    Button {
+                        showingAgentSourcesHelp = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             Section {
@@ -678,6 +684,50 @@ private struct SoundPackHelpSheet: View {
                     Text("**task.complete** — played when an agent finishes a task")
                     Text("**input.required** — played when an agent needs user input")
                     Text("Multiple files per category are rotated randomly without repeats.")
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
+    }
+}
+
+private struct AgentSourcesHelpSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Agent Sources")
+                .font(.headline)
+
+            Text("AgentBar receives agent events through the following sources.")
+                .font(.body)
+
+            GroupBox("Claude Hook") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Receives events via Unix socket at **~/.agentbar/events.sock**.")
+                    Text("Register the hook with **scripts/agentbar-hook.sh** in your Claude configuration.")
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+
+            GroupBox("Codex File Watcher") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Monitors **~/.codex/sessions** for session file changes.")
+                    Text("Fallback for users without hook configuration. Register **scripts/agentbar-codex-hook.sh** for socket-based delivery instead.")
                 }
                 .font(.caption)
                 .frame(maxWidth: .infinity, alignment: .leading)
