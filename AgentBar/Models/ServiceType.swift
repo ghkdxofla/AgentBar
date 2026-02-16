@@ -11,7 +11,7 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
     var darkColor: Color {
         switch self {
         case .claude:  Color(red: 0.851, green: 0.467, blue: 0.024) // amber-600
-        case .codex:   Color(red: 0.020, green: 0.588, blue: 0.412) // emerald-600
+        case .codex:   Color(red: 0.063, green: 0.725, blue: 0.506) // emerald-500
         case .gemini:  Color(red: 0.102, green: 0.431, blue: 0.882) // blue-600
         case .copilot: Color(red: 0.09, green: 0.47, blue: 0.95)    // blue-600
         case .cursor:  Color(red: 0.15, green: 0.68, blue: 0.38)    // green-600
