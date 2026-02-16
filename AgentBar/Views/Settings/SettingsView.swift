@@ -69,6 +69,7 @@ struct SettingsView: View {
         }
         .frame(width: 450, height: 750)
         .onAppear {
+            migrateLegacyClaudePlanIfNeeded()
             migrateLegacyCursorPlanIfNeeded()
             loadAPIKeys()
         }
@@ -209,7 +210,7 @@ struct SettingsView: View {
                     .onChange(of: copilotEnabled) { _ in
                         NotificationCenter.default.post(name: .limitsChanged, object: nil)
                     }
-                Text("Token is auto-read from gh CLI (gh auth token)")
+                Text("Plan is auto-detected from GitHub API. Token is auto-read from gh CLI (gh auth token).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -301,7 +302,7 @@ struct SettingsView: View {
                     }
                     .disabled(!Self.canSaveToken(zaiAPIKey))
                 }
-                Text("Limits are fetched automatically from Z.ai API")
+                Text("Plan and limits are auto-detected from Z.ai API")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -462,6 +463,17 @@ struct SettingsView: View {
             activeTokenSaveAlert = nil
         }
         return outcome
+    }
+
+    private func migrateLegacyClaudePlanIfNeeded() {
+        // Migrate "Max" from before Max 5x/20x split
+        if claudePlan == "Max" {
+            claudePlan = ClaudePlan.max5x.rawValue
+        }
+        // Validate stored value; fall back to Pro if unrecognized
+        if ClaudePlan(rawValue: claudePlan) == nil {
+            claudePlan = ClaudePlan.pro.rawValue
+        }
     }
 
     private func migrateLegacyCursorPlanIfNeeded() {

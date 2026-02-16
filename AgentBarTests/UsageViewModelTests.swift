@@ -134,8 +134,8 @@ final class UsageViewModelTests: XCTestCase {
 
     func testClaudePlanEnumHasExpectedCases() {
         let cases = ClaudePlan.allCases
-        XCTAssertEqual(cases.count, 4)
-        XCTAssertEqual(cases.map(\.rawValue), ["Free", "Pro", "Max", "Team"])
+        XCTAssertEqual(cases.count, 5)
+        XCTAssertEqual(cases.map(\.rawValue), ["Free", "Pro", "Max 5x", "Max 20x", "Team"])
     }
 
     func testClaudePlanRoundTrips() {
@@ -144,11 +144,24 @@ final class UsageViewModelTests: XCTestCase {
         }
     }
 
+    func testClaudePlanLegacyMaxMigratesTo5x() {
+        // "Max" is no longer a valid rawValue — migration should map it to max5x
+        XCTAssertNil(ClaudePlan(rawValue: "Max"))
+        XCTAssertEqual(ClaudePlan.max5x.rawValue, "Max 5x")
+        XCTAssertEqual(ClaudePlan.max20x.rawValue, "Max 20x")
+    }
+
     func testCopilotCapitalizedPlanName() {
         XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName("pro"), "Pro")
         XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName("business"), "Business")
         XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName("enterprise"), "Enterprise")
         XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName(""), "")
+    }
+
+    func testZaiCapitalizedPlanName() {
+        XCTAssertEqual(ZaiUsageProvider.capitalizedPlanName("max"), "Max")
+        XCTAssertEqual(ZaiUsageProvider.capitalizedPlanName("pro"), "Pro")
+        XCTAssertEqual(ZaiUsageProvider.capitalizedPlanName(""), "")
     }
 
     func testSanitizedTokenForSavingRejectsMaskedPlaceholder() {
