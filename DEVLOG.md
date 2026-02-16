@@ -420,6 +420,11 @@
 - All 186 tests passing
 
 
+## Iteration 52: Fix recurring button focus ring in popover
+- **Removed FocusState**: Deleted `@FocusState`, `PopoverButton` enum, and `.focused()` modifiers from `DetailPopoverView` — these explicitly registered buttons as focus targets, causing the ring to shift between buttons whenever one was removed
+- **Clear first responder on open**: Added `makeFirstResponder(nil)` in `PopoverController.show()` after the popover is displayed, so no element receives keyboard focus when the popover appears
+- All 186 tests passing
+
 ## Iteration 51: Enable launch at login by default
 - **Default changed**: `launchAtLogin` default value from `false` → `true`
 - **First-launch registration**: Added `registerLoginItemIfNeeded()` in `AppDelegate` — on first launch (when UserDefaults key is absent), writes the default and calls `LoginItemManager.setEnabled(true)` to actually register the login item
@@ -441,3 +446,10 @@
 - **Notification.Name**: `.alertsSettingsChanged` → `.notificationsSettingsChanged`
 - **AppDelegate**: `alertMonitor` → `notifyMonitor`
 - All 186 tests passing
+
+## Iteration 52: Add Z.ai usage provider test coverage
+- **New test suite**: Added `ZaiUsageProviderTests` to cover Z.ai quota parsing, plan capitalization, keychain configuration detection, and cache TTL behavior
+- **Auth retry verification**: Added API mock protocol assertions for Bearer-first then raw-key retry flow when receiving `401 Unauthorized`
+- **Error-path coverage**: Added tests for missing API key (`APIError.unauthorized`) and malformed quota payload without limits (`APIError.noData`)
+- **Cache behavior checks**: Added tests that verify `cachedIfFresh` expiration and `fetchUsage` short-circuiting to cache without network calls
+- All 194 tests passing
