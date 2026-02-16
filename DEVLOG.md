@@ -420,6 +420,13 @@
 - All 186 tests passing
 
 
+## Iteration 53: Fix Z.ai tests deleting real keychain data
+- **Root cause**: `ZaiUsageProviderTests` called `KeychainManager.delete(account: "zai")` in setUp/tearDown, which deleted the user's real Z.ai API key from the keychain — causing Z.ai to disappear from the popover after running tests
+- **credentialProvider injection**: Added `credentialProvider` closure parameter to `ZaiUsageProvider.init()`, matching the pattern used by `CopilotUsageProvider`. Production code defaults to reading from `KeychainManager`, tests inject mock credentials via closure
+- **Test rewrite**: Removed all `KeychainManager.save/delete` calls from `ZaiUsageProviderTests`. Tests now use `makeProvider(credential:)` helper that injects credentials without touching the real keychain
+- **isConfigured()**: Now uses the injected `credentialProvider()` instead of directly calling `KeychainManager.load()`
+- All 186 tests passing
+
 ## Iteration 52: Fix recurring button focus ring in popover
 - **Removed FocusState**: Deleted `@FocusState`, `PopoverButton` enum, and `.focused()` modifiers from `DetailPopoverView` — these explicitly registered buttons as focus targets, causing the ring to shift between buttons whenever one was removed
 - **Clear first responder on open**: Added `makeFirstResponder(nil)` in `PopoverController.show()` after the popover is displayed, so no element receives keyboard focus when the popover appears
