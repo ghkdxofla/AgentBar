@@ -2,6 +2,11 @@ import SwiftUI
 
 struct DetailPopoverView: View {
     @ObservedObject var viewModel: UsageViewModel
+    @FocusState private var focusedButton: PopoverButton?
+
+    private enum PopoverButton: Hashable {
+        case settings, quit
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -14,7 +19,7 @@ struct DetailPopoverView: View {
                     Image(systemName: "gearshape")
                 }
                 .buttonStyle(.plain)
-                .focusable(false)
+                .focused($focusedButton, equals: .settings)
             }
 
             Divider()
@@ -56,7 +61,7 @@ struct DetailPopoverView: View {
                     NSApp.terminate(nil)
                 }
                 .buttonStyle(.plain)
-                .focusable(false)
+                .focused($focusedButton, equals: .quit)
                 .foregroundStyle(.secondary)
             }
         }
