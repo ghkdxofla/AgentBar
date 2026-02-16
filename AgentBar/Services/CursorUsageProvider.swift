@@ -118,6 +118,9 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             resetTime = CopilotUsageProvider.firstOfNextMonthUTC()
         }
 
+        let planName = UserDefaults.standard.string(forKey: "cursorPlan")
+            .flatMap { CursorPlan(rawValue: $0) }?.rawValue
+
         return UsageData(
             service: .cursor,
             fiveHourUsage: UsageMetric(
@@ -128,7 +131,8 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             ),
             weeklyUsage: nil,
             lastUpdated: Date(),
-            isAvailable: true
+            isAvailable: true,
+            planName: planName
         )
     }
 

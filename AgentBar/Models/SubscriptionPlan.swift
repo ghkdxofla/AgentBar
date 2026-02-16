@@ -1,11 +1,13 @@
 import Foundation
 
 enum CodexPlan: String, CaseIterable, Codable, Sendable {
+    case plus = "Plus"
     case pro = "Pro"
     case custom = "Custom"
 
     var fiveHourTokenLimit: Double {
         switch self {
+        case .plus: return 1_000_000
         case .pro: return 10_000_000
         case .custom: return 0
         }
@@ -13,10 +15,18 @@ enum CodexPlan: String, CaseIterable, Codable, Sendable {
 
     var weeklyTokenLimit: Double {
         switch self {
+        case .plus: return 10_000_000
         case .pro: return 100_000_000
         case .custom: return 0
         }
     }
+}
+
+enum ClaudePlan: String, CaseIterable, Codable, Sendable {
+    case free = "Free"
+    case pro = "Pro"
+    case max = "Max"
+    case team = "Team"
 }
 
 enum CopilotPlan: String, CaseIterable, Codable, Sendable {

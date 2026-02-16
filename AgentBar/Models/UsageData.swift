@@ -7,6 +7,23 @@ struct UsageData: Identifiable, Sendable {
     let weeklyUsage: UsageMetric?
     let lastUpdated: Date
     let isAvailable: Bool
+    let planName: String?
+
+    init(
+        service: ServiceType,
+        fiveHourUsage: UsageMetric,
+        weeklyUsage: UsageMetric?,
+        lastUpdated: Date,
+        isAvailable: Bool,
+        planName: String? = nil
+    ) {
+        self.service = service
+        self.fiveHourUsage = fiveHourUsage
+        self.weeklyUsage = weeklyUsage
+        self.lastUpdated = lastUpdated
+        self.isAvailable = isAvailable
+        self.planName = planName
+    }
 }
 
 struct UsageMetric: Sendable {

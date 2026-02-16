@@ -53,6 +53,7 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.fiveHourUsage.used, 50)   // 300 - 250
         XCTAssertEqual(usage.fiveHourUsage.total, 300)
         XCTAssertNil(usage.weeklyUsage)
+        XCTAssertEqual(usage.planName, "Pro")
     }
 
     func testCalculatesResetToFirstOfNextMonth() async throws {
@@ -102,6 +103,7 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         XCTAssertEqual(usage.fiveHourUsage.used, 0)
         XCTAssertEqual(usage.fiveHourUsage.total, 0)
+        XCTAssertEqual(usage.planName, "Enterprise")
     }
 
     func testClampsUsedToZeroWhenRemainingExceedsEntitlement() async throws {

@@ -28,7 +28,8 @@ extension UsageData {
     static func mock(
         service: ServiceType,
         fiveHourPct: Double = 0.5,
-        weeklyPct: Double = 0.7
+        weeklyPct: Double = 0.7,
+        planName: String? = nil
     ) -> UsageData {
         UsageData(
             service: service,
@@ -45,7 +46,8 @@ extension UsageData {
                 resetTime: Date().addingTimeInterval(7 * 24 * 3600)
             ),
             lastUpdated: Date(),
-            isAvailable: true
+            isAvailable: true,
+            planName: planName
         )
     }
 }

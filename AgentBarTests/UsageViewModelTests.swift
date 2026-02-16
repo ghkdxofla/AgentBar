@@ -122,6 +122,35 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "cursorPlan"), CursorPlan.pro.rawValue)
     }
 
+    func testCodexPlanPlusLimits() {
+        XCTAssertEqual(CodexPlan.plus.fiveHourTokenLimit, 1_000_000)
+        XCTAssertEqual(CodexPlan.plus.weeklyTokenLimit, 10_000_000)
+    }
+
+    func testCodexPlanAllCasesIncludesPlus() {
+        XCTAssertTrue(CodexPlan.allCases.contains(.plus))
+        XCTAssertEqual(CodexPlan.allCases.first, .plus)
+    }
+
+    func testClaudePlanEnumHasExpectedCases() {
+        let cases = ClaudePlan.allCases
+        XCTAssertEqual(cases.count, 4)
+        XCTAssertEqual(cases.map(\.rawValue), ["Free", "Pro", "Max", "Team"])
+    }
+
+    func testClaudePlanRoundTrips() {
+        for plan in ClaudePlan.allCases {
+            XCTAssertEqual(ClaudePlan(rawValue: plan.rawValue), plan)
+        }
+    }
+
+    func testCopilotCapitalizedPlanName() {
+        XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName("pro"), "Pro")
+        XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName("business"), "Business")
+        XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName("enterprise"), "Enterprise")
+        XCTAssertEqual(CopilotUsageProvider.capitalizedPlanName(""), "")
+    }
+
     func testSanitizedTokenForSavingRejectsMaskedPlaceholder() {
         XCTAssertNil(SettingsView.sanitizedTokenForSaving("*****"))
         XCTAssertNil(SettingsView.sanitizedTokenForSaving("   ******   "))
