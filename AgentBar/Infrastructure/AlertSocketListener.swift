@@ -1,5 +1,4 @@
 import Foundation
-import Network
 
 struct SocketAlertEvent: Decodable, Sendable {
     let agent: String
@@ -17,12 +16,16 @@ struct SocketAlertEvent: Decodable, Sendable {
 final class AlertSocketListener: @unchecked Sendable {
     private let socketPath: String
     private let fileManager: FileManager
-    private var listener: NWListener?
-    private var connections: [NWConnection] = []
     private let queue = DispatchQueue(label: "com.agentbar.socket-listener")
     var onEvent: (@Sendable (AgentAlertEvent) -> Void)?
 
-    private(set) var isListening = false
+    private var serverFD: Int32 = -1
+    private var acceptSource: DispatchSourceRead?
+    private var _isListening = false
+
+    var isListening: Bool {
+        queue.sync { _isListening }
+    }
 
     init(
         socketPath: String? = nil,
@@ -34,90 +37,121 @@ final class AlertSocketListener: @unchecked Sendable {
     }
 
     func start() {
-        cleanupStaleSocket()
+        queue.sync { self._start() }
+    }
+
+    func stop() {
+        queue.sync { self._stop() }
+    }
+
+    private func _start() {
+        _stop()
 
         let dir = (socketPath as NSString).deletingLastPathComponent
         try? fileManager.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        let endpoint = NWEndpoint.unix(path: socketPath)
-        let params = NWParameters()
-        params.defaultProtocolStack.transportProtocol = NWProtocolTCP.Options()
-        params.requiredLocalEndpoint = endpoint
-
-        do {
-            let nwListener = try NWListener(using: params)
-            self.listener = nwListener
-
-            nwListener.stateUpdateHandler = { [weak self] state in
-                switch state {
-                case .ready:
-                    self?.isListening = true
-                case .failed, .cancelled:
-                    self?.isListening = false
-                default:
-                    break
-                }
-            }
-
-            nwListener.newConnectionHandler = { [weak self] connection in
-                self?.handleConnection(connection)
-            }
-
-            nwListener.start(queue: queue)
-        } catch {
-            isListening = false
-        }
-    }
-
-    func stop() {
-        listener?.cancel()
-        listener = nil
-        for connection in connections {
-            connection.cancel()
-        }
-        connections.removeAll()
-        isListening = false
-        cleanupStaleSocket()
-    }
-
-    private func cleanupStaleSocket() {
         if fileManager.fileExists(atPath: socketPath) {
             try? fileManager.removeItem(atPath: socketPath)
         }
-    }
 
-    private func handleConnection(_ connection: NWConnection) {
-        connections.append(connection)
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return }
 
-        connection.stateUpdateHandler = { [weak self] state in
-            if case .cancelled = state {
-                self?.queue.async { [weak self] in
-                    self?.connections.removeAll { $0 === connection }
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let pathBytes = socketPath.utf8CString
+        guard pathBytes.count <= MemoryLayout.size(ofValue: addr.sun_path) else {
+            close(fd)
+            return
+        }
+        withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
+            ptr.withMemoryRebound(to: CChar.self, capacity: pathBytes.count) { dest in
+                for (i, byte) in pathBytes.enumerated() {
+                    dest[i] = byte
                 }
             }
         }
 
-        connection.start(queue: queue)
-        receiveData(on: connection, buffer: Data())
+        let addrLen = socklen_t(MemoryLayout<sockaddr_un>.size)
+        let bindResult = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
+                bind(fd, sockPtr, addrLen)
+            }
+        }
+        guard bindResult == 0 else {
+            close(fd)
+            return
+        }
+
+        guard listen(fd, 5) == 0 else {
+            close(fd)
+            try? fileManager.removeItem(atPath: socketPath)
+            return
+        }
+
+        // Set non-blocking
+        let flags = fcntl(fd, F_GETFL)
+        _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
+
+        serverFD = fd
+        _isListening = true
+
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
+        source.setEventHandler { [weak self] in
+            self?.acceptConnection()
+        }
+        source.setCancelHandler { [weak self] in
+            guard let self else { return }
+            if self.serverFD >= 0 {
+                close(self.serverFD)
+                self.serverFD = -1
+            }
+            try? self.fileManager.removeItem(atPath: self.socketPath)
+            self._isListening = false
+        }
+        self.acceptSource = source
+        source.resume()
     }
 
-    private func receiveData(on connection: NWConnection, buffer: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] content, _, isComplete, error in
-            guard let self else { return }
-
-            var accumulated = buffer
-            if let content {
-                accumulated.append(content)
+    private func _stop() {
+        if let source = acceptSource {
+            source.cancel()
+            acceptSource = nil
+        } else if serverFD >= 0 {
+            close(serverFD)
+            serverFD = -1
+            if fileManager.fileExists(atPath: socketPath) {
+                try? fileManager.removeItem(atPath: socketPath)
             }
-
-            if isComplete || error != nil {
-                self.processBuffer(accumulated)
-                connection.cancel()
-                return
-            }
-
-            self.receiveData(on: connection, buffer: accumulated)
+            _isListening = false
         }
+    }
+
+    private func acceptConnection() {
+        let clientFD = accept(serverFD, nil, nil)
+        guard clientFD >= 0 else { return }
+
+        let flags = fcntl(clientFD, F_GETFL)
+        _ = fcntl(clientFD, F_SETFL, flags | O_NONBLOCK)
+
+        var buffer = Data()
+        let readSource = DispatchSource.makeReadSource(fileDescriptor: clientFD, queue: queue)
+        readSource.setEventHandler { [weak self] in
+            var buf = [UInt8](repeating: 0, count: 4096)
+            let bytesRead = read(clientFD, &buf, buf.count)
+            if bytesRead > 0 {
+                buffer.append(contentsOf: buf[0..<bytesRead])
+            } else {
+                // EOF or error: process and close
+                readSource.cancel()
+                self?.processBuffer(buffer)
+                close(clientFD)
+            }
+        }
+        readSource.setCancelHandler {
+            // Ensure close on cancel
+        }
+        readSource.resume()
     }
 
     private func processBuffer(_ data: Data) {

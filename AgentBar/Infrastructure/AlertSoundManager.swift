@@ -23,6 +23,13 @@ final class AlertSoundManager: @unchecked Sendable {
         self.defaults = defaults
         self.fileManager = fileManager
         loadLastPlayedState()
+        restorePersistedPack()
+    }
+
+    private func restorePersistedPack() {
+        guard let path = defaults.string(forKey: "alertSoundPackPath"),
+              !path.isEmpty else { return }
+        _ = loadPack(from: path)
     }
 
     var packName: String? {

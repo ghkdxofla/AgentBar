@@ -41,9 +41,17 @@ esac
 timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 session_id="${CODEX_SESSION_ID:-}"
 
-escaped_message="$(printf '%s' "$message" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || printf '"%s"' "$message")"
-
-normalized_json="{\"agent\":\"codex\",\"event\":\"${event_type}\",\"session_id\":\"${session_id}\",\"message\":${escaped_message},\"timestamp\":\"${timestamp}\"}"
+# Build JSON safely with python3 to handle all escaping
+normalized_json="$(python3 -c "
+import json, sys
+print(json.dumps({
+    'agent': 'codex',
+    'event': sys.argv[1],
+    'session_id': sys.argv[2],
+    'message': sys.argv[3],
+    'timestamp': sys.argv[4]
+}))
+" "$event_type" "$session_id" "$message" "$timestamp" 2>/dev/null)" || exit 0
 
 if [[ -S "$SOCKET_PATH" ]]; then
   printf '%s\n' "$normalized_json" | nc -U "$SOCKET_PATH" 2>/dev/null && exit 0
