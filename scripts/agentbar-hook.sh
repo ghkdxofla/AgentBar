@@ -14,10 +14,51 @@ if [[ -z "${payload//[[:space:]]/}" ]]; then
   exit 0
 fi
 
+has_python3=false
+has_perl=false
+if command -v python3 >/dev/null 2>&1; then
+  has_python3=true
+fi
+if command -v perl >/dev/null 2>&1; then
+  has_perl=true
+fi
+if [[ "$has_python3" == false && "$has_perl" == false ]]; then
+  echo "agentbar-hook: python3 or perl is required to parse JSON payloads" >&2
+  exit 0
+fi
+
+# Parse helpers
+extract_field_with_python3() {
+  local field="$1"
+  printf '%s' "$payload" | python3 -c "import sys,json; d=json.load(sys.stdin); v=d.get(sys.argv[1], ''); print(v if isinstance(v, str) else '')" "$field" 2>/dev/null
+}
+
+extract_field_with_perl() {
+  local field="$1"
+  printf '%s' "$payload" | perl -MJSON::PP=decode_json -e '
+use strict;
+use warnings;
+local $/;
+my $json = <STDIN>;
+my $field = shift @ARGV;
+my $data = eval { decode_json($json) };
+if (!$data || ref($data) ne "HASH") { exit 1; }
+my $value = $data->{$field};
+if (!defined $value || ref($value)) { print ""; exit 0; }
+print $value;
+' "$field" 2>/dev/null
+}
+
 # Extract fields from Claude hook JSON
-hook_event_name="$(printf '%s' "$payload" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('hook_event_name',''))" 2>/dev/null || echo "")"
-session_id="$(printf '%s' "$payload" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('session_id',''))" 2>/dev/null || echo "")"
-message="$(printf '%s' "$payload" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message',''))" 2>/dev/null || echo "")"
+if [[ "$has_python3" == true ]]; then
+  hook_event_name="$(extract_field_with_python3 "hook_event_name" || echo "")"
+  session_id="$(extract_field_with_python3 "session_id" || echo "")"
+  message="$(extract_field_with_python3 "message" || echo "")"
+else
+  hook_event_name="$(extract_field_with_perl "hook_event_name" || echo "")"
+  session_id="$(extract_field_with_perl "session_id" || echo "")"
+  message="$(extract_field_with_perl "message" || echo "")"
+fi
 
 # Map hook_event_name to normalized event type
 event_type=""
@@ -47,8 +88,8 @@ esac
 
 timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-# Build JSON safely; prefer python3 for proper escaping, fall back to printf
-if command -v python3 >/dev/null 2>&1; then
+# Build JSON safely with a real serializer
+if [[ "$has_python3" == true ]]; then
   normalized_json="$(python3 -c "
 import json, sys
 print(json.dumps({
@@ -59,13 +100,22 @@ print(json.dumps({
     'timestamp': sys.argv[4]
 }))
 " "$event_type" "$session_id" "$message" "$timestamp" 2>/dev/null)" || exit 0
+elif [[ "$has_perl" == true ]]; then
+  normalized_json="$(perl -MJSON::PP=encode_json -e '
+use strict;
+use warnings;
+my ($event, $session_id, $message, $timestamp) = @ARGV;
+print encode_json({
+  agent => "claude",
+  event => $event,
+  session_id => $session_id,
+  message => $message,
+  timestamp => $timestamp
+});
+' "$event_type" "$session_id" "$message" "$timestamp" 2>/dev/null)" || exit 0
 else
-  # Minimal fallback: strip quotes from values to prevent injection
-  safe_event="${event_type//\"/}"
-  safe_sid="${session_id//\"/}"
-  safe_msg="${message//\"/}"
-  safe_ts="${timestamp//\"/}"
-  normalized_json="{\"agent\":\"claude\",\"event\":\"${safe_event}\",\"session_id\":\"${safe_sid}\",\"message\":\"${safe_msg}\",\"timestamp\":\"${safe_ts}\"}"
+  echo "agentbar-hook: python3 or perl is required to encode JSON payloads" >&2
+  exit 0
 fi
 
 # Try socket first

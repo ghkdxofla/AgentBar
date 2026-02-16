@@ -1,5 +1,6 @@
 import XCTest
 @testable import AgentBar
+import Darwin
 
 final class AlertSocketListenerTests: XCTestCase {
     func testMapsStopEventToTaskCompleted() {
@@ -99,6 +100,41 @@ final class AlertSocketListenerTests: XCTestCase {
 final class AlertSocketListenerLifecycleTests: XCTestCase {
     private var tempDir: URL!
 
+    private func openClientSocket(to socketPath: String) -> Int32? {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return nil }
+
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+
+        let pathBytes = socketPath.utf8CString
+        guard pathBytes.count <= MemoryLayout.size(ofValue: addr.sun_path) else {
+            close(fd)
+            return nil
+        }
+
+        withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
+            ptr.withMemoryRebound(to: CChar.self, capacity: pathBytes.count) { dest in
+                for (index, byte) in pathBytes.enumerated() {
+                    dest[index] = byte
+                }
+            }
+        }
+
+        let addrLen = socklen_t(MemoryLayout<sockaddr_un>.size)
+        let result = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
+                connect(fd, sockPtr, addrLen)
+            }
+        }
+
+        guard result == 0 else {
+            close(fd)
+            return nil
+        }
+        return fd
+    }
+
     override func setUp() {
         super.setUp()
         tempDir = FileManager.default.temporaryDirectory
@@ -172,6 +208,247 @@ final class AlertSocketListenerLifecycleTests: XCTestCase {
         // isListening must be false synchronously after stop() returns
         listener.stop()
         XCTAssertFalse(listener.isListening)
+    }
+
+    func testStopWithActiveClientAllowsCleanRestart() throws {
+        let sockPath = tempDir.appendingPathComponent("a.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+        let clientFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        defer { close(clientFD) }
+
+        let message = "{\"agent\":\"claude\",\"event\":\"stop\"}\n"
+        _ = message.withCString { cString in
+            write(clientFD, cString, strlen(cString))
+        }
+
+        listener.stop()
+        XCTAssertFalse(listener.isListening)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: sockPath))
+
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+        let restartedFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        close(restartedFD)
+        listener.stop()
+    }
+
+    func testRestartRetainsSocketPathAndAcceptsConnections() throws {
+        let sockPath = tempDir.appendingPathComponent("r.sock").path
+        let listener = AlertSocketListener(socketPath: sockPath)
+
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+        listener.stop()
+        listener.start()
+        XCTAssertTrue(listener.isListening)
+
+        // Give stale cancel handlers a chance to run; socket path should remain valid.
+        usleep(100_000)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sockPath))
+
+        let clientFD = try XCTUnwrap(openClientSocket(to: sockPath))
+        close(clientFD)
+        listener.stop()
+    }
+}
+
+final class HookScriptFallbackTests: XCTestCase {
+    private var tempDir: URL!
+
+    private var repositoryRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    override func setUp() {
+        super.setUp()
+        tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: tempDir)
+        super.tearDown()
+    }
+
+    private func sourcePath(for command: String) throws -> String {
+        let candidates = ["/usr/bin/\(command)", "/bin/\(command)"]
+        if let match = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+            return match
+        }
+        throw NSError(
+            domain: "HookScriptFallbackTests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Required command not found: \(command)"]
+        )
+    }
+
+    private func makeToolsPathWithoutPython3() throws -> String {
+        let binDir = tempDir.appendingPathComponent("tools-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+
+        for command in ["cat", "tr", "date", "nc", "mkdir", "base64", "perl"] {
+            let source = try sourcePath(for: command)
+            try FileManager.default.createSymbolicLink(
+                atPath: binDir.appendingPathComponent(command).path,
+                withDestinationPath: source
+            )
+        }
+
+        return binDir.path
+    }
+
+    private func runScript(
+        named scriptName: String,
+        arguments: [String] = [],
+        stdin: String? = nil,
+        environmentOverrides: [String: String]
+    ) throws -> (status: Int32, stdout: String, stderr: String) {
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        let stdinPipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = [repositoryRoot.appendingPathComponent("scripts/\(scriptName)").path] + arguments
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+        if stdin != nil {
+            process.standardInput = stdinPipe
+        }
+
+        var env = ProcessInfo.processInfo.environment
+        for (key, value) in environmentOverrides {
+            env[key] = value
+        }
+        process.environment = env
+
+        try process.run()
+        if let stdin {
+            stdinPipe.fileHandleForWriting.write(Data(stdin.utf8))
+            stdinPipe.fileHandleForWriting.closeFile()
+        }
+        process.waitUntilExit()
+
+        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        return (process.terminationStatus, stdout, stderr)
+    }
+
+    private func waitForExit(of process: Process, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning && Date() < deadline {
+            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+        return !process.isRunning
+    }
+
+    private func captureSocketMessage(
+        at socketPath: String,
+        trigger: () throws -> Void
+    ) throws -> String {
+        let listener = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+
+        try? FileManager.default.removeItem(atPath: socketPath)
+
+        listener.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
+        listener.arguments = ["-lU", socketPath]
+        listener.standardOutput = stdoutPipe
+        listener.standardError = stderrPipe
+        try listener.run()
+
+        let readyDeadline = Date().addingTimeInterval(2)
+        while !FileManager.default.fileExists(atPath: socketPath) && Date() < readyDeadline {
+            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: socketPath), "Socket listener did not become ready")
+
+        try trigger()
+
+        if !waitForExit(of: listener, timeout: 2), listener.isRunning {
+            listener.terminate()
+            _ = waitForExit(of: listener, timeout: 1)
+            XCTFail("Timed out waiting for socket listener to receive script output")
+        }
+
+        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        XCTAssertEqual(listener.terminationStatus, 0, "Socket listener failed: \(stderr)")
+
+        let output = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func parseJSONObject(_ jsonText: String) throws -> [String: Any] {
+        let data = try XCTUnwrap(jsonText.data(using: .utf8))
+        let object = try JSONSerialization.jsonObject(with: data)
+        return try XCTUnwrap(object as? [String: Any])
+    }
+
+    func testClaudeHookParsesAndEncodesWithoutPython3() throws {
+        let socketPath = tempDir.appendingPathComponent("claude.sock").path
+        let expectedMessage = "Need \"quotes\" and \\slashes\\\nnext line"
+        let payloadData = try JSONSerialization.data(
+            withJSONObject: [
+                "hook_event_name": "Stop",
+                "session_id": "sess-1",
+                "message": expectedMessage
+            ],
+            options: []
+        )
+        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let toolsPath = try makeToolsPathWithoutPython3()
+
+        let jsonText = try captureSocketMessage(at: socketPath) {
+            let result = try runScript(
+                named: "agentbar-hook.sh",
+                stdin: payload,
+                environmentOverrides: [
+                    "PATH": toolsPath,
+                    "AGENTBAR_SOCKET": socketPath,
+                    "AGENTBAR_CLAUDE_HOOK_LOG": tempDir.appendingPathComponent("unused.jsonl").path
+                ]
+            )
+            XCTAssertEqual(result.status, 0, "Script failed: \(result.stderr)")
+        }
+
+        let decoded = try parseJSONObject(jsonText)
+        XCTAssertEqual(decoded["agent"] as? String, "claude")
+        XCTAssertEqual(decoded["event"] as? String, "stop")
+        XCTAssertEqual(decoded["session_id"] as? String, "sess-1")
+        XCTAssertEqual(decoded["message"] as? String, expectedMessage)
+    }
+
+    func testCodexHookEncodesWithoutPython3() throws {
+        let socketPath = tempDir.appendingPathComponent("codex.sock").path
+        let expectedMessage = "Decision needed: \"keep\" vs \\change\\\nline two"
+        let toolsPath = try makeToolsPathWithoutPython3()
+
+        let jsonText = try captureSocketMessage(at: socketPath) {
+            let result = try runScript(
+                named: "agentbar-codex-hook.sh",
+                arguments: ["custom-event"],
+                stdin: expectedMessage,
+                environmentOverrides: [
+                    "PATH": toolsPath,
+                    "AGENTBAR_SOCKET": socketPath,
+                    "CODEX_SESSION_ID": "codex-session-1"
+                ]
+            )
+            XCTAssertEqual(result.status, 0, "Script failed: \(result.stderr)")
+        }
+
+        let decoded = try parseJSONObject(jsonText)
+        XCTAssertEqual(decoded["agent"] as? String, "codex")
+        XCTAssertEqual(decoded["event"] as? String, "stop")
+        XCTAssertEqual(decoded["session_id"] as? String, "codex-session-1")
+        XCTAssertEqual(decoded["message"] as? String, expectedMessage)
     }
 }
 

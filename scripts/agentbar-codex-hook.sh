@@ -41,8 +41,21 @@ esac
 timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 session_id="${CODEX_SESSION_ID:-}"
 
-# Build JSON safely; prefer python3 for proper escaping, fall back to printf
+has_python3=false
+has_perl=false
 if command -v python3 >/dev/null 2>&1; then
+  has_python3=true
+fi
+if command -v perl >/dev/null 2>&1; then
+  has_perl=true
+fi
+if [[ "$has_python3" == false && "$has_perl" == false ]]; then
+  echo "agentbar-codex-hook: python3 or perl is required to encode JSON payloads" >&2
+  exit 0
+fi
+
+# Build JSON safely with a real serializer
+if [[ "$has_python3" == true ]]; then
   normalized_json="$(python3 -c "
 import json, sys
 print(json.dumps({
@@ -53,13 +66,22 @@ print(json.dumps({
     'timestamp': sys.argv[4]
 }))
 " "$event_type" "$session_id" "$message" "$timestamp" 2>/dev/null)" || exit 0
+elif [[ "$has_perl" == true ]]; then
+  normalized_json="$(perl -MJSON::PP=encode_json -e '
+use strict;
+use warnings;
+my ($event, $session_id, $message, $timestamp) = @ARGV;
+print encode_json({
+  agent => "codex",
+  event => $event,
+  session_id => $session_id,
+  message => $message,
+  timestamp => $timestamp
+});
+' "$event_type" "$session_id" "$message" "$timestamp" 2>/dev/null)" || exit 0
 else
-  # Minimal fallback: strip quotes from values to prevent injection
-  safe_event="${event_type//\"/}"
-  safe_sid="${session_id//\"/}"
-  safe_msg="${message//\"/}"
-  safe_ts="${timestamp//\"/}"
-  normalized_json="{\"agent\":\"codex\",\"event\":\"${safe_event}\",\"session_id\":\"${safe_sid}\",\"message\":\"${safe_msg}\",\"timestamp\":\"${safe_ts}\"}"
+  echo "agentbar-codex-hook: python3 or perl is required to encode JSON payloads" >&2
+  exit 0
 fi
 
 if [[ -S "$SOCKET_PATH" ]]; then
