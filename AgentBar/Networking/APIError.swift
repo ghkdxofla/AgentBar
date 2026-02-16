@@ -6,10 +6,8 @@ enum APIError: Error, LocalizedError, Sendable {
     case rateLimited
     case serverError(Int)
     case httpError(Int)
-    case timeout
     case noData
     case decodingError(String)
-    case networkError(String)
 
     var errorDescription: String? {
         switch self {
@@ -18,10 +16,8 @@ enum APIError: Error, LocalizedError, Sendable {
         case .rateLimited: "Rate limited — try again later"
         case .serverError(let code): "Server error (\(code))"
         case .httpError(let code): "HTTP error (\(code))"
-        case .timeout: "Request timed out"
         case .noData: "No data available"
         case .decodingError(let msg): "Decoding error: \(msg)"
-        case .networkError(let msg): "Network error: \(msg)"
         }
     }
 }

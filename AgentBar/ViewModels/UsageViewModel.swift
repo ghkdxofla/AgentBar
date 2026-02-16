@@ -11,8 +11,6 @@ final class UsageViewModel: ObservableObject {
     private let refreshInterval: TimeInterval
     private var timerCancellable: AnyCancellable?
     private var limitsCancellable: AnyCancellable?
-    private var consecutiveFailures: [ServiceType: Int] = [:]
-
     init(
         providers: [any UsageProviderProtocol]? = nil,
         refreshInterval: TimeInterval = 60
@@ -171,9 +169,3 @@ private extension Double {
     }
 }
 
-private extension UserDefaults {
-    func bool(forKey key: String, defaultValue: Bool) -> Bool {
-        guard object(forKey: key) != nil else { return defaultValue }
-        return bool(forKey: key)
-    }
-}

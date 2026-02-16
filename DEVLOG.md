@@ -1,5 +1,14 @@
 # AgentBar Development Log
 
+## Iteration 44: Codebase cleanup — remove dead code, consolidate duplicates
+- **Dead code removed**: `APIClient.getRawData`, `APIError.timeout`/`.networkError`, `UsageViewModel.consecutiveFailures`, `DateUtils.isWithinFiveHourWindow`/`isWithinWeeklyWindow`/`nextResetTime`/`nextResetAligned`, `CopilotPlan.monthlyPremiumRequests`, `CursorPlan.monthlyCreditDollars`
+- **Shared UserDefaultsExtensions.swift**: Consolidated 3 identical `bool(forKey:defaultValue:)` definitions (AgentAlertMonitor, UsageViewModel, AgentAlertNotificationService) into one `internal` extension
+- **Shared DynamicCodingKey.swift**: Extracted identical `DynamicCodingKey` struct from ClaudeUsageProvider and CursorUsageProvider into shared utility
+- **Protocol-level passesBoundary**: Moved duplicate `passesBoundary` from ClaudeHookAlertEventDetector and CodexAlertEventDetector into `AgentAlertEventDetectorProtocol` extension
+- **AlertSoundManager deduplication**: `cespCategory(for:)` now delegates to `AgentAlertEventType.cespCategory`; volume reading extracted to `currentVolume` computed property
+- **Tests cleaned**: Removed 6 test methods for removed DateUtils functions
+- All 179 tests passing
+
 ## Iteration 1: Project Scaffolding + Build Verification
 - Created `project.yml` for xcodegen (macOS 13.0, LSUIElement, entitlements)
 - Set up `AgentBar/Info.plist` with LSUIElement=true

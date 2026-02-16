@@ -14,4 +14,8 @@ extension AgentAlertEventDetectorProtocol {
     func detectEvents(since: Date) async -> [AgentAlertEvent] {
         await detectEvents(since: since, includeBoundary: false)
     }
+
+    func passesBoundary(_ date: Date, since: Date, includeBoundary: Bool) -> Bool {
+        includeBoundary ? date >= since : date > since
+    }
 }
