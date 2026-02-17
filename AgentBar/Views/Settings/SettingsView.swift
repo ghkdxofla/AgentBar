@@ -469,8 +469,6 @@ struct SettingsView: View {
                         .foregroundStyle(.red)
                 }
 
-                agentSoundOverridesSection
-
                 HStack {
                     Button("Test task.complete") {
                         _ = NotifySoundManager.shared.playTest(category: "task.complete")
@@ -482,6 +480,8 @@ struct SettingsView: View {
                     }
                     .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
                 }
+
+                agentSoundOverridesSection
 
                 HStack {
                     Text("Volume:")

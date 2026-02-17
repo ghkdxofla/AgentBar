@@ -577,3 +577,7 @@
 - **Preview copy update**: Settings copy now clarifies that preview mode shows agent output text in the notification body.
 - **Coverage update**: Added content-level assertions for both title and body formatting in `AgentNotifyNotificationServiceTests`.
 - All 240 tests passing
+
+## Iteration 69: Move Agent Sound Overrides below test buttons
+- **Layout reorder**: Moved Agent Sound Overrides DisclosureGroup below the Test buttons row in Notification Sounds section for better visual flow (Language → Pack → Progress/Error → Test → Overrides → Volume)
+- All 239 tests passing
