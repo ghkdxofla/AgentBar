@@ -6,12 +6,12 @@ enum AgentNotifyEventType: String, CaseIterable, Sendable {
     case permissionRequired
     case decisionRequired
 
-    var notificationTitle: String {
+    var notificationStatusLabel: String {
         switch self {
         case .taskCompleted:
-            return "Agent task completed"
+            return "Task completed"
         case .permissionRequired, .decisionRequired:
-            return "Agent input required"
+            return "Input required"
         }
     }
 

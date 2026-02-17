@@ -56,11 +56,6 @@ final class SoundPackViewModel: ObservableObject {
         }
     }
 
-    /// Uppercase display label for a language code (e.g. "en" → "EN", "zh-CN" → "ZH-CN").
-    nonisolated static func displayLanguage(_ code: String) -> String {
-        code.uppercased()
-    }
-
     // MARK: - Registry
 
     func loadRegistry(forceRefresh: Bool = false) async {

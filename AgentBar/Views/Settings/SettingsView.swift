@@ -350,7 +350,7 @@ struct SettingsView: View {
                         notifyNotificationsSettingsChanged()
                     }
 
-                Text("Preview shows message text with agent and session context when available.")
+                Text("Preview shows the agent output text in the notification body when available.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .disabled(!notificationsEnabled)
@@ -420,7 +420,7 @@ struct SettingsView: View {
                 Picker("Language", selection: $soundPackVM.selectedLanguage) {
                     Text("All").tag("")
                     ForEach(soundPackVM.availableLanguages, id: \.self) { lang in
-                        Text(SoundPackViewModel.displayLanguage(lang)).tag(lang)
+                        Text(lang).tag(lang)
                     }
                 }
                 .disabled(!notificationsEnabled)

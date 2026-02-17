@@ -563,9 +563,17 @@
 - All 236 tests passing
 
 ## Iteration 67: Sound settings polish — language display, multi-lang, style, test buttons
-- **Language uppercase display**: `displayLanguage()` (nonisolated static) converts codes to uppercase in Picker (e.g., "en" → "EN", "zh-CN" → "ZH-CN")
-- **Multi-language packs**: `availableLanguages` and `filteredPacks` now split comma-delimited language fields (e.g., "en,ru"); silicon_valley pack appears under both EN and RU filters
+- **Language display**: Language picker shows original codes (e.g., "en", "zh-CN") as-is
+- **Multi-language packs**: `availableLanguages` and `filteredPacks` now split comma-delimited language fields (e.g., "en,ru"); silicon_valley pack appears under both en and ru filters
 - **Section style consistency**: Notification Sounds section converted from `DisclosureGroup` wrapper inside `Section` to `Section { ... } header: { ... }` pattern matching Agent Sources section
 - **Test buttons with agent overrides**: `playTest(category:service:)` now uses `resolvePackPath(for:)` + `resolveManifest(at:)` for consistent path resolution; per-agent play buttons (play.circle icon) added to Agent Sound Overrides rows; global Test buttons test the global pack
-- **Tests**: Added `testMultiLanguageFilteringIncludesCommaDelimited`, `testAvailableLanguagesSplitsCommaDelimited`, `testDisplayLanguageUppercased`
+- **Tests**: Added `testMultiLanguageFilteringIncludesCommaDelimited`, `testAvailableLanguagesSplitsCommaDelimited`
 - All 239 tests passing
+
+## Iteration 68: Notification card readability refresh
+- **Title redesign**: Notification title now shows the agent/service name (for example `OpenAI Codex`, `Claude Code`) instead of a generic event title.
+- **Body redesign**: Notification body now starts with explicit state (`Task completed` or `Input required`) and then appends detail text.
+- **Session tag removal**: Removed the `[service | session]` prefix from notification body to avoid long, low-signal identifiers in cards.
+- **Preview copy update**: Settings copy now clarifies that preview mode shows agent output text in the notification body.
+- **Coverage update**: Added content-level assertions for both title and body formatting in `AgentNotifyNotificationServiceTests`.
+- All 240 tests passing

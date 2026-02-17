@@ -15,16 +15,19 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
     private let center: UNUserNotificationCenter
     private let defaults: UserDefaults
     private let postBodyOverride: (@Sendable (String) async throws -> Void)?
+    private let postContentOverride: (@Sendable (_ title: String, _ body: String) async throws -> Void)?
     private var didCheckAuthorization = false
 
     init(
         center: UNUserNotificationCenter = .current(),
         defaults: UserDefaults = .standard,
-        postBodyOverride: (@Sendable (String) async throws -> Void)? = nil
+        postBodyOverride: (@Sendable (String) async throws -> Void)? = nil,
+        postContentOverride: (@Sendable (_ title: String, _ body: String) async throws -> Void)? = nil
     ) {
         self.center = center
         self.defaults = defaults
         self.postBodyOverride = postBodyOverride
+        self.postContentOverride = postContentOverride
     }
 
     nonisolated static func requestAuthorizationPrompt() {
@@ -49,10 +52,10 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
 
     func post(event: AgentNotifyEvent) async {
         let content = UNMutableNotificationContent()
-        content.title = event.type.notificationTitle
+        content.title = event.service.rawValue
         let showMessagePreview = defaults.bool(forKey: "notificationShowMessagePreview", defaultValue: false)
-        let body = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
-        content.body = "\(event.notificationSourceTag) \(body)"
+        let detail = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
+        content.body = "\(event.type.notificationStatusLabel): \(detail)"
 
         #if AGENTBAR_NOTIFICATION_SOUNDS
         let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type, service: event.service)
@@ -68,7 +71,9 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         )
 
         do {
-            if let postBodyOverride {
+            if let postContentOverride {
+                try await postContentOverride(content.title, content.body)
+            } else if let postBodyOverride {
                 try await postBodyOverride(content.body)
             } else {
                 try await add(request)

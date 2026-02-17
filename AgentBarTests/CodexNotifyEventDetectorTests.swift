@@ -530,7 +530,7 @@ private actor TestAgentNotifyNotificationService: AgentNotifyNotificationService
 }
 
 final class AgentNotifyNotificationServiceTests: XCTestCase {
-    func testPostUsesRedactedBodyWhenMessagePreviewDisabled() async throws {
+    func testPostUsesServiceTitleAndRedactedBodyWhenMessagePreviewDisabled() async throws {
         let suiteName = "AgentBarTests.AgentNotifyNotificationService.Redacted.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
@@ -539,11 +539,11 @@ final class AgentNotifyNotificationServiceTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defaults.set(false, forKey: "notificationShowMessagePreview")
 
-        let recorder = NotificationBodyRecorder()
+        let recorder = NotificationContentRecorder()
         let service = AgentNotifyNotificationService(
             defaults: defaults,
-            postBodyOverride: { body in
-                recorder.append(body)
+            postContentOverride: { title, body in
+                recorder.append(title: title, body: body)
             }
         )
 
@@ -556,10 +556,13 @@ final class AgentNotifyNotificationServiceTests: XCTestCase {
         )
         await service.post(event: event)
 
-        XCTAssertEqual(recorder.bodies(), ["\(event.notificationSourceTag) Agent is waiting for your input."])
+        XCTAssertEqual(
+            recorder.contents(),
+            [NotificationContent(title: "OpenAI Codex", body: "Input required: Agent is waiting for your input.")]
+        )
     }
 
-    func testPostUsesMessagePreviewWhenEnabled() async throws {
+    func testPostUsesServiceTitleAndMessagePreviewWhenEnabled() async throws {
         let suiteName = "AgentBarTests.AgentNotifyNotificationService.Preview.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create UserDefaults suite")
@@ -568,11 +571,11 @@ final class AgentNotifyNotificationServiceTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defaults.set(true, forKey: "notificationShowMessagePreview")
 
-        let recorder = NotificationBodyRecorder()
+        let recorder = NotificationContentRecorder()
         let service = AgentNotifyNotificationService(
             defaults: defaults,
-            postBodyOverride: { body in
-                recorder.append(body)
+            postContentOverride: { title, body in
+                recorder.append(title: title, body: body)
             }
         )
 
@@ -585,7 +588,42 @@ final class AgentNotifyNotificationServiceTests: XCTestCase {
         )
         await service.post(event: event)
 
-        XCTAssertEqual(recorder.bodies(), ["\(event.notificationSourceTag) Should I proceed with the schema migration?"])
+        XCTAssertEqual(
+            recorder.contents(),
+            [NotificationContent(title: "OpenAI Codex", body: "Input required: Should I proceed with the schema migration?")]
+        )
+    }
+
+    func testPostUsesTaskCompletedStatusPrefix() async throws {
+        let suiteName = "AgentBarTests.AgentNotifyNotificationService.TaskCompleted.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(true, forKey: "notificationShowMessagePreview")
+
+        let recorder = NotificationContentRecorder()
+        let service = AgentNotifyNotificationService(
+            defaults: defaults,
+            postContentOverride: { title, body in
+                recorder.append(title: title, body: body)
+            }
+        )
+
+        let event = AgentNotifyEvent(
+            service: .claude,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 1),
+            message: nil,
+            sessionID: "session-1"
+        )
+        await service.post(event: event)
+
+        XCTAssertEqual(
+            recorder.contents(),
+            [NotificationContent(title: "Claude Code", body: "Task completed: Ready for your next prompt.")]
+        )
     }
 }
 
@@ -684,19 +722,24 @@ final class AgentNotifyEventTests: XCTestCase {
     }
 }
 
-private final class NotificationBodyRecorder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var capturedBodies: [String] = []
+private struct NotificationContent: Equatable {
+    let title: String
+    let body: String
+}
 
-    func append(_ body: String) {
+private final class NotificationContentRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var capturedContents: [NotificationContent] = []
+
+    func append(title: String, body: String) {
         lock.lock()
-        capturedBodies.append(body)
+        capturedContents.append(NotificationContent(title: title, body: body))
         lock.unlock()
     }
 
-    func bodies() -> [String] {
+    func contents() -> [NotificationContent] {
         lock.lock()
         defer { lock.unlock() }
-        return capturedBodies
+        return capturedContents
     }
 }

@@ -210,12 +210,6 @@ final class CESPRegistryPackTests: XCTestCase {
         XCTAssertEqual(langs.sorted(), ["de", "en", "ru"])
     }
 
-    func testDisplayLanguageUppercased() {
-        XCTAssertEqual(SoundPackViewModel.displayLanguage("en"), "EN")
-        XCTAssertEqual(SoundPackViewModel.displayLanguage("zh-CN"), "ZH-CN")
-        XCTAssertEqual(SoundPackViewModel.displayLanguage("pt-BR"), "PT-BR")
-    }
-
     // MARK: - Helpers
 
     private func makeTestPack(
