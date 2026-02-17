@@ -1,5 +1,4 @@
 import SwiftUI
-import ServiceManagement
 
 extension Notification.Name {
     static let limitsChanged = Notification.Name("AgentBarLimitsChanged")
@@ -18,7 +17,6 @@ struct SettingsView: View {
     @AppStorage("notificationShowMessagePreview") private var notificationShowMessagePreview = false
     #if AGENTBAR_NOTIFICATION_SOUNDS
     @AppStorage("notificationSoundPackPath") private var notificationSoundPackPath: String = ""
-    @AppStorage("notificationSoundPackName") private var notificationSoundPackName: String = ""
     @AppStorage("notificationSoundVolume") private var notificationSoundVolume: Double = 0.7
     #endif
 
@@ -723,7 +721,7 @@ struct SettingsView: View {
     }
 }
 
-enum SettingsTab: String {
+enum SettingsTab {
     case usage
     case notifications
 }
