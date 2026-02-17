@@ -75,6 +75,46 @@ final class DetailPopoverViewTests: XCTestCase {
         )
     }
 
+    func testSortedForDisplayOrdersByHighestUsageDescending() {
+        let input = [
+            UsageData.mock(service: .claude, fiveHourPct: 0.20, weeklyPct: 0.40),
+            UsageData.mock(service: .codex, fiveHourPct: 0.90, weeklyPct: 0.10),
+            UsageData.mock(service: .gemini, fiveHourPct: 0.50, weeklyPct: 0.60)
+        ]
+
+        let sorted = DetailPopoverView.sortedForDisplay(input)
+
+        XCTAssertEqual(sorted.map(\.service), [.codex, .gemini, .claude])
+    }
+
+    func testSortedForDisplayUsesServiceOrderAsTieBreaker() {
+        let input = [
+            UsageData.mock(service: .zai, fiveHourPct: 0.50, weeklyPct: 0.50),
+            UsageData.mock(service: .codex, fiveHourPct: 0.50, weeklyPct: 0.50),
+            UsageData.mock(service: .claude, fiveHourPct: 0.50, weeklyPct: 0.50)
+        ]
+
+        let sorted = DetailPopoverView.sortedForDisplay(input)
+
+        XCTAssertEqual(sorted.map(\.service), [.claude, .codex, .zai])
+    }
+
+    func testSortedForDisplayKeepsUnavailableRows() {
+        let unavailable = UsageData(
+            service: .claude,
+            fiveHourUsage: UsageMetric(used: 1, total: 100, unit: .percent, resetTime: nil),
+            weeklyUsage: nil,
+            lastUpdated: Date(),
+            isAvailable: false
+        )
+        let available = UsageData.mock(service: .codex, fiveHourPct: 0.30, weeklyPct: 0.30)
+
+        let sorted = DetailPopoverView.sortedForDisplay([unavailable, available])
+
+        XCTAssertEqual(sorted.count, 2)
+        XCTAssertTrue(sorted.contains { $0.service == .claude && !$0.isAvailable })
+    }
+
     private func makeUsageRows(count: Int) -> [UsageData] {
         let services = ServiceType.allCases
         return (0..<count).map { index in

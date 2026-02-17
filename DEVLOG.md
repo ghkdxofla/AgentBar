@@ -522,3 +522,9 @@
 - **Deterministic action verification**: Added `triggerBMCForTesting()` behind `#if DEBUG` to exercise the same BMC action path in unit tests.
 - **New regression test**: Added `DetailPopoverViewTests.testBuyMeACoffeeActionOpensExpectedURL` to verify the BMC action opens `https://buymeacoffee.com/_scari`.
 - All 210 tests passing
+
+## Iteration 62: Popover usage ranking by consumption + release-focused tests
+- **Popover ordering fix**: `DetailPopoverView` now renders usage rows with a consumption-based ranking (`DetailPopoverView.sortedForDisplay`) instead of fixed service order, so highest-usage agents appear first.
+- **Ranking consistency**: Popover ranking uses the same score/tie-break policy as status bar ranking (`max(5h, weekly)` then service order), while keeping unavailable rows visible in the popover.
+- **Coverage added**: Added `DetailPopoverViewTests.testSortedForDisplayOrdersByHighestUsageDescending`, `DetailPopoverViewTests.testSortedForDisplayUsesServiceOrderAsTieBreaker`, and `DetailPopoverViewTests.testSortedForDisplayKeepsUnavailableRows`.
+- All 213 tests passing

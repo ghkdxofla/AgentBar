@@ -3,6 +3,9 @@ import SwiftUI
 struct DetailPopoverView: View {
     @ObservedObject var viewModel: UsageViewModel
     private let openExternalURL: (URL) -> Void
+    private var displayUsageData: [UsageData] {
+        Self.sortedForDisplay(viewModel.usageData)
+    }
 
     init(
         viewModel: UsageViewModel,
@@ -37,7 +40,7 @@ struct DetailPopoverView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        ForEach(viewModel.usageData) { data in
+                        ForEach(displayUsageData) { data in
                             ServiceDetailRow(data: data)
                         }
                     }
@@ -97,6 +100,21 @@ struct DetailPopoverView: View {
     }
 
     private static let bmcSupportURL = URL(string: "https://buymeacoffee.com/_scari")!
+
+    static func sortedForDisplay(_ usageData: [UsageData]) -> [UsageData] {
+        let serviceOrder: [ServiceType] = [.claude, .codex, .gemini, .copilot, .cursor, .opencode, .zai]
+        return usageData.sorted { lhs, rhs in
+            let lhsScore = max(lhs.fiveHourUsage.percentage, lhs.weeklyUsage?.percentage ?? 0)
+            let rhsScore = max(rhs.fiveHourUsage.percentage, rhs.weeklyUsage?.percentage ?? 0)
+            if lhsScore != rhsScore {
+                return lhsScore > rhsScore
+            }
+
+            let lhsRank = serviceOrder.firstIndex(of: lhs.service) ?? serviceOrder.count
+            let rhsRank = serviceOrder.firstIndex(of: rhs.service) ?? serviceOrder.count
+            return lhsRank < rhsRank
+        }
+    }
 
     #if DEBUG
     func triggerBMCForTesting() {
