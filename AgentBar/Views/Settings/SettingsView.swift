@@ -16,10 +16,13 @@ struct SettingsView: View {
     @AppStorage("notificationClaudeHookEventsEnabled") private var notificationClaudeHookEventsEnabled = true
     @AppStorage("notificationOpencodeHookEventsEnabled") private var notificationOpencodeHookEventsEnabled = true
     @AppStorage("notificationShowMessagePreview") private var notificationShowMessagePreview = false
+    #if AGENTBAR_NOTIFICATION_SOUNDS
     @AppStorage("notificationSoundPackPath") private var notificationSoundPackPath: String = ""
+    @AppStorage("notificationSoundPackName") private var notificationSoundPackName: String = ""
     @AppStorage("notificationSoundVolume") private var notificationSoundVolume: Double = 0.7
     @AppStorage("notificationSoundTaskCompleteEnabled") private var notificationSoundTaskCompleteEnabled = true
     @AppStorage("notificationSoundInputRequiredEnabled") private var notificationSoundInputRequiredEnabled = true
+    #endif
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
     @AppStorage("claudePlan") private var claudePlan: String = ClaudePlan.pro.rawValue
@@ -41,7 +44,10 @@ struct SettingsView: View {
     @AppStorage("zaiEnabled") private var zaiEnabled = true
 
     @State private var selectedTab: SettingsTab = .usage
+    #if AGENTBAR_NOTIFICATION_SOUNDS
     @State private var showingSoundPackHelp = false
+    @StateObject private var soundPackVM = SoundPackViewModel()
+    #endif
     @State private var showingAgentSourcesHelp = false
     @State private var copilotPAT: String = ""
     @State private var hasSavedCopilotPAT = false
@@ -91,9 +97,11 @@ struct SettingsView: View {
                 )
             }
         }
+        #if AGENTBAR_NOTIFICATION_SOUNDS
         .sheet(isPresented: $showingSoundPackHelp) {
             SoundPackHelpSheet()
         }
+        #endif
         .sheet(isPresented: $showingAgentSourcesHelp) {
             AgentSourcesHelpSheet()
         }
@@ -409,18 +417,52 @@ struct SettingsView: View {
                 }
             }
 
+            #if AGENTBAR_NOTIFICATION_SOUNDS
             Section {
                 DisclosureGroup {
                     HStack {
-                        Text("Sound pack:")
-                        Text(notificationSoundPackPath.isEmpty ? "No pack loaded" : (URL(fileURLWithPath: notificationSoundPackPath).lastPathComponent))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Browse...") {
-                            chooseSoundPackDirectory()
+                        Picker("Sound pack", selection: $soundPackVM.selectedPackName) {
+                            Text("None").tag("")
+                            ForEach(soundPackVM.availablePacks) { pack in
+                                HStack {
+                                    Text(pack.display_name)
+                                    if !pack.formattedSize.isEmpty {
+                                        Text("(\(pack.formattedSize))")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .tag(pack.name)
+                            }
                         }
+                        .disabled(!notificationsEnabled || soundPackVM.isLoadingRegistry)
+                        .onChange(of: soundPackVM.selectedPackName) { newValue in
+                            soundPackVM.selectPack(newValue)
+                        }
+
+                        if soundPackVM.isLoadingRegistry {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+
+                        Button {
+                            Task { await soundPackVM.loadRegistry(forceRefresh: true) }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(soundPackVM.isLoadingRegistry)
                     }
-                    .disabled(!notificationsEnabled)
+
+                    if soundPackVM.isDownloading {
+                        ProgressView(value: soundPackVM.downloadProgress)
+                            .progressViewStyle(.linear)
+                    }
+
+                    if let error = soundPackVM.errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
 
                     HStack {
                         Text("Volume:")
@@ -463,8 +505,14 @@ struct SettingsView: View {
                     }
                 }
             }
+            #endif
         }
         .formStyle(.grouped)
+        #if AGENTBAR_NOTIFICATION_SOUNDS
+        .onAppear {
+            Task { await soundPackVM.loadRegistry() }
+        }
+        #endif
     }
 
     @discardableResult
@@ -533,18 +581,6 @@ struct SettingsView: View {
 
     private func notifyNotificationsSettingsChanged() {
         NotificationCenter.default.post(name: .notificationsSettingsChanged, object: nil)
-    }
-
-    private func chooseSoundPackDirectory() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.message = "Select a CESP-compatible sound pack directory containing openpeon.json"
-        if panel.runModal() == .OK, let url = panel.url {
-            notificationSoundPackPath = url.path
-            _ = NotifySoundManager.shared.loadPack(from: url.path)
-        }
     }
 
     struct CopilotPATSaveOutcome: Equatable {
@@ -673,41 +709,36 @@ enum SettingsTab: String {
     case notifications
 }
 
+#if AGENTBAR_NOTIFICATION_SOUNDS
 private struct SoundPackHelpSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Sound Pack Format (CESP)")
+            Text("Notification Sounds (CESP)")
                 .font(.headline)
 
-            Text("A sound pack is a directory containing an **openpeon.json** manifest and audio files.")
+            Text("Sound packs are fetched from the **PeonPing** registry and downloaded automatically when selected.")
                 .font(.body)
 
-            GroupBox("Directory Structure") {
-                Text("""
-                my-sound-pack/
-                  openpeon.json
-                  ding.wav
-                  chime.mp3
-                  alert.aiff
-                """)
-                .font(.system(.caption, design: .monospaced))
+            GroupBox("How It Works") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("1. Select a sound pack from the dropdown")
+                    Text("2. The pack is downloaded to **~/.openpeon/packs/**")
+                    Text("3. Sounds play automatically for agent events")
+                }
+                .font(.caption)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(4)
             }
 
-            GroupBox("Manifest (openpeon.json)") {
-                Text("""
-                {
-                  "name": "My Sound Pack",
-                  "sounds": {
-                    "task.complete": ["ding.wav", "chime.mp3"],
-                    "input.required": ["alert.aiff"]
-                  }
+            GroupBox("Sound Categories") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("**task.complete** — played when an agent finishes a task")
+                    Text("**input.required** — played when an agent needs user input")
+                    Text("Multiple files per category are rotated randomly without repeats.")
                 }
-                """)
-                .font(.system(.caption, design: .monospaced))
+                .font(.caption)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(4)
             }
@@ -715,9 +746,8 @@ private struct SoundPackHelpSheet: View {
             GroupBox("Details") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("**Supported formats:** WAV, MP3, AIFF, M4A, CAF")
-                    Text("**task.complete** — played when an agent finishes a task")
-                    Text("**input.required** — played when an agent needs user input")
-                    Text("Multiple files per category are rotated randomly without repeats.")
+                    Text("**Registry:** peonping.github.io/registry")
+                    Text("**Local storage:** ~/.openpeon/packs/")
                 }
                 .font(.caption)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -736,6 +766,7 @@ private struct SoundPackHelpSheet: View {
         .frame(width: 420)
     }
 }
+#endif
 
 private struct AgentSourcesHelpSheet: View {
     @Environment(\.dismiss) private var dismiss

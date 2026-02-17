@@ -1,9 +1,29 @@
+#if AGENTBAR_NOTIFICATION_SOUNDS
 import Foundation
 import AVFoundation
 
+struct CESPSoundEntry: Decodable, Sendable, Equatable {
+    let file: String
+    let label: String?
+}
+
+struct CESPCategoryEntry: Decodable, Sendable {
+    let sounds: [CESPSoundEntry]
+}
+
 struct CESPManifest: Decodable, Sendable {
+    let cesp_version: String?
     let name: String?
+    let display_name: String?
+    let categories: [String: CESPCategoryEntry]?
     let sounds: [String: [String]]?
+
+    func soundFiles(for category: String) -> [String] {
+        if let cat = categories?[category] {
+            return cat.sounds.map(\.file)
+        }
+        return sounds?[category] ?? []
+    }
 }
 
 final class NotifySoundManager: @unchecked Sendable {
@@ -35,7 +55,7 @@ final class NotifySoundManager: @unchecked Sendable {
     var packName: String? {
         lock.lock()
         defer { lock.unlock() }
-        return manifest?.name
+        return manifest?.display_name ?? manifest?.name
     }
 
     var isPackLoaded: Bool {
@@ -85,7 +105,12 @@ final class NotifySoundManager: @unchecked Sendable {
         }
 
         lock.lock()
-        guard let sounds = manifest?.sounds?[category], !sounds.isEmpty else {
+        guard let m = manifest else {
+            lock.unlock()
+            return false
+        }
+        let sounds = m.soundFiles(for: category)
+        guard !sounds.isEmpty else {
             lock.unlock()
             return false
         }
@@ -134,8 +159,12 @@ final class NotifySoundManager: @unchecked Sendable {
         }
 
         lock.lock()
-        guard let sounds = manifest?.sounds?[category], !sounds.isEmpty,
-              let chosen = sounds.randomElement() else {
+        guard let m = manifest else {
+            lock.unlock()
+            return false
+        }
+        let sounds = m.soundFiles(for: category)
+        guard !sounds.isEmpty, let chosen = sounds.randomElement() else {
             lock.unlock()
             return false
         }
@@ -195,3 +224,37 @@ final class NotifySoundManager: @unchecked Sendable {
         defaults.set(state, forKey: "notificationSoundLastPlayed")
     }
 }
+
+#else
+
+import Foundation
+
+final class NotifySoundManager: @unchecked Sendable {
+    static let shared = NotifySoundManager()
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard, fileManager: FileManager = .default) {
+        self.defaults = defaults
+    }
+
+    var packName: String? { nil }
+    var isPackLoaded: Bool { false }
+
+    func loadPack(from directoryPath: String) -> Bool { false }
+    func unloadPack() {}
+
+    static func cespCategory(for eventType: AgentNotifyEventType) -> String {
+        eventType.cespCategory
+    }
+
+    func play(for eventType: AgentNotifyEventType) -> Bool { false }
+    func playTest(category: String) -> Bool { false }
+}
+
+struct CESPManifest: Decodable, Sendable {
+    let name: String?
+    let sounds: [String: [String]]?
+}
+
+#endif

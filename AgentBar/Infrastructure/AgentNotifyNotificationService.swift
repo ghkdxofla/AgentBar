@@ -54,8 +54,12 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         let body = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
         content.body = "\(event.notificationSourceTag) \(body)"
 
+        #if AGENTBAR_NOTIFICATION_SOUNDS
         let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type)
         content.sound = didPlayCustomSound ? nil : .default
+        #else
+        content.sound = .default
+        #endif
 
         let request = UNNotificationRequest(
             identifier: "agentbar-agent-notify-\(UUID().uuidString)",

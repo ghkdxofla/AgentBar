@@ -1,3 +1,4 @@
+#if AGENTBAR_NOTIFICATION_SOUNDS
 import XCTest
 @testable import AgentBar
 
@@ -204,4 +205,115 @@ final class NotifySoundManagerTests: XCTestCase {
         XCTAssertFalse(manager.isPackLoaded)
         XCTAssertNil(manager.packName)
     }
+
+    // MARK: - Real CESP format (categories.*.sounds[].{file, label})
+
+    func testLoadPackParsesRealCESPFormat() throws {
+        let manifest = """
+        {
+          "cesp_version": "1.0",
+          "name": "warcraft3",
+          "display_name": "Warcraft III",
+          "categories": {
+            "task.complete": {
+              "sounds": [
+                {"file": "sounds/job-done.wav", "label": "Job's done"},
+                {"file": "sounds/work-complete.wav", "label": "Work complete"}
+              ]
+            },
+            "input.required": {
+              "sounds": [
+                {"file": "sounds/ready.wav", "label": "Ready"}
+              ]
+            }
+          }
+        }
+        """
+        try manifest.write(
+            to: tempDir.appendingPathComponent("openpeon.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let suiteName = "AgentBarTests.SoundManager.RealCESP.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = NotifySoundManager(defaults: defaults)
+        let result = manager.loadPack(from: tempDir.path)
+
+        XCTAssertTrue(result)
+        XCTAssertEqual(manager.packName, "Warcraft III")
+        XCTAssertTrue(manager.isPackLoaded)
+    }
+
+    func testSoundFilesForCategoryWithRealFormat() throws {
+        let json = """
+        {
+          "cesp_version": "1.0",
+          "name": "test",
+          "categories": {
+            "task.complete": {
+              "sounds": [
+                {"file": "sounds/a.wav", "label": "A"},
+                {"file": "sounds/b.wav", "label": "B"}
+              ]
+            }
+          }
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let manifest = try JSONDecoder().decode(CESPManifest.self, from: data)
+        let files = manifest.soundFiles(for: "task.complete")
+        XCTAssertEqual(files, ["sounds/a.wav", "sounds/b.wav"])
+    }
+
+    func testSoundFilesForCategoryFallsBackToLegacy() throws {
+        let json = """
+        {
+          "name": "legacy",
+          "sounds": {
+            "task.complete": ["ding.wav", "chime.wav"]
+          }
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let manifest = try JSONDecoder().decode(CESPManifest.self, from: data)
+        let files = manifest.soundFiles(for: "task.complete")
+        XCTAssertEqual(files, ["ding.wav", "chime.wav"])
+    }
+
+    func testSoundFilesReturnsEmptyForMissingCategory() throws {
+        let json = """
+        {"name": "empty"}
+        """
+        let data = json.data(using: .utf8)!
+        let manifest = try JSONDecoder().decode(CESPManifest.self, from: data)
+        let files = manifest.soundFiles(for: "task.complete")
+        XCTAssertTrue(files.isEmpty)
+    }
+
+    func testDisplayNamePreferredOverName() throws {
+        let manifest = """
+        {
+          "name": "wc3",
+          "display_name": "Warcraft III",
+          "sounds": {"task.complete": ["a.wav"]}
+        }
+        """
+        try manifest.write(
+            to: tempDir.appendingPathComponent("openpeon.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let suiteName = "AgentBarTests.SoundManager.DisplayName.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = NotifySoundManager(defaults: defaults)
+        _ = manager.loadPack(from: tempDir.path)
+        XCTAssertEqual(manager.packName, "Warcraft III")
+    }
 }
+#endif

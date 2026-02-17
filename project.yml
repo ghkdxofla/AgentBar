@@ -29,6 +29,8 @@ targets:
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_STYLE: Automatic
       configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG AGENTBAR_NOTIFICATION_SOUNDS"
         Release:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Developer ID Application"
@@ -46,3 +48,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.agentbar.app.tests
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_STYLE: Automatic
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG AGENTBAR_NOTIFICATION_SOUNDS"

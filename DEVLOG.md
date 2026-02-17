@@ -535,3 +535,14 @@
 - **Renderer fallback**: SVG rendering automatically falls back across available tools (`rsvg-convert`, `inkscape`, `magick`, `sips`, `qlmanage`).
 - **ICNS fallback**: Uses `iconutil` when available and falls back to `python3 + Pillow` when `iconutil` rejects iconset conversion in the local environment.
 - **README docs**: Added concise icon-generation usage and output paths.
+
+## Iteration 64: CESP sound pack registry integration
+- **Build flag**: Added `AGENTBAR_NOTIFICATION_SOUNDS` compilation condition (ON in Debug, OFF in Release) to gate all notification sound functionality; wrapped `NotifySoundManager`, `AgentNotifyNotificationService` sound calls, `SettingsView` sound sections, and `NotifySoundManagerTests` with `#if` guards
+- **CESPManifest dual format**: Updated `CESPManifest` to support both real CESP format (`categories.*.sounds[].{file, label}`) and legacy format (`sounds: [String: [String]]`), with `soundFiles(for:)` helper method
+- **CESPRegistryPack model**: New `CESPRegistryPack` (Decodable, Sendable, Identifiable) with computed `formattedSize`, `baseContentURL`, `manifestURL` properties; `CESPRegistryIndex` wrapper
+- **CESPRegistryService**: Actor-based registry fetcher with 1-hour cache, fetching from `peonping.github.io/registry/index.json`
+- **CESPPackDownloadService**: Actor-based download service storing packs to `~/.openpeon/packs/{name}/`; downloads manifest then each sound file with progress callback; cleans up partial downloads on failure
+- **SoundPackViewModel**: `@MainActor ObservableObject` managing registry loading, pack selection, download progress, and activation via `NotifySoundManager`
+- **Settings UI refactoring**: Replaced NSOpenPanel file browser with Picker dropdown from CESP registry; added download progress bar, error display, and refresh button; removed `chooseSoundPackDirectory()` method
+- **New tests**: `CESPRegistryPackTests` (8 tests), `CESPPackDownloadServiceTests` (4 tests with `MockURLProtocol`), 5 new `NotifySoundManagerTests` for real CESP format, display name, and fallback behavior
+- All 231 tests passing
