@@ -126,7 +126,7 @@ struct SettingsView: View {
             Section("Claude Code") {
                 Toggle("Enabled", isOn: $claudeEnabled)
                     .onChange(of: claudeEnabled) { _ in
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
 
                 Picker("Plan", selection: $claudePlan) {
@@ -135,7 +135,7 @@ struct SettingsView: View {
                     }
                 }
                 .onChange(of: claudePlan) { _ in
-                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    notifyLimitsChanged()
                 }
 
                 Text("Usage is fetched from Anthropic OAuth API using Claude Code credentials")
@@ -146,7 +146,7 @@ struct SettingsView: View {
             Section("OpenAI Codex") {
                 Toggle("Enabled", isOn: $codexEnabled)
                     .onChange(of: codexEnabled) { _ in
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
 
                 Picker("Plan", selection: $codexPlan) {
@@ -159,7 +159,7 @@ struct SettingsView: View {
                         codexFiveHourLimit = plan.fiveHourTokenLimit
                         codexWeeklyLimit = plan.weeklyTokenLimit
                     }
-                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    notifyLimitsChanged()
                 }
 
                 HStack {
@@ -172,7 +172,7 @@ struct SettingsView: View {
                 }
                 .onChange(of: codexFiveHourLimit) { _ in
                     if codexPlan == CodexPlan.custom.rawValue {
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
                 }
 
@@ -186,7 +186,7 @@ struct SettingsView: View {
                 }
                 .onChange(of: codexWeeklyLimit) { _ in
                     if codexPlan == CodexPlan.custom.rawValue {
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
                 }
 
@@ -198,7 +198,7 @@ struct SettingsView: View {
             Section("Google Gemini") {
                 Toggle("Enabled", isOn: $geminiEnabled)
                     .onChange(of: geminiEnabled) { _ in
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
 
                 HStack {
@@ -209,7 +209,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .onChange(of: geminiDailyLimit) { _ in
-                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    notifyLimitsChanged()
                 }
 
                 Text("Usage is derived from local Gemini logs in ~/.gemini/tmp")
@@ -220,7 +220,7 @@ struct SettingsView: View {
             Section("GitHub Copilot") {
                 Toggle("Enabled", isOn: $copilotEnabled)
                     .onChange(of: copilotEnabled) { _ in
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
                 Text("Plan is auto-detected from GitHub API. Token is auto-read from gh CLI (gh auth token).")
                     .font(.caption)
@@ -237,7 +237,7 @@ struct SettingsView: View {
                             .frame(width: 200)
                         Button("Save") {
                             if saveCopilotPAT() {
-                                NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                                notifyLimitsChanged()
                             }
                         }
                         .disabled(!Self.canSaveToken(copilotPAT))
@@ -252,7 +252,7 @@ struct SettingsView: View {
             Section("Cursor") {
                 Toggle("Enabled", isOn: $cursorEnabled)
                     .onChange(of: cursorEnabled) { _ in
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
 
                 Picker("Plan", selection: $cursorPlan) {
@@ -264,7 +264,7 @@ struct SettingsView: View {
                     if let plan = CursorPlan(rawValue: newValue), plan != .custom {
                         cursorMonthlyLimit = plan.monthlyRequestEstimate
                     }
-                    NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                    notifyLimitsChanged()
                 }
 
                 HStack {
@@ -277,7 +277,7 @@ struct SettingsView: View {
                 }
                 .onChange(of: cursorMonthlyLimit) { _ in
                     if cursorPlan == CursorPlan.custom.rawValue {
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
                 }
 
@@ -289,7 +289,7 @@ struct SettingsView: View {
             Section("Z.ai Coding Plan") {
                 Toggle("Enabled", isOn: $zaiEnabled)
                     .onChange(of: zaiEnabled) { _ in
-                        NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        notifyLimitsChanged()
                     }
                 if hasSavedZaiAPIKey {
                     Text("An API key is already saved in Keychain")
@@ -301,15 +301,8 @@ struct SettingsView: View {
                     SecureField("API key", text: $zaiAPIKey)
                         .frame(width: 200)
                     Button("Save") {
-                        let outcome = saveTokenWithUIState(
-                            zaiAPIKey,
-                            account: ServiceType.zai.keychainAccount,
-                            hasSavedToken: hasSavedZaiAPIKey
-                        )
-                        hasSavedZaiAPIKey = outcome.hasSavedToken
-                        zaiAPIKey = outcome.tokenFieldValue
-                        if outcome.didSave {
-                            NotificationCenter.default.post(name: .limitsChanged, object: nil)
+                        if saveZaiAPIKey() {
+                            notifyLimitsChanged()
                         }
                     }
                     .disabled(!Self.canSaveToken(zaiAPIKey))
@@ -565,6 +558,18 @@ struct SettingsView: View {
         return outcome.didSave
     }
 
+    @discardableResult
+    private func saveZaiAPIKey() -> Bool {
+        let outcome = saveTokenWithUIState(
+            zaiAPIKey,
+            account: ServiceType.zai.keychainAccount,
+            hasSavedToken: hasSavedZaiAPIKey
+        )
+        hasSavedZaiAPIKey = outcome.hasSavedToken
+        zaiAPIKey = outcome.tokenFieldValue
+        return outcome.didSave
+    }
+
     private func saveTokenWithUIState(
         _ token: String,
         account: String,
@@ -621,10 +626,8 @@ struct SettingsView: View {
         NotificationCenter.default.post(name: .notificationsSettingsChanged, object: nil)
     }
 
-    struct CopilotPATSaveOutcome: Equatable {
-        let didSave: Bool
-        let hasSavedCopilotPAT: Bool
-        let copilotPAT: String
+    private func notifyLimitsChanged() {
+        NotificationCenter.default.post(name: .limitsChanged, object: nil)
     }
 
     struct TokenSaveUIOutcome: Equatable {
@@ -648,28 +651,6 @@ struct SettingsView: View {
                 return "saveFailed:\(message)"
             }
         }
-    }
-
-    static func copilotPATSaveOutcome(
-        currentPAT: String,
-        hasSavedCopilotPAT: Bool,
-        save: (String) -> Bool
-    ) -> CopilotPATSaveOutcome {
-        let outcome = tokenSaveUIOutcome(
-            currentToken: currentPAT,
-            hasSavedToken: hasSavedCopilotPAT,
-            account: ServiceType.copilot.keychainAccount
-        ) { token, _ in
-            if save(token) {
-                return
-            }
-            throw SaveOutcomeError.didNotSave
-        }
-        return CopilotPATSaveOutcome(
-            didSave: outcome.didSave,
-            hasSavedCopilotPAT: outcome.hasSavedToken,
-            copilotPAT: outcome.tokenFieldValue
-        )
     }
 
     enum SaveResult {
@@ -889,8 +870,4 @@ private struct HookConfigurationStatusRow: View {
                 .foregroundStyle(.secondary)
         }
     }
-}
-
-private enum SaveOutcomeError: Error {
-    case didNotSave
 }

@@ -269,45 +269,6 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(outcome.saveErrorMessage, "Keychain unavailable")
     }
 
-    func testCopilotPATSaveOutcomeMarksSavedAndClearsInputOnSuccess() {
-        let outcome = SettingsView.copilotPATSaveOutcome(
-            currentPAT: "ghp_valid_token",
-            hasSavedCopilotPAT: false
-        ) { _ in
-            true
-        }
-
-        XCTAssertTrue(outcome.didSave)
-        XCTAssertTrue(outcome.hasSavedCopilotPAT)
-        XCTAssertEqual(outcome.copilotPAT, "")
-    }
-
-    func testCopilotPATSaveOutcomePreservesStateOnFailure() {
-        let outcome = SettingsView.copilotPATSaveOutcome(
-            currentPAT: "ghp_valid_token",
-            hasSavedCopilotPAT: false
-        ) { _ in
-            false
-        }
-
-        XCTAssertFalse(outcome.didSave)
-        XCTAssertFalse(outcome.hasSavedCopilotPAT)
-        XCTAssertEqual(outcome.copilotPAT, "ghp_valid_token")
-    }
-
-    func testCopilotPATSaveOutcomeKeepsSavedStateOnFailureWhenAlreadySaved() {
-        let outcome = SettingsView.copilotPATSaveOutcome(
-            currentPAT: "ghp_valid_token",
-            hasSavedCopilotPAT: true
-        ) { _ in
-            false
-        }
-
-        XCTAssertFalse(outcome.didSave)
-        XCTAssertTrue(outcome.hasSavedCopilotPAT)
-        XCTAssertEqual(outcome.copilotPAT, "ghp_valid_token")
-    }
-
     func testKeychainSaveStoresInDataProtectionAndCleansLegacyOnSuccess() throws {
         let account = "tests.save.primary"
         let securityAPI = MockKeychainSecurityAPI(
