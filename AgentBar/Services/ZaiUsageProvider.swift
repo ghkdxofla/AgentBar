@@ -17,15 +17,8 @@ struct ZaiLimit: Decodable, Sendable {
     let type: String
     let usage: Double?          // total capacity
     let currentValue: Double?   // currently used
-    let remaining: Double?
     let percentage: Double?
     let nextResetTime: Double?  // epoch ms
-    let usageDetails: [ZaiUsageDetail]?
-}
-
-struct ZaiUsageDetail: Decodable, Sendable {
-    let modelCode: String?
-    let usage: Int?
 }
 
 // MARK: - Provider
@@ -140,8 +133,7 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     // MARK: - Helpers
 
     static func capitalizedPlanName(_ raw: String) -> String {
-        guard !raw.isEmpty else { return raw }
-        return raw.prefix(1).uppercased() + raw.dropFirst()
+        raw.capitalizingFirstCharacter()
     }
 
     // MARK: - Private

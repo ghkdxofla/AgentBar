@@ -28,9 +28,7 @@ struct CursorUsageResponse: Decodable, Sendable {
 
 struct CursorModelUsage: Decodable, Sendable {
     let numRequests: Int?
-    let numRequestsTotal: Int?
     let maxRequestUsage: Int?
-    let numTokens: Int?
 }
 
 // MARK: - Provider
@@ -69,7 +67,7 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let jwt = try readAccessToken(from: dbPath)
 
         // 2. Decode JWT to extract user ID
-        let userId = try decodeUserIdFromJWT(jwt)
+        let userId = try Self.decodeUserIdFromJWT(jwt)
 
         // 3. Call Cursor usage API
         var components = URLComponents(string: Self.apiBaseURL)
@@ -184,10 +182,6 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         return decoded.sub
     }
 
-    func decodeUserIdFromJWT(_ jwt: String) throws -> String {
-        try Self.decodeUserIdFromJWT(jwt)
-    }
-
     // MARK: - Helpers
 
     static func base64URLDecode(_ string: String) -> Data? {
@@ -208,16 +202,7 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
 
     static func parseStartOfMonthReset(_ startOfMonth: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let parsed = formatter.date(from: startOfMonth) ?? {
-            let noFrac = ISO8601DateFormatter()
-            noFrac.formatOptions = [.withInternetDateTime]
-            return noFrac.date(from: startOfMonth)
-        }()
-
-        guard let startDate = parsed else { return nil }
+        guard let startDate = DateUtils.parseISO8601(startOfMonth) else { return nil }
 
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!

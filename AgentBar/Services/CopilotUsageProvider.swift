@@ -11,8 +11,6 @@ struct CopilotQuotaSnapshot: Decodable, Sendable {
     let quota_id: String
     let entitlement: Int?
     let remaining: Int?
-    let percent_remaining: Double?
-    let overage_count: Int?
     let unlimited: Bool?
 }
 
@@ -198,8 +196,7 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     // MARK: - Helpers
 
     static func capitalizedPlanName(_ raw: String) -> String {
-        guard !raw.isEmpty else { return raw }
-        return raw.prefix(1).uppercased() + raw.dropFirst()
+        raw.capitalizingFirstCharacter()
     }
 
     static func firstOfNextMonthUTC(relativeTo now: Date = Date()) -> Date {
