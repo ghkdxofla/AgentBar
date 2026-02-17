@@ -150,23 +150,20 @@ final class NotifySoundManager: @unchecked Sendable {
         }
     }
 
-    func playTest(category: String) -> Bool {
-        guard let packPath = defaults.string(forKey: "notificationSoundPackPath"),
+    func playTest(category: String, service: ServiceType? = nil) -> Bool {
+        guard let packPath = resolvePackPath(for: service),
               !packPath.isEmpty else {
             return false
         }
 
-        lock.lock()
-        guard let m = manifest else {
-            lock.unlock()
+        guard let m = resolveManifest(at: packPath) else {
             return false
         }
+
         let sounds = m.soundFiles(for: category)
         guard !sounds.isEmpty, let chosen = sounds.randomElement() else {
-            lock.unlock()
             return false
         }
-        lock.unlock()
 
         let soundURL = URL(fileURLWithPath: packPath)
             .appendingPathComponent(chosen)
@@ -273,7 +270,7 @@ final class NotifySoundManager: @unchecked Sendable {
     }
 
     func play(for eventType: AgentNotifyEventType, service: ServiceType? = nil) -> Bool { false }
-    func playTest(category: String) -> Bool { false }
+    func playTest(category: String, service: ServiceType? = nil) -> Bool { false }
 }
 
 struct CESPManifest: Decodable, Sendable {

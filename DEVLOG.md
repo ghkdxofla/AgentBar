@@ -561,3 +561,11 @@
 - **SettingsView cleanup**: Removed `notificationSoundTaskCompleteEnabled`/`notificationSoundInputRequiredEnabled` toggles; added Language picker, Agent Sound Overrides DisclosureGroup; moved Volume slider to section bottom; Test buttons retained
 - **Tests**: Added agent-override tests (`testPlayReturnsFalseWhenAgentSetToNone`, `testPlayUsesGlobalPackWhenNoAgentOverride`, `testPlayReturnsFalseWhenNoPackConfiguredWithService`); language filtering tests in CESPRegistryPackTests (`testLanguageFieldDecodes`, `testLanguageFilteringOnPacks`, `testAvailableLanguagesFromPacks`)
 - All 236 tests passing
+
+## Iteration 67: Sound settings polish — language display, multi-lang, style, test buttons
+- **Language uppercase display**: `displayLanguage()` (nonisolated static) converts codes to uppercase in Picker (e.g., "en" → "EN", "zh-CN" → "ZH-CN")
+- **Multi-language packs**: `availableLanguages` and `filteredPacks` now split comma-delimited language fields (e.g., "en,ru"); silicon_valley pack appears under both EN and RU filters
+- **Section style consistency**: Notification Sounds section converted from `DisclosureGroup` wrapper inside `Section` to `Section { ... } header: { ... }` pattern matching Agent Sources section
+- **Test buttons with agent overrides**: `playTest(category:service:)` now uses `resolvePackPath(for:)` + `resolveManifest(at:)` for consistent path resolution; per-agent play buttons (play.circle icon) added to Agent Sound Overrides rows; global Test buttons test the global pack
+- **Tests**: Added `testMultiLanguageFilteringIncludesCommaDelimited`, `testAvailableLanguagesSplitsCommaDelimited`, `testDisplayLanguageUppercased`
+- All 239 tests passing

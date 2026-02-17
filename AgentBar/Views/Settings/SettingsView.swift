@@ -417,94 +417,92 @@ struct SettingsView: View {
 
             #if AGENTBAR_NOTIFICATION_SOUNDS
             Section {
-                DisclosureGroup {
-                    Picker("Language", selection: $soundPackVM.selectedLanguage) {
-                        Text("All").tag("")
-                        ForEach(soundPackVM.availableLanguages, id: \.self) { lang in
-                            Text(lang).tag(lang)
-                        }
+                Picker("Language", selection: $soundPackVM.selectedLanguage) {
+                    Text("All").tag("")
+                    ForEach(soundPackVM.availableLanguages, id: \.self) { lang in
+                        Text(SoundPackViewModel.displayLanguage(lang)).tag(lang)
                     }
-                    .disabled(!notificationsEnabled)
+                }
+                .disabled(!notificationsEnabled)
 
-                    HStack {
-                        Picker("Sound pack", selection: $soundPackVM.selectedPackName) {
-                            Text("None").tag("")
-                            ForEach(soundPackVM.filteredPacks) { pack in
-                                HStack {
-                                    Text(pack.display_name)
-                                    if !pack.formattedSize.isEmpty {
-                                        Text("(\(pack.formattedSize))")
-                                            .foregroundStyle(.secondary)
-                                    }
+                HStack {
+                    Picker("Sound pack", selection: $soundPackVM.selectedPackName) {
+                        Text("None").tag("")
+                        ForEach(soundPackVM.filteredPacks) { pack in
+                            HStack {
+                                Text(pack.display_name)
+                                if !pack.formattedSize.isEmpty {
+                                    Text("(\(pack.formattedSize))")
+                                        .foregroundStyle(.secondary)
                                 }
-                                .tag(pack.name)
                             }
+                            .tag(pack.name)
                         }
-                        .disabled(!notificationsEnabled || soundPackVM.isLoadingRegistry)
-                        .onChange(of: soundPackVM.selectedPackName) { newValue in
-                            soundPackVM.selectPack(newValue)
-                        }
-
-                        if soundPackVM.isLoadingRegistry {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-
-                        Button {
-                            Task { await soundPackVM.loadRegistry(forceRefresh: true) }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(soundPackVM.isLoadingRegistry)
+                    }
+                    .disabled(!notificationsEnabled || soundPackVM.isLoadingRegistry)
+                    .onChange(of: soundPackVM.selectedPackName) { newValue in
+                        soundPackVM.selectPack(newValue)
                     }
 
-                    if soundPackVM.isDownloading {
-                        ProgressView(value: soundPackVM.downloadProgress)
-                            .progressViewStyle(.linear)
+                    if soundPackVM.isLoadingRegistry {
+                        ProgressView()
+                            .controlSize(.small)
                     }
 
-                    if let error = soundPackVM.errorMessage {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                    Button {
+                        Task { await soundPackVM.loadRegistry(forceRefresh: true) }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
+                    .buttonStyle(.plain)
+                    .disabled(soundPackVM.isLoadingRegistry)
+                }
 
-                    agentSoundOverridesSection
+                if soundPackVM.isDownloading {
+                    ProgressView(value: soundPackVM.downloadProgress)
+                        .progressViewStyle(.linear)
+                }
 
-                    HStack {
-                        Button("Test task.complete") {
-                            _ = NotifySoundManager.shared.playTest(category: "task.complete")
-                        }
-                        .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
+                if let error = soundPackVM.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
 
-                        Button("Test input.required") {
-                            _ = NotifySoundManager.shared.playTest(category: "input.required")
-                        }
-                        .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
+                agentSoundOverridesSection
+
+                HStack {
+                    Button("Test task.complete") {
+                        _ = NotifySoundManager.shared.playTest(category: "task.complete")
                     }
+                    .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
 
-                    HStack {
-                        Text("Volume:")
-                        Slider(value: $notificationSoundVolume, in: 0...1, step: 0.1)
-                            .frame(width: 150)
-                        Text(String(format: "%.0f%%", notificationSoundVolume * 100))
+                    Button("Test input.required") {
+                        _ = NotifySoundManager.shared.playTest(category: "input.required")
+                    }
+                    .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
+                }
+
+                HStack {
+                    Text("Volume:")
+                    Slider(value: $notificationSoundVolume, in: 0...1, step: 0.1)
+                        .frame(width: 150)
+                    Text(String(format: "%.0f%%", notificationSoundVolume * 100))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 40, alignment: .trailing)
+                }
+                .disabled(!notificationsEnabled)
+            } header: {
+                HStack {
+                    Text("Notification Sounds")
+                    Spacer()
+                    Button {
+                        showingSoundPackHelp = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
                             .foregroundStyle(.secondary)
-                            .frame(width: 40, alignment: .trailing)
                     }
-                    .disabled(!notificationsEnabled)
-                } label: {
-                    HStack {
-                        Text("Notification Sounds")
-                        Spacer()
-                        Button {
-                            showingSoundPackHelp = true
-                        } label: {
-                            Image(systemName: "questionmark.circle")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    .buttonStyle(.plain)
                 }
             }
             #endif
@@ -522,18 +520,33 @@ struct SettingsView: View {
         DisclosureGroup("Agent Sound Overrides") {
             ForEach(SoundPackViewModel.overridableAgents, id: \.rawValue) { service in
                 let account = service.keychainAccount
+                let overrideValue = soundPackVM.agentOverrides[account] ?? ""
                 let binding = Binding<String>(
-                    get: { soundPackVM.agentOverrides[account] ?? "" },
+                    get: { overrideValue },
                     set: { soundPackVM.selectAgentPack(service, name: $0) }
                 )
-                Picker(service.rawValue, selection: binding) {
-                    Text("Default").tag("")
-                    Text("None").tag("__none__")
-                    ForEach(soundPackVM.filteredPacks) { pack in
-                        Text(pack.display_name).tag(pack.name)
+                HStack {
+                    Picker(service.rawValue, selection: binding) {
+                        Text("Default").tag("")
+                        Text("None").tag("__none__")
+                        ForEach(soundPackVM.filteredPacks) { pack in
+                            Text(pack.display_name).tag(pack.name)
+                        }
                     }
+                    .disabled(!notificationsEnabled)
+
+                    Button {
+                        _ = NotifySoundManager.shared.playTest(
+                            category: "task.complete",
+                            service: service
+                        )
+                    } label: {
+                        Image(systemName: "play.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!notificationsEnabled || overrideValue == "__none__")
+                    .help("Test \(service.rawValue) sound")
                 }
-                .disabled(!notificationsEnabled)
             }
         }
         .disabled(!notificationsEnabled)

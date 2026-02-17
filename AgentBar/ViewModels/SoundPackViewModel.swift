@@ -35,13 +35,30 @@ final class SoundPackViewModel: ObservableObject {
     // MARK: - Computed
 
     var availableLanguages: [String] {
-        let langs = Set(availablePacks.compactMap(\.language))
+        var langs = Set<String>()
+        for pack in availablePacks {
+            guard let language = pack.language else { continue }
+            for code in language.split(separator: ",") {
+                let trimmed = code.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty { langs.insert(trimmed) }
+            }
+        }
         return langs.sorted()
     }
 
     var filteredPacks: [CESPRegistryPack] {
         guard !selectedLanguage.isEmpty else { return availablePacks }
-        return availablePacks.filter { $0.language == selectedLanguage }
+        return availablePacks.filter { pack in
+            guard let language = pack.language else { return false }
+            return language.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .contains(selectedLanguage)
+        }
+    }
+
+    /// Uppercase display label for a language code (e.g. "en" → "EN", "zh-CN" → "ZH-CN").
+    nonisolated static func displayLanguage(_ code: String) -> String {
+        code.uppercased()
     }
 
     // MARK: - Registry

@@ -146,6 +146,32 @@ final class CESPRegistryPackTests: XCTestCase {
         XCTAssertEqual(filtered.map(\.name), ["en1", "en2"])
     }
 
+    func testMultiLanguageFilteringIncludesCommaDelimited() {
+        let packs = [
+            makeTestPack(name: "en1", language: "en"),
+            makeTestPack(name: "multi", language: "en,ru"),
+            makeTestPack(name: "ru1", language: "ru"),
+            makeTestPack(name: "de1", language: "de"),
+        ]
+
+        let selectedLanguage = "en"
+        let filtered = packs.filter { pack in
+            guard let language = pack.language else { return false }
+            return language.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .contains(selectedLanguage)
+        }
+        XCTAssertEqual(filtered.map(\.name), ["en1", "multi"])
+
+        let filteredRu = packs.filter { pack in
+            guard let language = pack.language else { return false }
+            return language.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .contains("ru")
+        }
+        XCTAssertEqual(filteredRu.map(\.name), ["multi", "ru1"])
+    }
+
     func testAvailableLanguagesFromPacks() {
         let packs = [
             makeTestPack(name: "a", language: "en"),
@@ -155,8 +181,39 @@ final class CESPRegistryPackTests: XCTestCase {
             makeTestPack(name: "e", language: nil),
         ]
 
-        let langs = Set(packs.compactMap(\.language)).sorted()
-        XCTAssertEqual(langs, ["de", "en", "zh-CN"])
+        var langs = Set<String>()
+        for pack in packs {
+            guard let language = pack.language else { continue }
+            for code in language.split(separator: ",") {
+                let trimmed = code.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty { langs.insert(trimmed) }
+            }
+        }
+        XCTAssertEqual(langs.sorted(), ["de", "en", "zh-CN"])
+    }
+
+    func testAvailableLanguagesSplitsCommaDelimited() {
+        let packs = [
+            makeTestPack(name: "a", language: "en"),
+            makeTestPack(name: "b", language: "en,ru"),
+            makeTestPack(name: "c", language: "de"),
+        ]
+
+        var langs = Set<String>()
+        for pack in packs {
+            guard let language = pack.language else { continue }
+            for code in language.split(separator: ",") {
+                let trimmed = code.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty { langs.insert(trimmed) }
+            }
+        }
+        XCTAssertEqual(langs.sorted(), ["de", "en", "ru"])
+    }
+
+    func testDisplayLanguageUppercased() {
+        XCTAssertEqual(SoundPackViewModel.displayLanguage("en"), "EN")
+        XCTAssertEqual(SoundPackViewModel.displayLanguage("zh-CN"), "ZH-CN")
+        XCTAssertEqual(SoundPackViewModel.displayLanguage("pt-BR"), "PT-BR")
     }
 
     // MARK: - Helpers
