@@ -5,7 +5,6 @@
 </p>
 
 [![Apple Notarized](https://img.shields.io/badge/Apple-Notarized-000000?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution)
-
 macOS menu bar app that tracks AI coding assistant usage in one place.
 
 <p align="center">
@@ -43,9 +42,16 @@ Download `AgentBar.dmg` from [Releases](https://github.com/scari/CCUsageBar/rele
 xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet
 open build/Build/Products/Debug/AgentBar.app
 
-# Test
-xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS'
+# Test (recommended: serial workers, no system keychain integration tests)
+./scripts/test.sh
+
+# Optional: run with system keychain integration test enabled
+AGENTBAR_RUN_SYSTEM_KEYCHAIN_TESTS=1 ./scripts/test.sh
 ```
+
+Notes:
+- `scripts/test.sh` defaults to `-parallel-testing-enabled NO` and worker count `1` to avoid repeated macOS security prompts.
+- The system Keychain integration test is opt-in via `AGENTBAR_RUN_SYSTEM_KEYCHAIN_TESTS=1`.
 
 ## Support
 

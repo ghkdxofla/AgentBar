@@ -16,18 +16,27 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
     private let defaults: UserDefaults
     private let postBodyOverride: (@Sendable (String) async throws -> Void)?
     private let postContentOverride: (@Sendable (_ title: String, _ body: String) async throws -> Void)?
+    private let authorizationStatusOverride: (@Sendable () async -> Int)?
+    private let requestAuthorizationOverride: (@Sendable () async -> Bool)?
+    private let addRequestOverride: (@Sendable (UNNotificationRequest) async throws -> Void)?
     private var didCheckAuthorization = false
 
     init(
         center: UNUserNotificationCenter = .current(),
         defaults: UserDefaults = .standard,
         postBodyOverride: (@Sendable (String) async throws -> Void)? = nil,
-        postContentOverride: (@Sendable (_ title: String, _ body: String) async throws -> Void)? = nil
+        postContentOverride: (@Sendable (_ title: String, _ body: String) async throws -> Void)? = nil,
+        authorizationStatusOverride: (@Sendable () async -> Int)? = nil,
+        requestAuthorizationOverride: (@Sendable () async -> Bool)? = nil,
+        addRequestOverride: (@Sendable (UNNotificationRequest) async throws -> Void)? = nil
     ) {
         self.center = center
         self.defaults = defaults
         self.postBodyOverride = postBodyOverride
         self.postContentOverride = postContentOverride
+        self.authorizationStatusOverride = authorizationStatusOverride
+        self.requestAuthorizationOverride = requestAuthorizationOverride
+        self.addRequestOverride = addRequestOverride
     }
 
     nonisolated static func requestAuthorizationPrompt() {
@@ -41,12 +50,12 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         }
         didCheckAuthorization = true
 
-        let statusRawValue = await authorizationStatusRawValue()
+        let statusRawValue = await currentAuthorizationStatusRawValue()
         guard statusRawValue == UNAuthorizationStatus.notDetermined.rawValue else {
             logger.debug("Authorization status already determined: \(statusRawValue, privacy: .public).")
             return
         }
-        let granted = await requestAuthorization()
+        let granted = await currentRequestAuthorization()
         logger.info("Notification permission prompt completed. granted=\(granted, privacy: .public).")
     }
 
@@ -75,6 +84,8 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
                 try await postContentOverride(content.title, content.body)
             } else if let postBodyOverride {
                 try await postBodyOverride(content.body)
+            } else if let addRequestOverride {
+                try await addRequestOverride(request)
             } else {
                 try await add(request)
             }
@@ -86,6 +97,20 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
                 "Failed to post notification service=\(event.service.rawValue, privacy: .public) type=\(event.type.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
         }
+    }
+
+    private func currentAuthorizationStatusRawValue() async -> Int {
+        if let authorizationStatusOverride {
+            return await authorizationStatusOverride()
+        }
+        return await authorizationStatusRawValue()
+    }
+
+    private func currentRequestAuthorization() async -> Bool {
+        if let requestAuthorizationOverride {
+            return await requestAuthorizationOverride()
+        }
+        return await requestAuthorization()
     }
 
     private func authorizationStatusRawValue() async -> Int {

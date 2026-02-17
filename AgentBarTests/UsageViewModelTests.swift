@@ -396,6 +396,10 @@ final class UsageViewModelTests: XCTestCase {
     }
 
     func testKeychainFallbackSaveWorksWithSystemSecurityAPI() throws {
+        guard ProcessInfo.processInfo.environment["AGENTBAR_RUN_SYSTEM_KEYCHAIN_TESTS"] == "1" else {
+            throw XCTSkip("Set AGENTBAR_RUN_SYSTEM_KEYCHAIN_TESTS=1 to run system Keychain integration tests.")
+        }
+
         let account = "tests.integration.legacy.\(UUID().uuidString)"
         let token = "integration-token"
         let securityAPI = DataProtectionUnavailableSystemSecurityAPI()
