@@ -516,3 +516,9 @@
 - **BMC support button**: Added centered "Buy Me a Coffee" button between usage section and footer in `DetailPopoverView`. Opens `https://buymeacoffee.com/_scari` in default browser on click.
 - **Styling**: Orange `.bordered` button with coffee cup icon, centered in popover width
 - All 209 tests passing
+
+## Iteration 61: Harden BMC action testability and coverage
+- **Injectable URL opener**: `DetailPopoverView` now accepts an `openExternalURL` closure (defaulting to `NSWorkspace.shared.open`) so external-link behavior is testable without launching a browser.
+- **Deterministic action verification**: Added `triggerBMCForTesting()` behind `#if DEBUG` to exercise the same BMC action path in unit tests.
+- **New regression test**: Added `DetailPopoverViewTests.testBuyMeACoffeeActionOpensExpectedURL` to verify the BMC action opens `https://buymeacoffee.com/_scari`.
+- All 210 tests passing

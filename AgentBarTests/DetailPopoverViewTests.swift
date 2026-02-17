@@ -59,6 +59,22 @@ final class DetailPopoverViewTests: XCTestCase {
         withExtendedLifetime(rendered.window) {}
     }
 
+    func testBuyMeACoffeeActionOpensExpectedURL() {
+        let viewModel = UsageViewModel(providers: [])
+        var openedURLs: [URL] = []
+
+        let view = DetailPopoverView(viewModel: viewModel) { url in
+            openedURLs.append(url)
+        }
+        view.triggerBMCForTesting()
+
+        XCTAssertEqual(
+            openedURLs.first?.absoluteString,
+            "https://buymeacoffee.com/_scari",
+            "Expected tapping Buy Me a Coffee to attempt opening the BMC support URL."
+        )
+    }
+
     private func makeUsageRows(count: Int) -> [UsageData] {
         let services = ServiceType.allCases
         return (0..<count).map { index in
@@ -66,8 +82,11 @@ final class DetailPopoverViewTests: XCTestCase {
         }
     }
 
-    private func renderPopover(viewModel: UsageViewModel) -> (window: NSWindow, hostingView: NSHostingView<DetailPopoverView>) {
-        let rootView = DetailPopoverView(viewModel: viewModel)
+    private func renderPopover(
+        viewModel: UsageViewModel,
+        openExternalURL: @escaping (URL) -> Void = { _ in }
+    ) -> (window: NSWindow, hostingView: NSHostingView<DetailPopoverView>) {
+        let rootView = DetailPopoverView(viewModel: viewModel, openExternalURL: openExternalURL)
         let hostingView = NSHostingView(rootView: rootView)
         let frame = NSRect(x: 0, y: 0, width: 320, height: 480)
         hostingView.frame = frame

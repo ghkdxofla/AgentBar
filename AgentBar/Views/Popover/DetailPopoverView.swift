@@ -2,6 +2,17 @@ import SwiftUI
 
 struct DetailPopoverView: View {
     @ObservedObject var viewModel: UsageViewModel
+    private let openExternalURL: (URL) -> Void
+
+    init(
+        viewModel: UsageViewModel,
+        openExternalURL: @escaping (URL) -> Void = { url in
+            NSWorkspace.shared.open(url)
+        }
+    ) {
+        self.viewModel = viewModel
+        self.openExternalURL = openExternalURL
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -82,10 +93,16 @@ struct DetailPopoverView: View {
     }
 
     private func openBMC() {
-        if let url = URL(string: "https://buymeacoffee.com/_scari") {
-            NSWorkspace.shared.open(url)
-        }
+        openExternalURL(Self.bmcSupportURL)
     }
+
+    private static let bmcSupportURL = URL(string: "https://buymeacoffee.com/_scari")!
+
+    #if DEBUG
+    func triggerBMCForTesting() {
+        openBMC()
+    }
+    #endif
 
     private static let versionString: String = {
         let info = Bundle.main.infoDictionary
