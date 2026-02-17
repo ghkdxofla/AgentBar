@@ -491,3 +491,16 @@
 - **Settings UX alignment**: Notifications section now focuses on `Enable notifications`, `Task completed`, `Input required`, and `Show message preview`, while `Agent Sources` and `Notification Sounds` sections remain source/sound-specific.
 - **Tests**: Updated notification body assertions to use source tags and added migration coverage for alert-era input keys.
 - All 208 tests passing
+
+## Iteration 57: OpenCode plugin reliability fix for Agent notifications
+- **Root issue area**: OpenCode notifications relied on spawning `agentbar-opencode-hook.sh` from plugin runtime; if process spawn/runtime environment failed silently, OpenCode events were dropped while other agents still worked.
+- **Plugin transport rewrite**: Installer now generates `~/.config/opencode/plugins/agentbar-notify.js` that writes normalized events directly to `~/.agentbar/events.sock` via `node:net` instead of shelling out per event.
+- **Event normalization hardening**: Added robust mapping and field extraction for `session.idle/session.completed`, `permission.asked`, and input/error variants; supports both `input.event` and direct event-shaped payloads.
+- **Safe install behavior preserved**: Re-running `scripts/install-agent-hooks.sh` still creates timestamped backups before modifying plugin files.
+- **Verification**: `bash -n scripts/install-agent-hooks.sh` passed, installer updated plugin with backup, and local dry-run confirmed plugin emits normalized OpenCode payloads over Unix socket.
+
+## Iteration 58: OpenCode event model aligned to two-category notifications
+- **Two-category alignment**: OpenCode permission prompts are now normalized as `decision` (input-required) rather than a separate `permission` category, matching the app's simplified notification model (`task completed` vs `input required`).
+- **Hook script update**: `scripts/agentbar-opencode-hook.sh` now maps `permission.asked`/`permission`/`required_permission` to `decision`.
+- **Installer plugin update**: Generated OpenCode plugin from `scripts/install-agent-hooks.sh` now applies the same mapping so runtime behavior matches hook script behavior.
+- **Regression test**: Added `HookScriptFallbackTests.testOpenCodeHookMapsPermissionAskedToDecisionWithoutPython3` to verify OpenCode payload normalization without python3 dependency.

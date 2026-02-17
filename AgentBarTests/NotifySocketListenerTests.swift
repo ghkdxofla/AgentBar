@@ -593,6 +593,40 @@ final class HookScriptFallbackTests: XCTestCase {
         XCTAssertEqual(decoded["session_id"] as? String, "codex-session-1")
         XCTAssertEqual(decoded["message"] as? String, expectedMessage)
     }
+
+    func testOpenCodeHookMapsPermissionAskedToDecisionWithoutPython3() throws {
+        let socketPath = tempDir.appendingPathComponent("opencode.sock").path
+        let payloadData = try JSONSerialization.data(
+            withJSONObject: [
+                "type": "permission.asked",
+                "properties": [
+                    "sessionID": "oc-session-1",
+                    "permission": "Shell command"
+                ]
+            ],
+            options: []
+        )
+        let payload = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        let toolsPath = try makeToolsPathWithoutPython3()
+
+        let jsonText = try captureSocketMessage(at: socketPath) {
+            let result = try runScript(
+                named: "agentbar-opencode-hook.sh",
+                stdin: payload,
+                environmentOverrides: [
+                    "PATH": toolsPath,
+                    "AGENTBAR_SOCKET": socketPath
+                ]
+            )
+            XCTAssertEqual(result.status, 0, "Script failed: \(result.stderr)")
+        }
+
+        let decoded = try parseJSONObject(jsonText)
+        XCTAssertEqual(decoded["agent"] as? String, "opencode")
+        XCTAssertEqual(decoded["event"] as? String, "decision")
+        XCTAssertEqual(decoded["session_id"] as? String, "oc-session-1")
+        XCTAssertEqual(decoded["message"] as? String, "Permission requested: Shell command")
+    }
 }
 
 @MainActor

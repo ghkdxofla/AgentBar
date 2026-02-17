@@ -771,6 +771,7 @@ private struct AgentSourcesHelpSheet: View {
             GroupBox("OpenCode Hook") {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Receives OpenCode events via plugin and forwards to **~/.agentbar/events.sock**.")
+                    Text("OpenCode permission/question prompts are normalized as **Input required** notifications.")
                     Text("Install with **scripts/install-agent-hooks.sh** (creates **~/.config/opencode/plugins/agentbar-notify.js**).")
                 }
                 .font(.caption)

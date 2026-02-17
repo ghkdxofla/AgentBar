@@ -263,61 +263,154 @@ PY
 }
 
 render_opencode_plugin() {
-  python3 - "$OPENCODE_HOOK_SCRIPT" <<'PY'
-import json
-import sys
+  python3 - <<'PY'
+content = '''import os from "node:os";
+import { createConnection } from "node:net";
 
-hook_script = sys.argv[1]
+const SOCKET_PATH =
+  process.env.AGENTBAR_SOCKET || `${os.homedir()}/.agentbar/events.sock`;
 
-hook_literal = json.dumps(hook_script)
+function coerceString(value) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const converted = String(value).trim();
+  return converted.length > 0 ? converted : null;
+}
 
-content = f'''import {{ spawn }} from "node:child_process";
+function mapEventType(sourceType) {
+  const normalized = (sourceType || "").toLowerCase();
+  switch (normalized) {
+    case "session.idle":
+    case "session.completed":
+    case "stop":
+    case "done":
+    case "task_complete":
+      return "stop";
+    case "permission.asked":
+    case "permission":
+    case "required_permission":
+      return "decision";
+    case "question.asked":
+    case "question":
+    case "required_input":
+    case "decision":
+    case "session.error":
+    case "error":
+      return "decision";
+    default:
+      return null;
+  }
+}
 
-const HOOK_PATH = process.env.AGENTBAR_OPENCODE_HOOK || {hook_literal};
-const FORWARDED_EVENT_TYPES = new Set([
-  "session.idle",
-  "session.completed",
-  "permission.asked",
-  "question.asked",
-  "session.error",
-]);
+function extractSessionID(sourceEvent) {
+  return (
+    coerceString(sourceEvent?.properties?.sessionID) ||
+    coerceString(sourceEvent?.properties?.sessionId) ||
+    coerceString(sourceEvent?.sessionID) ||
+    coerceString(sourceEvent?.sessionId) ||
+    ""
+  );
+}
 
-function forwardToAgentBar(eventPayload) {{
-  return new Promise((resolve) => {{
-    const child = spawn(HOOK_PATH, [], {{ stdio: ["pipe", "ignore", "ignore"] }});
+function extractMessage(sourceEvent) {
+  const message =
+    coerceString(sourceEvent?.properties?.message) ||
+    coerceString(sourceEvent?.properties?.error?.message) ||
+    coerceString(sourceEvent?.properties?.permission) ||
+    coerceString(sourceEvent?.message) ||
+    coerceString(sourceEvent?.error?.message);
 
-    child.on("error", () => resolve());
-    child.on("close", () => resolve());
+  if (!message) {
+    return null;
+  }
+  if (message.startsWith("Permission requested:")) {
+    return message;
+  }
+  if (sourceEvent?.properties?.permission) {
+    return `Permission requested: ${message}`;
+  }
+  return message;
+}
 
-    try {{
-      child.stdin.write(JSON.stringify(eventPayload));
-    }} catch (_error) {{
-      // ignore serialization/pipe errors
-    }} finally {{
-      child.stdin.end();
-    }}
-  }});
-}}
+function defaultMessage(eventType) {
+  switch (eventType) {
+    case "stop":
+      return "OpenCode task completed.";
+    case "decision":
+      return "OpenCode is waiting for your input.";
+    default:
+      return "OpenCode event received.";
+  }
+}
 
-export const AgentBarNotifyPlugin = async () => {{
-  return {{
-    event: async (input) => {{
-      const event = input?.event;
-      if (!event || typeof event !== "object") {{
+function forwardToAgentBar(payload) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) {
         return;
-      }}
+      }
+      settled = true;
+      try {
+        socket.destroy();
+      } catch (_error) {
+        // no-op
+      }
+      resolve();
+    };
 
-      if (!FORWARDED_EVENT_TYPES.has(event.type)) {{
+    const socket = createConnection(SOCKET_PATH);
+    socket.on("error", finish);
+    socket.on("timeout", finish);
+    socket.on("close", finish);
+    socket.setTimeout(500);
+
+    socket.on("connect", () => {
+      try {
+        socket.write(`${JSON.stringify(payload)}\\n`);
+      } catch (_error) {
+        // ignore serialization/socket write errors
+      } finally {
+        socket.end();
+      }
+    });
+  });
+}
+
+export const AgentBarNotifyPlugin = async () => {
+  return {
+    event: async (input) => {
+      const sourceEvent =
+        input && typeof input.event === "object" ? input.event : input;
+      if (!sourceEvent || typeof sourceEvent !== "object") {
         return;
-      }}
+      }
 
-      await forwardToAgentBar(event);
-    }},
-  }};
-}};
+      const sourceType = coerceString(sourceEvent.type);
+      const eventType = mapEventType(sourceType);
+      if (!eventType) {
+        return;
+      }
+
+      const payload = {
+        agent: "opencode",
+        event: eventType,
+        session_id: extractSessionID(sourceEvent),
+        message: extractMessage(sourceEvent) || defaultMessage(eventType),
+        timestamp: new Date().toISOString(),
+      };
+      await forwardToAgentBar(payload);
+    },
+  };
+};
 '''
 
-sys.stdout.write(content)
+print(content, end="")
 PY
 }
 

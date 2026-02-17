@@ -117,7 +117,7 @@ case "$lower_event" in
     event_type="stop"
     ;;
   permission.asked|permission|required_permission)
-    event_type="permission"
+    event_type="decision"
     ;;
   question.asked|question|required_input|decision)
     event_type="decision"
@@ -134,9 +134,6 @@ if [[ -z "${message//[[:space:]]/}" ]]; then
   case "$event_type" in
     stop)
       message="OpenCode task completed."
-      ;;
-    permission)
-      message="OpenCode requested permission."
       ;;
     decision)
       message="OpenCode is waiting for your input."
