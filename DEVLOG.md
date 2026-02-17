@@ -510,3 +510,9 @@
 - **Footer version display**: `DetailPopoverView` now shows a version identifier below "Last updated" — displays git tag if available, otherwise short commit hash, in `.caption2` `.tertiary` style
 - **Static computation**: Version string is computed once via `static let` from `Bundle.main.infoDictionary` for zero runtime cost
 - All 209 tests passing
+
+
+## Iteration 60: Add Buy Me a Coffee button in popover
+- **BMC support button**: Added centered "Buy Me a Coffee" button between usage section and footer in `DetailPopoverView`. Opens `https://buymeacoffee.com/_scari` in default browser on click.
+- **Styling**: Orange `.bordered` button with coffee cup icon, centered in popover width
+- All 209 tests passing

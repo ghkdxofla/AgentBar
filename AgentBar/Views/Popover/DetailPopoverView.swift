@@ -37,6 +37,15 @@ struct DetailPopoverView: View {
 
             Spacer(minLength: 0)
 
+            // Buy Me a Coffee
+            Button(action: openBMC) {
+                Label("Buy Me a Coffee", systemImage: "cup.and.saucer.fill")
+                    .font(.caption)
+            }
+            .buttonStyle(.bordered)
+            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity)
+
             // Footer
             Divider()
 
@@ -70,6 +79,12 @@ struct DetailPopoverView: View {
     private func openSettings() {
         PopoverController.shared.hide()
         SettingsWindowController.shared.show()
+    }
+
+    private func openBMC() {
+        if let url = URL(string: "https://buymeacoffee.com/_scari") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private static let versionString: String = {
