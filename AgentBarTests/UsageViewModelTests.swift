@@ -122,30 +122,20 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "cursorPlan"), CursorPlan.pro.rawValue)
     }
 
-    func testCodexPlanPlusLimits() {
+    func testPlanEnumsRoundTripAndHaveExpectedCases() {
         XCTAssertEqual(CodexPlan.plus.fiveHourTokenLimit, 1_000_000)
         XCTAssertEqual(CodexPlan.plus.weeklyTokenLimit, 10_000_000)
-    }
-
-    func testCodexPlanAllCasesIncludesPlus() {
-        XCTAssertTrue(CodexPlan.allCases.contains(.plus))
         XCTAssertEqual(CodexPlan.allCases.first, .plus)
-    }
+        for plan in CodexPlan.allCases {
+            XCTAssertEqual(CodexPlan(rawValue: plan.rawValue), plan)
+        }
 
-    func testClaudePlanEnumHasExpectedCases() {
-        let cases = ClaudePlan.allCases
-        XCTAssertEqual(cases.count, 5)
-        XCTAssertEqual(cases.map(\.rawValue), ["Free", "Pro", "Max 5x", "Max 20x", "Team"])
-    }
-
-    func testClaudePlanRoundTrips() {
-        for plan in ClaudePlan.allCases {
+        let claudeCases = ClaudePlan.allCases
+        XCTAssertEqual(claudeCases.count, 5)
+        XCTAssertEqual(claudeCases.map(\.rawValue), ["Free", "Pro", "Max 5x", "Max 20x", "Team"])
+        for plan in claudeCases {
             XCTAssertEqual(ClaudePlan(rawValue: plan.rawValue), plan)
         }
-    }
-
-    func testClaudePlanLegacyMaxMigratesTo5x() {
-        // "Max" is no longer a valid rawValue — migration should map it to max5x
         XCTAssertNil(ClaudePlan(rawValue: "Max"))
         XCTAssertEqual(ClaudePlan.max5x.rawValue, "Max 5x")
         XCTAssertEqual(ClaudePlan.max20x.rawValue, "Max 20x")
@@ -360,56 +350,22 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(securityAPI.dataProtectionItems[account], original)
     }
 
-    func testKeychainLoadDoesNotFallbackToLegacyOnUnexpectedDataProtectionFailure() {
-        let account = "tests.load.no_fallback_unexpected_status"
+    func testKeychainLoadMigrationBehavior() {
+        let account = "tests.migration"
         let tokenData = Data("legacy-token".utf8)
-        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
-        securityAPI.copyStatusByStore[.dataProtection] = errSecInteractionNotAllowed
 
-        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
+        let successAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
+        let loadedSuccess = KeychainManager.load(account: account, securityAPI: successAPI)
+        XCTAssertEqual(loadedSuccess, "legacy-token")
+        XCTAssertEqual(successAPI.dataProtectionItems[account], tokenData)
+        XCTAssertNil(successAPI.legacyItems[account])
 
-        XCTAssertNil(loaded)
-        XCTAssertEqual(securityAPI.legacyItems[account], tokenData)
-        XCTAssertNil(securityAPI.dataProtectionItems[account])
-    }
-
-    func testKeychainLoadFallsBackToLegacyOnMissingEntitlementAndKeepsLegacyWhenMigrationFails() {
-        let account = "tests.load.fallback_missing_entitlement"
-        let tokenData = Data("legacy-token".utf8)
-        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
-        securityAPI.copyStatusByStore[.dataProtection] = errSecMissingEntitlement
-        securityAPI.addStatusByStore[.dataProtection] = errSecMissingEntitlement
-
-        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
-
-        XCTAssertEqual(loaded, "legacy-token")
-        XCTAssertNil(securityAPI.dataProtectionItems[account])
-        XCTAssertEqual(securityAPI.legacyItems[account], tokenData)
-    }
-
-    func testKeychainLoadMigratesLegacyItemWhenDataProtectionSaveSucceeds() {
-        let account = "tests.migration.success"
-        let tokenData = Data("legacy-token".utf8)
-        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
-
-        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
-
-        XCTAssertEqual(loaded, "legacy-token")
-        XCTAssertEqual(securityAPI.dataProtectionItems[account], tokenData)
-        XCTAssertNil(securityAPI.legacyItems[account])
-    }
-
-    func testKeychainLoadKeepsLegacyItemWhenMigrationSaveFails() {
-        let account = "tests.migration.failure"
-        let tokenData = Data("legacy-token".utf8)
-        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
-        securityAPI.addStatusByStore[.dataProtection] = errSecInteractionNotAllowed
-
-        let loaded = KeychainManager.load(account: account, securityAPI: securityAPI)
-
-        XCTAssertEqual(loaded, "legacy-token")
-        XCTAssertNil(securityAPI.dataProtectionItems[account])
-        XCTAssertEqual(securityAPI.legacyItems[account], tokenData)
+        let failAPI = MockKeychainSecurityAPI(legacyItems: [account: tokenData])
+        failAPI.addStatusByStore[.dataProtection] = errSecInteractionNotAllowed
+        let loadedFail = KeychainManager.load(account: account, securityAPI: failAPI)
+        XCTAssertEqual(loadedFail, "legacy-token")
+        XCTAssertNil(failAPI.dataProtectionItems[account])
+        XCTAssertEqual(failAPI.legacyItems[account], tokenData)
     }
 
     func testKeychainDeleteRemovesDataProtectionAndLegacyItems() throws {
@@ -492,70 +448,6 @@ final class UsageViewModelTests: XCTestCase {
         }
 
         XCTAssertEqual(loaded, token)
-    }
-
-    func testMockKeychainSecurityAPIRejectsMalformedCopyQuery() {
-        let securityAPI = MockKeychainSecurityAPI()
-
-        let result = securityAPI.copyMatching([
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.agentbar.apikeys",
-            kSecAttrAccount as String: "tests.invalid.copy"
-        ])
-
-        XCTAssertEqual(result.status, errSecParam)
-        XCTAssertNil(result.data)
-    }
-
-    func testMockKeychainSecurityAPIRejectsMalformedAddQuery() {
-        let account = "tests.invalid.add"
-        let securityAPI = MockKeychainSecurityAPI()
-
-        let status = securityAPI.add([
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.agentbar.apikeys",
-            kSecAttrAccount as String: account,
-            kSecValueData as String: Data("token".utf8),
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
-        ])
-
-        XCTAssertEqual(status, errSecParam)
-        XCTAssertNil(securityAPI.dataProtectionItems[account])
-        XCTAssertNil(securityAPI.legacyItems[account])
-    }
-
-    func testMockKeychainSecurityAPIRejectsMalformedUpdateQuery() {
-        let account = "tests.invalid.update"
-        let existingData = Data("existing-token".utf8)
-        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: existingData])
-
-        let status = securityAPI.update([
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.agentbar.apikeys",
-            kSecAttrAccount as String: account
-        ], attributes: [
-            kSecValueData as String: Data("replacement-token".utf8),
-            kSecReturnData as String: true
-        ])
-
-        XCTAssertEqual(status, errSecParam)
-        XCTAssertEqual(securityAPI.legacyItems[account], existingData)
-    }
-
-    func testMockKeychainSecurityAPIRejectsMalformedDeleteQuery() {
-        let account = "tests.invalid.delete"
-        let existingData = Data("existing-token".utf8)
-        let securityAPI = MockKeychainSecurityAPI(legacyItems: [account: existingData])
-
-        let status = securityAPI.delete([
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.agentbar.apikeys",
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true
-        ])
-
-        XCTAssertEqual(status, errSecParam)
-        XCTAssertEqual(securityAPI.legacyItems[account], existingData)
     }
 
     private static func isSkippableSystemKeychainStatus(

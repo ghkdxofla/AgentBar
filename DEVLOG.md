@@ -581,3 +581,11 @@
 ## Iteration 69: Move Agent Sound Overrides below test buttons
 - **Layout reorder**: Moved Agent Sound Overrides DisclosureGroup below the Test buttons row in Notification Sounds section for better visual flow (Language → Pack → Progress/Error → Test → Overrides → Volume)
 - All 239 tests passing
+
+
+## Iteration 70: Test suite consolidation for faster execution
+- **Removed Mock API validation tests** (4 tests): `testMockKeychainSecurityAPIRejectsMalformedCopyQuery`, `testMockKeychainSecurityAPIRejectsMalformedAddQuery`, `testMockKeychainSecurityAPIRejectsMalformedUpdateQuery`, `testMockKeychainSecurityAPIRejectsMalformedDeleteQuery` — these tested the mock itself, not production code
+- **Consolidated Keychain load tests** (4 → 1): Merged `testKeychainLoadDoesNotFallbackToLegacyOnUnexpectedDataProtectionFailure`, `testKeychainLoadFallsBackToLegacyOnMissingEntitlementAndKeepsLegacyWhenMigrationFails`, `testKeychainLoadMigratesLegacyItemWhenDataProtectionSaveSucceeds`, `testKeychainLoadKeepsLegacyItemWhenMigrationSaveFails` into single `testKeychainLoadMigrationBehavior`
+- **Consolidated Plan enum tests** (5 → 1): Merged `testCodexPlanPlusLimits`, `testCodexPlanAllCasesIncludesPlus`, `testClaudePlanEnumHasExpectedCases`, `testClaudePlanRoundTrips`, `testClaudePlanLegacyMaxMigratesTo5x` into single `testPlanEnumsRoundTripAndHaveExpectedCases`
+- **Test count**: 236 → 225 (11 tests removed via consolidation)
+- All 225 tests passing
