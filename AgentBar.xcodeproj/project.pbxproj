@@ -373,6 +373,7 @@
 			buildPhases = (
 				450ECC00D4FA325F92A901F3 /* Sources */,
 				738BBDBE43F3D1937A5C45F2 /* Frameworks */,
+				A1B2C3D4E5F60001ABCD0001 /* Embed Git Version Info */,
 			);
 			buildRules = (
 			);
@@ -418,6 +419,23 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A1B2C3D4E5F60001ABCD0001 /* Embed Git Version Info */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Git Version Info";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "PLIST=\"${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}\"\nGIT_HASH=$(git -C \"${SRCROOT}\" rev-parse --short HEAD 2>/dev/null || echo \"unknown\")\nGIT_TAG=$(git -C \"${SRCROOT}\" describe --tags --exact-match 2>/dev/null || echo \"\")\n/usr/libexec/PlistBuddy -c \"Add :GitCommitHash string ${GIT_HASH}\" \"${PLIST}\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Set :GitCommitHash ${GIT_HASH}\" \"${PLIST}\"\nif [ -n \"${GIT_TAG}\" ]; then\n  /usr/libexec/PlistBuddy -c \"Add :GitVersionTag string ${GIT_TAG}\" \"${PLIST}\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Set :GitVersionTag ${GIT_TAG}\" \"${PLIST}\"\nelse\n  /usr/libexec/PlistBuddy -c \"Delete :GitVersionTag\" \"${PLIST}\" 2>/dev/null || true\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		183B9300456E53AE419C918F /* Sources */ = {

@@ -504,3 +504,9 @@
 - **Hook script update**: `scripts/agentbar-opencode-hook.sh` now maps `permission.asked`/`permission`/`required_permission` to `decision`.
 - **Installer plugin update**: Generated OpenCode plugin from `scripts/install-agent-hooks.sh` now applies the same mapping so runtime behavior matches hook script behavior.
 - **Regression test**: Added `HookScriptFallbackTests.testOpenCodeHookMapsPermissionAskedToDecisionWithoutPython3` to verify OpenCode payload normalization without python3 dependency.
+
+## Iteration 59: Build version identifier in popover footer
+- **Run Script build phase**: Added "Embed Git Version Info" phase that injects `GitCommitHash` (and `GitVersionTag` if present) into the built product's Info.plist via PlistBuddy
+- **Footer version display**: `DetailPopoverView` now shows a version identifier below "Last updated" — displays git tag if available, otherwise short commit hash, in `.caption2` `.tertiary` style
+- **Static computation**: Version string is computed once via `static let` from `Bundle.main.infoDictionary` for zero runtime cost
+- All 209 tests passing

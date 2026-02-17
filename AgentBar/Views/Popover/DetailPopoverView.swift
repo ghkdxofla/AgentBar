@@ -41,14 +41,19 @@ struct DetailPopoverView: View {
             Divider()
 
             HStack {
-                if let error = viewModel.lastError {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                } else {
-                    Text("Last updated: \(relativeTimeString())")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let error = viewModel.lastError {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Text("Last updated: \(relativeTimeString())")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(Self.versionString)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
                 Spacer()
                 Button("Quit") {
@@ -66,6 +71,17 @@ struct DetailPopoverView: View {
         PopoverController.shared.hide()
         SettingsWindowController.shared.show()
     }
+
+    private static let versionString: String = {
+        let info = Bundle.main.infoDictionary
+        if let tag = info?["GitVersionTag"] as? String, !tag.isEmpty {
+            return tag
+        }
+        if let hash = info?["GitCommitHash"] as? String, !hash.isEmpty {
+            return hash
+        }
+        return info?["CFBundleShortVersionString"] as? String ?? "unknown"
+    }()
 
     private func relativeTimeString() -> String {
         guard let latest = viewModel.usageData.map(\.lastUpdated).max() else {
