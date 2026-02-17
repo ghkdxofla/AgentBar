@@ -420,29 +420,6 @@
 - All 186 tests passing
 
 
-## Iteration 53: Fix Z.ai tests deleting real keychain data
-- **Root cause**: `ZaiUsageProviderTests` called `KeychainManager.delete(account: "zai")` in setUp/tearDown, which deleted the user's real Z.ai API key from the keychain — causing Z.ai to disappear from the popover after running tests
-- **credentialProvider injection**: Added `credentialProvider` closure parameter to `ZaiUsageProvider.init()`, matching the pattern used by `CopilotUsageProvider`. Production code defaults to reading from `KeychainManager`, tests inject mock credentials via closure
-- **Test rewrite**: Removed all `KeychainManager.save/delete` calls from `ZaiUsageProviderTests`. Tests now use `makeProvider(credential:)` helper that injects credentials without touching the real keychain
-- **isConfigured()**: Now uses the injected `credentialProvider()` instead of directly calling `KeychainManager.load()`
-- All 186 tests passing
-
-## Iteration 52: Fix recurring button focus ring in popover
-- **Removed FocusState**: Deleted `@FocusState`, `PopoverButton` enum, and `.focused()` modifiers from `DetailPopoverView` — these explicitly registered buttons as focus targets, causing the ring to shift between buttons whenever one was removed
-- **Clear first responder on open**: Added `makeFirstResponder(nil)` in `PopoverController.show()` after the popover is displayed, so no element receives keyboard focus when the popover appears
-- All 186 tests passing
-
-## Iteration 51: Enable launch at login by default
-- **Default changed**: `launchAtLogin` default value from `false` → `true`
-- **First-launch registration**: Added `registerLoginItemIfNeeded()` in `AppDelegate` — on first launch (when UserDefaults key is absent), writes the default and calls `LoginItemManager.setEnabled(true)` to actually register the login item
-- All 186 tests passing
-
-## Iteration 50: Split agent sources into separate section, add help sheet, Z.ai cache TTL
-- **Agent Sources section**: Moved Codex file watcher and Claude hook toggles from "Agent Notifications (Beta)" into a dedicated "Agent Sources" section, since they are agent-specific configuration
-- **Help sheet**: Removed inline description captions (socket path, hook script setup, codex fallback) from the notifications UI and added a `?` button on the Agent Sources header that opens `AgentSourcesHelpSheet` with full documentation
-- **Z.ai response cache**: Added 60-second minimum cache TTL to `ZaiUsageProvider` via `cachedIfFresh()`/`updateCache()` static methods, preventing excessive API requests when refresh interval is below 60s
-- All 186 tests passing
-
 ## Iteration 49: Rename Alert → Notification terminology
 - **Renamed models**: `AgentAlertEvent` → `AgentNotifyEvent`, `AgentAlertEventType` → `AgentNotifyEventType`
 - **Renamed infrastructure**: `AgentAlertMonitor` → `AgentNotifyMonitor`, `AgentAlertNotificationService` → `AgentNotifyNotificationService`, `AlertSocketListener` → `NotifySocketListener`, `AlertSoundManager` → `NotifySoundManager`
@@ -454,12 +431,41 @@
 - **AppDelegate**: `alertMonitor` → `notifyMonitor`
 - All 186 tests passing
 
+
+## Iteration 50: Split agent sources into separate section, add help sheet, Z.ai cache TTL
+- **Agent Sources section**: Moved Codex file watcher and Claude hook toggles from "Agent Notifications (Beta)" into a dedicated "Agent Sources" section, since they are agent-specific configuration
+- **Help sheet**: Removed inline description captions (socket path, hook script setup, codex fallback) from the notifications UI and added a `?` button on the Agent Sources header that opens `AgentSourcesHelpSheet` with full documentation
+- **Z.ai response cache**: Added 60-second minimum cache TTL to `ZaiUsageProvider` via `cachedIfFresh()`/`updateCache()` static methods, preventing excessive API requests when refresh interval is below 60s
+- All 186 tests passing
+
+
+## Iteration 51: Enable launch at login by default
+- **Default changed**: `launchAtLogin` default value from `false` → `true`
+- **First-launch registration**: Added `registerLoginItemIfNeeded()` in `AppDelegate` — on first launch (when UserDefaults key is absent), writes the default and calls `LoginItemManager.setEnabled(true)` to actually register the login item
+- All 186 tests passing
+
+
+## Iteration 52: Fix recurring button focus ring in popover
+- **Removed FocusState**: Deleted `@FocusState`, `PopoverButton` enum, and `.focused()` modifiers from `DetailPopoverView` — these explicitly registered buttons as focus targets, causing the ring to shift between buttons whenever one was removed
+- **Clear first responder on open**: Added `makeFirstResponder(nil)` in `PopoverController.show()` after the popover is displayed, so no element receives keyboard focus when the popover appears
+- All 186 tests passing
+
+
 ## Iteration 52: Add Z.ai usage provider test coverage
 - **New test suite**: Added `ZaiUsageProviderTests` to cover Z.ai quota parsing, plan capitalization, keychain configuration detection, and cache TTL behavior
 - **Auth retry verification**: Added API mock protocol assertions for Bearer-first then raw-key retry flow when receiving `401 Unauthorized`
 - **Error-path coverage**: Added tests for missing API key (`APIError.unauthorized`) and malformed quota payload without limits (`APIError.noData`)
 - **Cache behavior checks**: Added tests that verify `cachedIfFresh` expiration and `fetchUsage` short-circuiting to cache without network calls
 - All 194 tests passing
+
+
+## Iteration 53: Fix Z.ai tests deleting real keychain data
+- **Root cause**: `ZaiUsageProviderTests` called `KeychainManager.delete(account: "zai")` in setUp/tearDown, which deleted the user's real Z.ai API key from the keychain — causing Z.ai to disappear from the popover after running tests
+- **credentialProvider injection**: Added `credentialProvider` closure parameter to `ZaiUsageProvider.init()`, matching the pattern used by `CopilotUsageProvider`. Production code defaults to reading from `KeychainManager`, tests inject mock credentials via closure
+- **Test rewrite**: Removed all `KeychainManager.save/delete` calls from `ZaiUsageProviderTests`. Tests now use `makeProvider(credential:)` helper that injects credentials without touching the real keychain
+- **isConfigured()**: Now uses the injected `credentialProvider()` instead of directly calling `KeychainManager.load()`
+- All 186 tests passing
+
 
 ## Iteration 54: Agent notification hook reliability + OpenCode first-class source
 - **Legacy settings migration on launch**: Added `AgentNotifySettingsMigrator` and wired `AgentNotifySettingsMigrator.migrateIfNeeded()` in `AppDelegate.applicationDidFinishLaunching`. Migrates `alert*` keys to `notification*` keys and removes old keys after migration.
