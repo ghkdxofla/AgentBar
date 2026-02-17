@@ -5,6 +5,8 @@
 </p>
 
 [![Apple Notarized](https://img.shields.io/badge/Apple-Notarized-000000?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution)
+[![Coverage](https://img.shields.io/badge/coverage-78%25-green)](#build)
+
 macOS menu bar app that tracks AI coding assistant usage in one place.
 
 <p align="center">
@@ -33,7 +35,7 @@ macOS menu bar app that tracks AI coding assistant usage in one place.
 
 ## Install
 
-Download `AgentBar.dmg` from [Releases](https://github.com/scari/CCUsageBar/releases), open the DMG, and drag AgentBar to Applications.
+Download `AgentBar.dmg` from [Releases](https://github.com/scari/AgentBar/releases), open the DMG, and drag AgentBar to Applications.
 
 ## Build
 
