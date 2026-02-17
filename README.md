@@ -44,4 +44,4 @@ AgentBar is a macOS menu bar app that tracks AI coding assistant usage in one pl
 
 ## License
 
-MIT License. See `[LICENSE](LICENSE)`.
+MIT License. See [LICENSE](LICENSE).

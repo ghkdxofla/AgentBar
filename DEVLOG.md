@@ -528,3 +528,10 @@
 - **Ranking consistency**: Popover ranking uses the same score/tie-break policy as status bar ranking (`max(5h, weekly)` then service order), while keeping unavailable rows visible in the popover.
 - **Coverage added**: Added `DetailPopoverViewTests.testSortedForDisplayOrdersByHighestUsageDescending`, `DetailPopoverViewTests.testSortedForDisplayUsesServiceOrderAsTieBreaker`, and `DetailPopoverViewTests.testSortedForDisplayKeepsUnavailableRows`.
 - All 213 tests passing
+
+## Iteration 63: SVG icon automation for README/DMG packaging
+- **Icon pipeline script**: Added `scripts/generate-icons.sh` to generate app icon assets from `docs/assets/agentbar-icon.svg`.
+- **Output formats**: Script produces `1024` master PNG, resized PNG set (`16` through `1024`), `.iconset`, and `.icns` under `build/icons/`.
+- **Renderer fallback**: SVG rendering automatically falls back across available tools (`rsvg-convert`, `inkscape`, `magick`, `sips`, `qlmanage`).
+- **ICNS fallback**: Uses `iconutil` when available and falls back to `python3 + Pillow` when `iconutil` rejects iconset conversion in the local environment.
+- **README docs**: Added concise icon-generation usage and output paths.
