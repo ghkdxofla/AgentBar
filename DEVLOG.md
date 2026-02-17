@@ -552,3 +552,12 @@
 - **Settings UI refactoring**: Replaced NSOpenPanel file browser with Picker dropdown from CESP registry; added download progress bar, error display, and refresh button; removed `chooseSoundPackDirectory()` method
 - **New tests**: `CESPRegistryPackTests` (8 tests), `CESPPackDownloadServiceTests` (4 tests with `MockURLProtocol`), 5 new `NotifySoundManagerTests` for real CESP format, display name, and fallback behavior
 - All 231 tests passing
+
+## Iteration 66: Sound pack settings UI enhancement
+- **Language filter**: Added `selectedLanguage` and `filteredPacks` to `SoundPackViewModel`; `availableLanguages` computed from pack list; Language Picker in settings filters pack dropdown
+- **Agent sound overrides**: Per-agent (Claude, Codex, OpenCode) sound pack selection with Default/None/pack options; stored in UserDefaults as `notificationSoundPackName_{keychainAccount}` and `notificationSoundPackPath_{keychainAccount}`
+- **NotifySoundManager refactored**: `play(for:service:)` resolves agent-specific pack path before falling back to global; added `resolvePackPath(for:)` and manifest cache (`resolveManifest(at:)`); removed `isCategoryEnabled()` as category toggles were redundant with notification-level toggles
+- **AgentNotifyNotificationService**: Passes `event.service` to `NotifySoundManager.play(for:service:)` for per-agent sound routing
+- **SettingsView cleanup**: Removed `notificationSoundTaskCompleteEnabled`/`notificationSoundInputRequiredEnabled` toggles; added Language picker, Agent Sound Overrides DisclosureGroup; moved Volume slider to section bottom; Test buttons retained
+- **Tests**: Added agent-override tests (`testPlayReturnsFalseWhenAgentSetToNone`, `testPlayUsesGlobalPackWhenNoAgentOverride`, `testPlayReturnsFalseWhenNoPackConfiguredWithService`); language filtering tests in CESPRegistryPackTests (`testLanguageFieldDecodes`, `testLanguageFilteringOnPacks`, `testAvailableLanguagesFromPacks`)
+- All 236 tests passing

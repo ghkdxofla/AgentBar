@@ -55,7 +55,7 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         content.body = "\(event.notificationSourceTag) \(body)"
 
         #if AGENTBAR_NOTIFICATION_SOUNDS
-        let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type)
+        let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type, service: event.service)
         content.sound = didPlayCustomSound ? nil : .default
         #else
         content.sound = .default

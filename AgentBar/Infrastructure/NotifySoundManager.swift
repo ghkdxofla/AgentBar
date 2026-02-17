@@ -94,27 +94,25 @@ final class NotifySoundManager: @unchecked Sendable {
         eventType.cespCategory
     }
 
-    func play(for eventType: AgentNotifyEventType) -> Bool {
+    func play(for eventType: AgentNotifyEventType, service: ServiceType? = nil) -> Bool {
         let category = Self.cespCategory(for: eventType)
 
-        guard isCategoryEnabled(category) else { return false }
-
-        guard let packPath = defaults.string(forKey: "notificationSoundPackPath"),
+        guard let packPath = resolvePackPath(for: service),
               !packPath.isEmpty else {
             return false
         }
 
-        lock.lock()
-        guard let m = manifest else {
-            lock.unlock()
-            return false
-        }
-        let sounds = m.soundFiles(for: category)
-        guard !sounds.isEmpty else {
-            lock.unlock()
+        let resolvedManifest = resolveManifest(at: packPath)
+        guard let m = resolvedManifest else {
             return false
         }
 
+        let sounds = m.soundFiles(for: category)
+        guard !sounds.isEmpty else {
+            return false
+        }
+
+        lock.lock()
         let lastPlayed = lastPlayedPerCategory[category]
         let candidates: [String]
         if sounds.count > 1, let lastPlayed {
@@ -195,18 +193,44 @@ final class NotifySoundManager: @unchecked Sendable {
             : 0.7
     }
 
-    private func isCategoryEnabled(_ category: String) -> Bool {
-        let key: String
-        switch category {
-        case "task.complete":
-            key = "notificationSoundTaskCompleteEnabled"
-        case "input.required":
-            key = "notificationSoundInputRequiredEnabled"
-        default:
-            return false
+    private func resolvePackPath(for service: ServiceType?) -> String? {
+        if let service {
+            let agentNameKey = "notificationSoundPackName_\(service.keychainAccount)"
+            if let agentName = defaults.string(forKey: agentNameKey) {
+                // "__none__" means no custom sound for this agent
+                if agentName == "__none__" { return nil }
+                // Use agent-specific path
+                let agentPathKey = "notificationSoundPackPath_\(service.keychainAccount)"
+                return defaults.string(forKey: agentPathKey)
+            }
+            // No override set → fall through to global
         }
-        guard defaults.object(forKey: key) != nil else { return true }
-        return defaults.bool(forKey: key)
+        return defaults.string(forKey: "notificationSoundPackPath")
+    }
+
+    private var manifestCache: [String: CESPManifest] = [:]
+
+    private func resolveManifest(at packPath: String) -> CESPManifest? {
+        lock.lock()
+        if let cached = manifestCache[packPath] {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let manifestURL = URL(fileURLWithPath: packPath)
+            .appendingPathComponent("openpeon.json")
+
+        guard fileManager.fileExists(atPath: manifestURL.path),
+              let data = try? Data(contentsOf: manifestURL),
+              let parsed = try? JSONDecoder().decode(CESPManifest.self, from: data) else {
+            return nil
+        }
+
+        lock.lock()
+        manifestCache[packPath] = parsed
+        lock.unlock()
+        return parsed
     }
 
     private func loadLastPlayedState() {
@@ -248,7 +272,7 @@ final class NotifySoundManager: @unchecked Sendable {
         eventType.cespCategory
     }
 
-    func play(for eventType: AgentNotifyEventType) -> Bool { false }
+    func play(for eventType: AgentNotifyEventType, service: ServiceType? = nil) -> Bool { false }
     func playTest(category: String) -> Bool { false }
 }
 

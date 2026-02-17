@@ -104,6 +104,61 @@ final class CESPRegistryPackTests: XCTestCase {
         XCTAssertNil(index.packs[0].tags)
     }
 
+    func testLanguageFieldDecodes() throws {
+        let json = """
+        {
+          "packs": [
+            {
+              "name": "wc3-en",
+              "display_name": "Warcraft III (EN)",
+              "source_repo": "user/repo",
+              "source_ref": "main",
+              "source_path": "pack",
+              "language": "en"
+            },
+            {
+              "name": "wc3-de",
+              "display_name": "Warcraft III (DE)",
+              "source_repo": "user/repo",
+              "source_ref": "main",
+              "source_path": "pack",
+              "language": "de"
+            }
+          ]
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let index = try JSONDecoder().decode(CESPRegistryIndex.self, from: data)
+        XCTAssertEqual(index.packs[0].language, "en")
+        XCTAssertEqual(index.packs[1].language, "de")
+    }
+
+    func testLanguageFilteringOnPacks() {
+        let packs = [
+            makeTestPack(name: "en1", language: "en"),
+            makeTestPack(name: "de1", language: "de"),
+            makeTestPack(name: "en2", language: "en"),
+            makeTestPack(name: "nil1", language: nil),
+        ]
+
+        let filtered = packs.filter { $0.language == "en" }
+        XCTAssertEqual(filtered.count, 2)
+        XCTAssertEqual(filtered.map(\.name), ["en1", "en2"])
+    }
+
+    func testAvailableLanguagesFromPacks() {
+        let packs = [
+            makeTestPack(name: "a", language: "en"),
+            makeTestPack(name: "b", language: "de"),
+            makeTestPack(name: "c", language: "en"),
+            makeTestPack(name: "d", language: "zh-CN"),
+            makeTestPack(name: "e", language: nil),
+        ]
+
+        let langs = Set(packs.compactMap(\.language)).sorted()
+        XCTAssertEqual(langs, ["de", "en", "zh-CN"])
+    }
+
     // MARK: - Helpers
 
     private func makeTestPack(
@@ -111,7 +166,8 @@ final class CESPRegistryPackTests: XCTestCase {
         sourceRepo: String = "user/repo",
         sourceRef: String = "main",
         sourcePath: String = "pack",
-        totalSizeBytes: Int? = nil
+        totalSizeBytes: Int? = nil,
+        language: String? = nil
     ) -> CESPRegistryPack {
         CESPRegistryPack(
             name: name,
@@ -122,7 +178,7 @@ final class CESPRegistryPackTests: XCTestCase {
             source_path: sourcePath,
             sound_count: nil,
             total_size_bytes: totalSizeBytes,
-            language: nil,
+            language: language,
             trust_tier: nil,
             tags: nil
         )

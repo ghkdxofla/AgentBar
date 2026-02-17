@@ -20,8 +20,6 @@ struct SettingsView: View {
     @AppStorage("notificationSoundPackPath") private var notificationSoundPackPath: String = ""
     @AppStorage("notificationSoundPackName") private var notificationSoundPackName: String = ""
     @AppStorage("notificationSoundVolume") private var notificationSoundVolume: Double = 0.7
-    @AppStorage("notificationSoundTaskCompleteEnabled") private var notificationSoundTaskCompleteEnabled = true
-    @AppStorage("notificationSoundInputRequiredEnabled") private var notificationSoundInputRequiredEnabled = true
     #endif
 
     @AppStorage("claudeEnabled") private var claudeEnabled = true
@@ -420,10 +418,18 @@ struct SettingsView: View {
             #if AGENTBAR_NOTIFICATION_SOUNDS
             Section {
                 DisclosureGroup {
+                    Picker("Language", selection: $soundPackVM.selectedLanguage) {
+                        Text("All").tag("")
+                        ForEach(soundPackVM.availableLanguages, id: \.self) { lang in
+                            Text(lang).tag(lang)
+                        }
+                    }
+                    .disabled(!notificationsEnabled)
+
                     HStack {
                         Picker("Sound pack", selection: $soundPackVM.selectedPackName) {
                             Text("None").tag("")
-                            ForEach(soundPackVM.availablePacks) { pack in
+                            ForEach(soundPackVM.filteredPacks) { pack in
                                 HStack {
                                     Text(pack.display_name)
                                     if !pack.formattedSize.isEmpty {
@@ -464,21 +470,7 @@ struct SettingsView: View {
                             .foregroundStyle(.red)
                     }
 
-                    HStack {
-                        Text("Volume:")
-                        Slider(value: $notificationSoundVolume, in: 0...1, step: 0.1)
-                            .frame(width: 150)
-                        Text(String(format: "%.0f%%", notificationSoundVolume * 100))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 40, alignment: .trailing)
-                    }
-                    .disabled(!notificationsEnabled)
-
-                    Toggle("Task complete sounds", isOn: $notificationSoundTaskCompleteEnabled)
-                        .disabled(!notificationsEnabled)
-
-                    Toggle("Input required sounds", isOn: $notificationSoundInputRequiredEnabled)
-                        .disabled(!notificationsEnabled)
+                    agentSoundOverridesSection
 
                     HStack {
                         Button("Test task.complete") {
@@ -491,6 +483,16 @@ struct SettingsView: View {
                         }
                         .disabled(!notificationsEnabled || notificationSoundPackPath.isEmpty)
                     }
+
+                    HStack {
+                        Text("Volume:")
+                        Slider(value: $notificationSoundVolume, in: 0...1, step: 0.1)
+                            .frame(width: 150)
+                        Text(String(format: "%.0f%%", notificationSoundVolume * 100))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                    .disabled(!notificationsEnabled)
                 } label: {
                     HStack {
                         Text("Notification Sounds")
@@ -514,6 +516,29 @@ struct SettingsView: View {
         }
         #endif
     }
+
+    #if AGENTBAR_NOTIFICATION_SOUNDS
+    private var agentSoundOverridesSection: some View {
+        DisclosureGroup("Agent Sound Overrides") {
+            ForEach(SoundPackViewModel.overridableAgents, id: \.rawValue) { service in
+                let account = service.keychainAccount
+                let binding = Binding<String>(
+                    get: { soundPackVM.agentOverrides[account] ?? "" },
+                    set: { soundPackVM.selectAgentPack(service, name: $0) }
+                )
+                Picker(service.rawValue, selection: binding) {
+                    Text("Default").tag("")
+                    Text("None").tag("__none__")
+                    ForEach(soundPackVM.filteredPacks) { pack in
+                        Text(pack.display_name).tag(pack.name)
+                    }
+                }
+                .disabled(!notificationsEnabled)
+            }
+        }
+        .disabled(!notificationsEnabled)
+    }
+    #endif
 
     @discardableResult
     private func saveCopilotPAT() -> Bool {
