@@ -1,5 +1,10 @@
 # AgentBar Development Log
 
+## Iteration 70: Add app icon to Asset Catalog + update README
+- **AppIcon asset catalog**: Created `Assets.xcassets/AppIcon.appiconset` with all macOS icon sizes (16–512@2x), added PBXResourcesBuildPhase to Xcode project so the icon is included in the app bundle
+- **README.md**: Simplified to match v0.4 feature set — cleaner service table, feature list, install/build sections
+- All 225 tests passing
+
 ## Iteration 1: Project Scaffolding + Build Verification
 - Created `project.yml` for xcodegen (macOS 13.0, LSUIElement, entitlements)
 - Set up `AgentBar/Info.plist` with LSUIElement=true

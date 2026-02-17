@@ -5,41 +5,47 @@
 </p>
 
 [![Apple Notarized](https://img.shields.io/badge/Apple-Notarized-000000?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution)
-[![Coverage](https://img.shields.io/badge/coverage-59.6%25-yellow)](#test--coverage)
 
-AgentBar is a macOS menu bar app that tracks AI coding assistant usage in one place.
+macOS menu bar app that tracks AI coding assistant usage in one place.
 
 <p align="center">
   <img src="docs/assets/screenshot.png" alt="AgentBar Screenshot" />
 </p>
 
-## What It Does
+## Supported Services
 
-- Shows current usage in the menu bar and detailed metrics in a popover.
-- Supports Claude Code, OpenAI Codex, Google Gemini, GitHub Copilot, Cursor, and Z.ai.
-- Includes configurable desktop notifications (Codex watcher + Claude/OpenCode hooks).
+| Service | Data Source |
+|---------|-----------|
+| Claude Code | Anthropic OAuth API (Keychain credential) |
+| OpenAI Codex | Local session logs (`~/.codex/sessions/`) |
+| Google Gemini | Local logs (`~/.gemini/tmp/`) |
+| GitHub Copilot | GitHub Copilot API (PAT from Keychain) |
+| Cursor | Cursor API + local SQLite DB |
+| Z.ai | Z.ai quota API (API key from Keychain) |
 
-## How Usage Is Collected
+## Features
 
-- Claude Code: Anthropic OAuth usage API (credential read from local Keychain).
-- OpenAI Codex: local session logs in `~/.codex/sessions` (JSONL parsing).
-- Google Gemini: local logs in `~/.gemini/tmp/**/logs.json`.
-- GitHub Copilot: GitHub Copilot API (`gh auth token` first, optional PAT fallback).
-- Cursor: Cursor local DB token + Cursor usage API.
-- Z.ai: Z.ai quota API with API key from Keychain.
+- Stacked usage bar in the menu bar, sorted by usage
+- Detail popover with per-service metrics
+- Desktop notifications for agent events (Claude hooks, Codex watcher)
+- Configurable refresh interval, per-service enable/disable
+- Plan/limit controls and API key management
+- Sound pack support via CESP registry
 
-## Settings Menu
+## Install
 
-- Usage tab: launch at login, refresh interval, per-service enable/disable.
-- Usage tab: plan/limit controls and API key/PAT save (service-dependent).
-- Notifications tab: notification on/off, event categories, source toggles, message preview.
-- Notifications tab: hook status check and sound pack configuration.
+Download `AgentBar.dmg` from [Releases](https://github.com/scari/CCUsageBar/releases), open the DMG, and drag AgentBar to Applications.
 
-## Test / Coverage
+## Build
 
-- Test command: `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS'`
-- Latest local result: `213 tests, 0 failures`
-- Coverage report command: `xcrun xccov view --report <path-to-xcresult>`
+```sh
+# Build & Run
+xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet
+open build/Build/Products/Debug/AgentBar.app
+
+# Test
+xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS'
+```
 
 ## Support
 

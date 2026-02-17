@@ -70,6 +70,7 @@
 		F170BA5EC5D011596BD52DCF /* DetailPopoverViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C159E0C80DB514BBF986E6 /* DetailPopoverViewTests.swift */; };
 		F1AD3836030930D7C0009875 /* CodexUsageProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC18E21D095D18251F7E9DBB /* CodexUsageProviderTests.swift */; };
 		FCE5028EE8EE278731C8DA7E /* CodexNotifyEventDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20A6ABE351ED25CC0D1A595D /* CodexNotifyEventDetectorTests.swift */; };
+		AA000001ASSETS0000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000002ASSETS0000000002 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -149,6 +150,7 @@
 		F17BA952C208A2A34C428D88 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		F5E8FE4C68C3CE713FD06DB8 /* ClaudeHookNotifyEventDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNotifyEventDetectorTests.swift; sourceTree = "<group>"; };
 		FCCC943FDF80266E8F2A5F64 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		AA000002ASSETS0000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -177,6 +179,7 @@
 				758D0717F59EC6FDE2447BA9 /* AgentBar.entitlements */,
 				8259B8727B73CB3C81B552FC /* AgentBarApp.swift */,
 				E586F56F84C70C31B3A4C7A1 /* AppDelegate.swift */,
+				AA000002ASSETS0000000002 /* Assets.xcassets */,
 				6C5F7A9F14F77AE444864261 /* Info.plist */,
 				BE6D4902BB6AEB4E12E15984 /* Infrastructure */,
 				0C0C87F18A9AD5921B7923EC /* Models */,
@@ -391,6 +394,7 @@
 			buildPhases = (
 				450ECC00D4FA325F92A901F3 /* Sources */,
 				738BBDBE43F3D1937A5C45F2 /* Frameworks */,
+				AA000003RESOURCES000003 /* Resources */,
 				A1B2C3D4E5F60001ABCD0001 /* Embed Git Version Info */,
 			);
 			buildRules = (
@@ -437,6 +441,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA000003RESOURCES000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001ASSETS0000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		A1B2C3D4E5F60001ABCD0001 /* Embed Git Version Info */ = {
