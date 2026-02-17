@@ -9,6 +9,10 @@
 
 AgentBar is a macOS menu bar app that tracks AI coding assistant usage in one place.
 
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="AgentBar Screenshot" />
+</p>
+
 ## What It Does
 
 - Shows current usage in the menu bar and detailed metrics in a popover.
