@@ -451,7 +451,7 @@
 - All 186 tests passing
 
 
-## Iteration 52: Add Z.ai usage provider test coverage
+## Iteration 53: Add Z.ai usage provider test coverage
 - **New test suite**: Added `ZaiUsageProviderTests` to cover Z.ai quota parsing, plan capitalization, keychain configuration detection, and cache TTL behavior
 - **Auth retry verification**: Added API mock protocol assertions for Bearer-first then raw-key retry flow when receiving `401 Unauthorized`
 - **Error-path coverage**: Added tests for missing API key (`APIError.unauthorized`) and malformed quota payload without limits (`APIError.noData`)
@@ -459,7 +459,7 @@
 - All 194 tests passing
 
 
-## Iteration 53: Fix Z.ai tests deleting real keychain data
+## Iteration 54: Fix Z.ai tests deleting real keychain data
 - **Root cause**: `ZaiUsageProviderTests` called `KeychainManager.delete(account: "zai")` in setUp/tearDown, which deleted the user's real Z.ai API key from the keychain — causing Z.ai to disappear from the popover after running tests
 - **credentialProvider injection**: Added `credentialProvider` closure parameter to `ZaiUsageProvider.init()`, matching the pattern used by `CopilotUsageProvider`. Production code defaults to reading from `KeychainManager`, tests inject mock credentials via closure
 - **Test rewrite**: Removed all `KeychainManager.save/delete` calls from `ZaiUsageProviderTests`. Tests now use `makeProvider(credential:)` helper that injects credentials without touching the real keychain
@@ -467,7 +467,7 @@
 - All 186 tests passing
 
 
-## Iteration 54: Agent notification hook reliability + OpenCode first-class source
+## Iteration 55: Agent notification hook reliability + OpenCode first-class source
 - **Legacy settings migration on launch**: Added `AgentNotifySettingsMigrator` and wired `AgentNotifySettingsMigrator.migrateIfNeeded()` in `AppDelegate.applicationDidFinishLaunching`. Migrates `alert*` keys to `notification*` keys and removes old keys after migration.
 - **Codex hook config detection hardening**: Added `AgentHookConfigurationChecker` and settings status UI. Codex `notify` is now validated only at TOML top-level (table-local `notify` is treated as unconfigured).
 - **Agent Sources UI upgrade**: Added hook status rows + manual re-check action, OpenCode source toggle (`notificationOpencodeHookEventsEnabled`), and help sheet sections for OpenCode + safe installer usage.
@@ -482,7 +482,7 @@
 - **Tests**: Added `AgentHookConfigurationCheckerTests` + `AgentNotifySettingsMigratorTests`; expanded `AgentNotifyEventTests` (dedupe fallbacks) and `NotifySocketListenerTests` (OpenCode mapping + source toggle behavior).
 - **Verification**: Targeted suite run passed (`AgentHookConfigurationCheckerTests`, `AgentNotifySettingsMigratorTests`, `AgentNotifyEventTests`, `NotifySocketListenerTests`, `StatusBarDisplayPlannerTests`) — 32 tests, 0 failures.
 
-## Iteration 55: OSS hardening for signing secrets + history cleanup
+## Iteration 56: OSS hardening for signing secrets + history cleanup
 - **Team ID de-hardcode**: Removed hardcoded `DEVELOPMENT_TEAM` from `project.yml` and `AgentBar.xcodeproj/project.pbxproj`. Release signing scripts now require `DEVELOPMENT_TEAM` via environment variable instead of embedding a value in tracked files.
 - **Release script guardrails**: Updated `scripts/verify-release-signing.sh` and `scripts/release.sh` to fail fast with a clear message when `DEVELOPMENT_TEAM` is missing. Added parser coverage in `scripts/test-verify-release-signing.sh`.
 - **CI secret scanning**: Added `.github/workflows/secret-scan.yml` to run `gitleaks` against full git history on PRs and `main` pushes.
@@ -490,7 +490,7 @@
 - **History rewrite**: Rewrote repository history with `git filter-repo` to remove sensitive identifiers (team ID literal and personal alias) from blobs and commit/tag messages.
 - All 203 tests passing
 
-## Iteration 56: Agent notification settings simplification + source-aware preview
+## Iteration 57: Agent notification settings simplification + source-aware preview
 - **Notification event toggles simplified**: Settings now expose two event toggles only: `Task completed` and `Input required`. `permissionRequired` and `decisionRequired` remain distinct event types internally but share one title and one settings key.
 - **Unified settings key migration**: Added migration to map legacy input toggles (`notificationPermissionRequiredEnabled`, `notificationDecisionRequiredEnabled`, `alertPermissionRequiredEnabled`, `alertDecisionRequiredEnabled`) into `notificationInputRequiredEnabled`, then delete old keys.
 - **Message source identification improved**: Notification body prefix now uses a source tag with agent and optional session context (e.g. `[OpenAI Codex | session-1]`). Long session IDs are compacted for readability.
@@ -498,51 +498,51 @@
 - **Tests**: Updated notification body assertions to use source tags and added migration coverage for alert-era input keys.
 - All 208 tests passing
 
-## Iteration 57: OpenCode plugin reliability fix for Agent notifications
+## Iteration 58: OpenCode plugin reliability fix for Agent notifications
 - **Root issue area**: OpenCode notifications relied on spawning `agentbar-opencode-hook.sh` from plugin runtime; if process spawn/runtime environment failed silently, OpenCode events were dropped while other agents still worked.
 - **Plugin transport rewrite**: Installer now generates `~/.config/opencode/plugins/agentbar-notify.js` that writes normalized events directly to `~/.agentbar/events.sock` via `node:net` instead of shelling out per event.
 - **Event normalization hardening**: Added robust mapping and field extraction for `session.idle/session.completed`, `permission.asked`, and input/error variants; supports both `input.event` and direct event-shaped payloads.
 - **Safe install behavior preserved**: Re-running `scripts/install-agent-hooks.sh` still creates timestamped backups before modifying plugin files.
 - **Verification**: `bash -n scripts/install-agent-hooks.sh` passed, installer updated plugin with backup, and local dry-run confirmed plugin emits normalized OpenCode payloads over Unix socket.
 
-## Iteration 58: OpenCode event model aligned to two-category notifications
+## Iteration 59: OpenCode event model aligned to two-category notifications
 - **Two-category alignment**: OpenCode permission prompts are now normalized as `decision` (input-required) rather than a separate `permission` category, matching the app's simplified notification model (`task completed` vs `input required`).
 - **Hook script update**: `scripts/agentbar-opencode-hook.sh` now maps `permission.asked`/`permission`/`required_permission` to `decision`.
 - **Installer plugin update**: Generated OpenCode plugin from `scripts/install-agent-hooks.sh` now applies the same mapping so runtime behavior matches hook script behavior.
 - **Regression test**: Added `HookScriptFallbackTests.testOpenCodeHookMapsPermissionAskedToDecisionWithoutPython3` to verify OpenCode payload normalization without python3 dependency.
 
-## Iteration 59: Build version identifier in popover footer
+## Iteration 60: Build version identifier in popover footer
 - **Run Script build phase**: Added "Embed Git Version Info" phase that injects `GitCommitHash` (and `GitVersionTag` if present) into the built product's Info.plist via PlistBuddy
 - **Footer version display**: `DetailPopoverView` now shows a version identifier below "Last updated" — displays git tag if available, otherwise short commit hash, in `.caption2` `.tertiary` style
 - **Static computation**: Version string is computed once via `static let` from `Bundle.main.infoDictionary` for zero runtime cost
 - All 209 tests passing
 
 
-## Iteration 60: Add Buy Me a Coffee button in popover
+## Iteration 61: Add Buy Me a Coffee button in popover
 - **BMC support button**: Added centered "Buy Me a Coffee" button between usage section and footer in `DetailPopoverView`. Opens `https://buymeacoffee.com/_scari` in default browser on click.
 - **Styling**: Orange `.bordered` button with coffee cup icon, centered in popover width
 - All 209 tests passing
 
-## Iteration 61: Harden BMC action testability and coverage
+## Iteration 62: Harden BMC action testability and coverage
 - **Injectable URL opener**: `DetailPopoverView` now accepts an `openExternalURL` closure (defaulting to `NSWorkspace.shared.open`) so external-link behavior is testable without launching a browser.
 - **Deterministic action verification**: Added `triggerBMCForTesting()` behind `#if DEBUG` to exercise the same BMC action path in unit tests.
 - **New regression test**: Added `DetailPopoverViewTests.testBuyMeACoffeeActionOpensExpectedURL` to verify the BMC action opens `https://buymeacoffee.com/_scari`.
 - All 210 tests passing
 
-## Iteration 62: Popover usage ranking by consumption + release-focused tests
+## Iteration 63: Popover usage ranking by consumption + release-focused tests
 - **Popover ordering fix**: `DetailPopoverView` now renders usage rows with a consumption-based ranking (`DetailPopoverView.sortedForDisplay`) instead of fixed service order, so highest-usage agents appear first.
 - **Ranking consistency**: Popover ranking uses the same score/tie-break policy as status bar ranking (`max(5h, weekly)` then service order), while keeping unavailable rows visible in the popover.
 - **Coverage added**: Added `DetailPopoverViewTests.testSortedForDisplayOrdersByHighestUsageDescending`, `DetailPopoverViewTests.testSortedForDisplayUsesServiceOrderAsTieBreaker`, and `DetailPopoverViewTests.testSortedForDisplayKeepsUnavailableRows`.
 - All 213 tests passing
 
-## Iteration 63: SVG icon automation for README/DMG packaging
+## Iteration 64: SVG icon automation for README/DMG packaging
 - **Icon pipeline script**: Added `scripts/generate-icons.sh` to generate app icon assets from `docs/assets/agentbar-icon.svg`.
 - **Output formats**: Script produces `1024` master PNG, resized PNG set (`16` through `1024`), `.iconset`, and `.icns` under `build/icons/`.
 - **Renderer fallback**: SVG rendering automatically falls back across available tools (`rsvg-convert`, `inkscape`, `magick`, `sips`, `qlmanage`).
 - **ICNS fallback**: Uses `iconutil` when available and falls back to `python3 + Pillow` when `iconutil` rejects iconset conversion in the local environment.
 - **README docs**: Added concise icon-generation usage and output paths.
 
-## Iteration 64: CESP sound pack registry integration
+## Iteration 65: CESP sound pack registry integration
 - **Build flag**: Added `AGENTBAR_NOTIFICATION_SOUNDS` compilation condition (ON in Debug, OFF in Release) to gate all notification sound functionality; wrapped `NotifySoundManager`, `AgentNotifyNotificationService` sound calls, `SettingsView` sound sections, and `NotifySoundManagerTests` with `#if` guards
 - **CESPManifest dual format**: Updated `CESPManifest` to support both real CESP format (`categories.*.sounds[].{file, label}`) and legacy format (`sounds: [String: [String]]`), with `soundFiles(for:)` helper method
 - **CESPRegistryPack model**: New `CESPRegistryPack` (Decodable, Sendable, Identifiable) with computed `formattedSize`, `baseContentURL`, `manifestURL` properties; `CESPRegistryIndex` wrapper
