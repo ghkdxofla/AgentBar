@@ -302,8 +302,56 @@ final class ClaudeUsageProviderTests: XCTestCase {
             _ = try await provider.fetchUsage()
             XCTFail("Should have thrown")
         } catch {
-            // Expected — unauthorized
+            // Expected — unauthorized with no cache
         }
+    }
+
+    func testFallsBackToCacheOnAPIFailureWhenSevenDayCacheValid() async throws {
+        let defaults = makeDefaultsSuite()
+        // 5h cache expired, 7d cache still valid (reset in 3 days)
+        defaults.set(15.0, forKey: "claudeUsageCache.fiveHour.used")
+        defaults.set(100.0, forKey: "claudeUsageCache.fiveHour.total")
+        defaults.set(Date(timeIntervalSinceNow: -3600).timeIntervalSince1970,
+                     forKey: "claudeUsageCache.fiveHour.resetTime")
+
+        defaults.set(42.0, forKey: "claudeUsageCache.sevenDay.used")
+        defaults.set(100.0, forKey: "claudeUsageCache.sevenDay.total")
+        defaults.set(Date(timeIntervalSinceNow: 3 * 24 * 3600).timeIntervalSince1970,
+                     forKey: "claudeUsageCache.sevenDay.resetTime")
+
+        MockURLProtocol.stubResponse(data: Data(), statusCode: 401)
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { "expired-token" },
+            defaults: defaults
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        // 5h expired → 0%, 7d cached → 42%
+        XCTAssertEqual(usage.fiveHourUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage?.used, 42.0)
+        XCTAssertNotNil(usage.weeklyUsage?.resetTime)
+    }
+
+    func testFallsBackToCacheOnMissingCredentials() async throws {
+        let defaults = makeDefaultsSuite()
+        defaults.set(30.0, forKey: "claudeUsageCache.sevenDay.used")
+        defaults.set(100.0, forKey: "claudeUsageCache.sevenDay.total")
+        defaults.set(Date(timeIntervalSinceNow: 2 * 24 * 3600).timeIntervalSince1970,
+                     forKey: "claudeUsageCache.sevenDay.resetTime")
+
+        let provider = ClaudeUsageProvider(
+            session: MockURLProtocol.session(),
+            credentialProvider: { nil },
+            defaults: defaults
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.fiveHourUsage.used, 0)
+        XCTAssertEqual(usage.weeklyUsage?.used, 30.0)
     }
 
     func testHandlesMissingCredentials() async {

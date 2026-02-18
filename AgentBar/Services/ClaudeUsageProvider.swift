@@ -100,28 +100,32 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     func fetchUsage() async throws -> UsageData {
         guard let token = credentialProvider() else {
-            throw APIError.unauthorized
+            return try cachedOrThrow(APIError.unauthorized)
         }
 
         var request = URLRequest(url: Self.usageURL, timeoutInterval: 10)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
 
-        let (data, response) = try await session.data(for: request)
+        let usageResponse: ClaudeUsageResponse
+        do {
+            let (data, response) = try await session.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if httpResponse.statusCode == 401 {
-                throw APIError.unauthorized
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return try cachedOrThrow(APIError.invalidResponse)
             }
-            throw APIError.httpError(httpResponse.statusCode)
-        }
 
-        let usageResponse = (try? JSONDecoder().decode(ClaudeUsageResponse.self, from: data))
-            ?? ClaudeUsageResponse()
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let error: APIError = httpResponse.statusCode == 401
+                    ? .unauthorized : .httpError(httpResponse.statusCode)
+                return try cachedOrThrow(error)
+            }
+
+            usageResponse = (try? JSONDecoder().decode(ClaudeUsageResponse.self, from: data))
+                ?? ClaudeUsageResponse()
+        } catch {
+            return try cachedOrThrow(error)
+        }
 
         let fiveHour = resolveMetric(
             window: usageResponse.mergedWindow(for: "five_hour"),
@@ -139,6 +143,30 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             service: .claude,
             fiveHourUsage: fiveHour,
             weeklyUsage: sevenDay,
+            lastUpdated: Date(),
+            isAvailable: true,
+            planName: planName
+        )
+    }
+
+    /// Returns cached usage data when available, otherwise re-throws the original error.
+    /// This preserves valid 7d values when the API fails (e.g. token expiry overnight)
+    /// but the 7d reset window hasn't passed yet.
+    private func cachedOrThrow(_ error: Error) throws -> UsageData {
+        let now = Date()
+        let fiveHour = validCachedMetric(forKey: "claudeUsageCache.fiveHour", now: now)
+        let sevenDay = validCachedMetric(forKey: "claudeUsageCache.sevenDay", now: now)
+
+        guard fiveHour != nil || sevenDay != nil else { throw error }
+
+        let zeroPercent = UsageMetric(used: 0, total: 100, unit: .percent, resetTime: nil)
+        let planName = (defaults.string(forKey: "claudePlan")
+            .flatMap { ClaudePlan(rawValue: $0) } ?? .pro).rawValue
+
+        return UsageData(
+            service: .claude,
+            fiveHourUsage: fiveHour ?? zeroPercent,
+            weeklyUsage: sevenDay ?? zeroPercent,
             lastUpdated: Date(),
             isAvailable: true,
             planName: planName
