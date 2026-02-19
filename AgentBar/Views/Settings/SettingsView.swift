@@ -368,60 +368,6 @@ struct SettingsView: View {
                 .disabled(!notificationsEnabled)
             }
 
-            Section {
-                Toggle("Codex file watcher", isOn: $notificationCodexEventsEnabled)
-                    .disabled(!notificationsEnabled)
-                    .onChange(of: notificationCodexEventsEnabled) { _ in
-                        notifyNotificationsSettingsChanged()
-                    }
-
-                Toggle("Claude hook", isOn: $notificationClaudeHookEventsEnabled)
-                    .disabled(!notificationsEnabled)
-                    .onChange(of: notificationClaudeHookEventsEnabled) { _ in
-                        notifyNotificationsSettingsChanged()
-                    }
-
-                Toggle("OpenCode hook", isOn: $notificationOpencodeHookEventsEnabled)
-                    .disabled(!notificationsEnabled)
-                    .onChange(of: notificationOpencodeHookEventsEnabled) { _ in
-                        notifyNotificationsSettingsChanged()
-                    }
-
-                HookConfigurationStatusRow(
-                    title: "Codex notify hook",
-                    status: hookConfigurationStatus.codex
-                )
-
-                HookConfigurationStatusRow(
-                    title: "Claude hook command",
-                    status: hookConfigurationStatus.claude
-                )
-
-                HStack {
-                    Button("Re-check hook configuration") {
-                        refreshHookConfigurationStatus()
-                    }
-                    Spacer()
-                    if hookConfigurationStatus.checkedAt != .distantPast {
-                        Text(hookConfigurationStatus.checkedAt.formatted(date: .omitted, time: .shortened))
-                            .foregroundStyle(.secondary)
-                            .font(.caption2)
-                    }
-                }
-            } header: {
-                HStack {
-                    Text("Agent Sources")
-                    Spacer()
-                    Button {
-                        showingAgentSourcesHelp = true
-                    } label: {
-                        Image(systemName: "questionmark.circle")
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
             #if AGENTBAR_NOTIFICATION_SOUNDS
             Section {
                 Picker("Language", selection: $soundPackVM.selectedLanguage) {
@@ -513,6 +459,60 @@ struct SettingsView: View {
                 }
             }
             #endif
+
+            Section {
+                Toggle("Codex file watcher", isOn: $notificationCodexEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationCodexEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
+                    }
+
+                Toggle("Claude hook", isOn: $notificationClaudeHookEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationClaudeHookEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
+                    }
+
+                Toggle("OpenCode hook", isOn: $notificationOpencodeHookEventsEnabled)
+                    .disabled(!notificationsEnabled)
+                    .onChange(of: notificationOpencodeHookEventsEnabled) { _ in
+                        notifyNotificationsSettingsChanged()
+                    }
+
+                HookConfigurationStatusRow(
+                    title: "Codex notify hook",
+                    status: hookConfigurationStatus.codex
+                )
+
+                HookConfigurationStatusRow(
+                    title: "Claude hook command",
+                    status: hookConfigurationStatus.claude
+                )
+
+                HStack {
+                    Button("Re-check hook configuration") {
+                        refreshHookConfigurationStatus()
+                    }
+                    Spacer()
+                    if hookConfigurationStatus.checkedAt != .distantPast {
+                        Text(hookConfigurationStatus.checkedAt.formatted(date: .omitted, time: .shortened))
+                            .foregroundStyle(.secondary)
+                            .font(.caption2)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Agent Sources")
+                    Spacer()
+                    Button {
+                        showingAgentSourcesHelp = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
         .formStyle(.grouped)
         #if AGENTBAR_NOTIFICATION_SOUNDS

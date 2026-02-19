@@ -608,3 +608,8 @@
 - **Settings data hygiene**: Added invalid-value sanitization in `SettingsView.onAppear` so unknown stored sound mode values fall back to `system`.
 - **Behavioral test coverage**: Extended `AgentNotifyNotificationServiceBehaviorTests` with `testPostMutesSoundWhenSoundModeIsMute` to verify mute mode suppresses sound payloads.
 - All 253 tests passing
+
+## Iteration 72: Reorder notification settings sections
+- **Notification Sounds placement**: Moved the `Notification Sounds` section above `Agent Sources` in the Notifications tab (`SettingsView.notificationsTab`) so sound controls appear earlier in the workflow.
+- **No behavior changes**: Kept existing sound/source toggles and handlers unchanged; this is a presentation-order update only.
+- All 253 tests passing
