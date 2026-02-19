@@ -1,5 +1,13 @@
 # AgentBar Development Log
 
+## Iteration 77: Usage History Step 6 - build and runtime handoff
+- Rebuilt debug app with `xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet`
+- Attempted runtime handoff:
+  - terminated existing AgentBar process (`pkill -x AgentBar`)
+  - attempted to relaunch app bundle (`open build/Build/Products/Debug/AgentBar.app`)
+- In this execution environment, `open` returned LaunchServices error `-600` and direct binary launch exited immediately, so persistent UI runtime verification could not be completed from the agent side
+- Delivered build artifact path for local verification: `build/Build/Products/Debug/AgentBar.app`
+
 ## Iteration 76: Usage History Step 5 - test coverage
 - Added `UsageHistoryStoreTests`:
   - day record peak/average aggregation
