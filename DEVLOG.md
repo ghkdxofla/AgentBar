@@ -1,5 +1,17 @@
 # AgentBar Development Log
 
+## Iteration 74: Usage History Step 3 - History view model and cycle analytics
+- Added `UsageHistoryViewModel` in `AgentBar/ViewModels/UsageHistoryViewModel.swift`
+- Implemented daily heatmap data generation (`7 x weeks`) and daily summary metrics
+- Implemented secondary sample cycle grouping by `resetAt` for 7d consistency analysis
+- Added cycle metrics:
+  - completion rate
+  - days to 80% / 100%
+  - high-band hours (`>=80%`, capped segment)
+  - current completion streak
+- Wired history refresh to `Notification.Name.usageHistoryChanged`
+- Build passes
+
 ## Iteration 73: Usage History Step 2 - fetch pipeline integration
 - `UsageViewModel` now accepts `historyStore: UsageHistoryStoreProtocol` for dependency injection
 - `fetchAllUsage()` now tracks provider outcomes as success/failure separately
