@@ -207,6 +207,38 @@ final class CopilotUsageProviderTests: XCTestCase {
         XCTAssertEqual(usage.fiveHourUsage.total, 300)
     }
 
+    func testReusesCachedPlanNameWhenAPIFailsAfterSuccessfulFetch() async throws {
+        let successJSON = """
+        {
+            "copilot_plan": "business",
+            "quota_snapshots": [
+                {"quota_id": "premium_requests", "entitlement": 300, "remaining": 250, "unlimited": false}
+            ]
+        }
+        """
+
+        var attempt = 0
+        CopilotMockURLProtocol.responseProvider = { _ in
+            defer { attempt += 1 }
+            if attempt == 0 {
+                return (Data(successJSON.utf8), 200)
+            }
+            return (Data(), 500)
+        }
+
+        let provider = CopilotUsageProvider(
+            session: CopilotMockURLProtocol.session(),
+            credentialProvider: { "ghp_test" },
+            defaults: testDefaults
+        )
+
+        let firstUsage = try await provider.fetchUsage()
+        XCTAssertEqual(firstUsage.planName, "Business")
+
+        let fallbackUsage = try await provider.fetchUsage()
+        XCTAssertEqual(fallbackUsage.planName, "Business")
+    }
+
     func testReadGHCLITokenCachesResultWithinTTL() {
         let counter = CounterBox()
         CopilotUsageProvider.ghCLICommandRunner = { _ in

@@ -22,6 +22,32 @@ enum BuyMeACoffeeSettings {
 enum CopilotCredentialSettings {
     /// Enables Keychain fallback for Copilot when gh CLI token is unavailable.
     static let manualPATEnabledKey = "copilotManualPATEnabled"
+    /// One-time marker for migrating pre-flag users who already saved a Copilot PAT.
+    static let legacyManualPATMigrationCheckedKey = "copilotManualPATMigrationChecked"
+
+    static func isManualPATEnabled(in defaults: UserDefaults) -> Bool {
+        defaults.bool(forKey: manualPATEnabledKey, defaultValue: false)
+    }
+
+    /// Backward compatibility for users from builds that saved Copilot PAT
+    /// in Keychain before `copilotManualPATEnabled` existed.
+    static func migrateLegacyManualPATIfNeeded(
+        in defaults: UserDefaults,
+        loadSavedToken: (String) -> String? = { account in
+            KeychainManager.load(account: account)
+        }
+    ) {
+        guard !defaults.bool(forKey: legacyManualPATMigrationCheckedKey, defaultValue: false) else {
+            return
+        }
+
+        if !isManualPATEnabled(in: defaults),
+           loadSavedToken(ServiceType.copilot.keychainAccount) != nil {
+            defaults.set(true, forKey: manualPATEnabledKey)
+        }
+
+        defaults.set(true, forKey: legacyManualPATMigrationCheckedKey)
+    }
 }
 
 extension UserDefaults {

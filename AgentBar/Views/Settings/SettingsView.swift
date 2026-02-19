@@ -84,6 +84,7 @@ struct SettingsView: View {
             migrateLegacyClaudePlanIfNeeded()
             migrateLegacyCursorPlanIfNeeded()
             sanitizeNotificationSoundModeIfNeeded()
+            migrateLegacyCopilotManualPATIfNeeded()
             loadAPIKeys()
             refreshHookConfigurationStatus()
         }
@@ -650,6 +651,11 @@ struct SettingsView: View {
     private func sanitizeNotificationSoundModeIfNeeded() {
         guard NotificationSoundMode(rawValue: notificationSoundMode) == nil else { return }
         notificationSoundMode = NotificationSoundMode.system.rawValue
+    }
+
+    private func migrateLegacyCopilotManualPATIfNeeded() {
+        CopilotCredentialSettings.migrateLegacyManualPATIfNeeded(in: .standard)
+        copilotManualPATEnabled = CopilotCredentialSettings.isManualPATEnabled(in: .standard)
     }
 
     private func loadAPIKeys() {

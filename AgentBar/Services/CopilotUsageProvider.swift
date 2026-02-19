@@ -35,6 +35,8 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     private let defaults: UserDefaults
 
     static let apiURL = URL(string: "https://api.github.com/copilot_internal/user")!
+    private static let usageCachePrefix = "copilotUsageCache.monthly"
+    private static let planNameCacheKey = "copilotUsageCache.planName"
     private static let defaultGHTokenCacheTTL: TimeInterval = 60
     private static let ghTokenLookupTimeout: TimeInterval = 2
     private static let ghTokenCacheLock = NSLock()
@@ -55,16 +57,19 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     ) {
         self.session = session
         self.defaults = defaults
+
+        if credentialProvider == nil && fallbackCredentialProvider == nil {
+            CopilotCredentialSettings.migrateLegacyManualPATIfNeeded(in: defaults)
+        }
+
         if let credentialProvider {
             self.primaryCredentialProvider = credentialProvider
             self.fallbackCredentialProvider = fallbackCredentialProvider ?? { nil }
         } else {
             self.primaryCredentialProvider = { Self.readGHCLIToken() }
-            self.fallbackCredentialProvider = fallbackCredentialProvider ?? {
-                guard UserDefaults.standard.bool(
-                    forKey: CopilotCredentialSettings.manualPATEnabledKey,
-                    defaultValue: false
-                ) else {
+            let defaultsBox = SendableDefaultsBox(defaults)
+            self.fallbackCredentialProvider = fallbackCredentialProvider ?? { [defaultsBox] in
+                guard CopilotCredentialSettings.isManualPATEnabled(in: defaultsBox.defaults) else {
                     return nil
                 }
                 return KeychainManager.load(account: ServiceType.copilot.keychainAccount)
@@ -157,9 +162,10 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             unit: .requests,
             resetTime: resetTime
         )
-        saveMetricCache(metric, forKey: "copilotUsageCache.monthly")
+        saveMetricCache(metric, forKey: Self.usageCachePrefix)
 
         let planName = apiResponse.copilot_plan.map { Self.capitalizedPlanName($0) } ?? "Free"
+        savePlanNameCache(planName)
 
         return UsageData(
             service: .copilot,
@@ -175,7 +181,7 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     private func cachedOrThrow(_ error: Error) throws -> UsageData {
         let now = Date()
-        guard let cached = validCachedMetric(forKey: "copilotUsageCache.monthly", now: now) else {
+        guard let cached = validCachedMetric(forKey: Self.usageCachePrefix, now: now) else {
             throw error
         }
         return UsageData(
@@ -184,7 +190,7 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             weeklyUsage: nil,
             lastUpdated: now,
             isAvailable: true,
-            planName: "Pro"
+            planName: loadPlanNameCache()
         )
     }
 
@@ -217,6 +223,14 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         defaults.removeObject(forKey: "\(key).used")
         defaults.removeObject(forKey: "\(key).total")
         defaults.removeObject(forKey: "\(key).resetTime")
+    }
+
+    private func savePlanNameCache(_ planName: String) {
+        defaults.set(planName, forKey: Self.planNameCacheKey)
+    }
+
+    private func loadPlanNameCache() -> String? {
+        defaults.string(forKey: Self.planNameCacheKey)
     }
 
     // MARK: - gh CLI Token
@@ -277,5 +291,13 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             return now
         }
         return nextMonth
+    }
+}
+
+private final class SendableDefaultsBox: @unchecked Sendable {
+    let defaults: UserDefaults
+
+    init(_ defaults: UserDefaults) {
+        self.defaults = defaults
     }
 }
