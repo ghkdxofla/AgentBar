@@ -1,5 +1,17 @@
 # AgentBar Development Log
 
+## Iteration 87: Add launch nudge to DMG background
+- **Two-step guide**: Updated DMG background from single "Drag to Applications" to numbered steps: "1. Drag AgentBar to Applications" + "2. Open AgentBar to get started"
+- **Script refactored**: Extracted `load_font()` and `draw_centered_text()` helpers; step 2 uses slightly smaller font and dimmer alpha for visual hierarchy
+- All 277 tests passing
+
+## Iteration 86: Styled DMG installer with create-dmg
+- **`scripts/generate-dmg-background.py`**: Python3+Pillow script generating 1200x800 Retina background with slate gradient, chevron arrow, and "Drag to Applications" hint text
+- **`docs/assets/dmg-background@2x.png`**: Pre-generated background image committed for reuse across releases
+- **`scripts/create-styled-dmg.sh`**: `create-dmg` wrapper with 600x400 window, app icon at (150,200), Applications drop link at (450,200), volume icon, and hidden `.app` extension
+- **`scripts/release.sh`**: Replaced bare `hdiutil create` with `create-styled-dmg.sh` call; added `create-dmg` prerequisite check
+- All 277 tests passing
+
 ## Iteration 85: Post-v0.5 reliability refactor (history + keychain)
 - **UsageHistoryStore**: snapshot + append-log(`usage-history.events.jsonl`) 구조로 전환
   - 기록 시 전체 snapshot rewrite 대신 log append

@@ -42,6 +42,12 @@ if [[ -z "${TEAM_ID//[[:space:]]/}" ]]; then
   exit 1
 fi
 
+if ! command -v create-dmg &>/dev/null; then
+  echo "create-dmg is required for styled DMG creation." >&2
+  echo "Install with: brew install create-dmg" >&2
+  exit 1
+fi
+
 # 1. Test
 if [[ $SKIP_TESTS -eq 0 ]]; then
   step "Running tests"
@@ -98,13 +104,9 @@ echo "Ticket stapled."
 step "Verifying Gatekeeper assessment"
 spctl --assess --type execute --verbose=4 "$APP_PATH" 2>&1 || true
 
-# 7. Create DMG
-step "Creating DMG"
-hdiutil create \
-  -volname AgentBar \
-  -srcfolder "$APP_PATH" \
-  -ov -format UDZO \
-  "$DMG_PATH"
+# 7. Create styled DMG
+step "Creating styled DMG"
+"$ROOT_DIR/scripts/create-styled-dmg.sh" "$APP_PATH" "$DMG_PATH"
 
 # 8. Notarize the DMG too
 step "Notarizing DMG"
