@@ -1,5 +1,17 @@
 # AgentBar Development Log
 
+## Iteration 72: Usage History Step 1 - Models and persistent store
+- Added `UsageHistory` models in `AgentBar/Models/UsageHistory.swift`:
+  - `UsageHistoryDayRecord`
+  - `UsageHistorySecondarySample`
+  - `UsageHistoryStoreFile` (schema v2)
+  - `UsageHistoryWindow`
+- Added `UsageHistoryStore` actor in `AgentBar/Infrastructure/UsageHistoryStore.swift` with `UsageHistoryStoreProtocol`
+- Implemented persisted history storage at `~/Library/Application Support/AgentBar/usage-history.json`
+- Implemented day-level aggregation, secondary sample collection, retention pruning, and atomic JSON writes
+- Added corrupt file recovery and legacy schema v1 migration path
+- Build passes
+
 ## Iteration 71: Fix Claude 7d row disappearing on API failure with valid cache
 - **Root cause**: When `fetchUsage()` threw (e.g. OAuth token expired overnight), `UsageViewModel.zeroUsageData()` returned `weeklyUsage: nil`, hiding the 7d row entirely even though cached 7d data was still valid (reset time not yet passed)
 - **Cache fallback on API failure**: Added `cachedOrThrow(_:)` to `ClaudeUsageProvider` — on any API error (401, network, etc.), checks UserDefaults cache before throwing. If at least one cached window (5h or 7d) has a valid reset time still in the future, returns cached values instead of throwing
