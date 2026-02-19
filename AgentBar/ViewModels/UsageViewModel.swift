@@ -12,15 +12,18 @@ final class UsageViewModel: ObservableObject {
     ]
 
     private var providers: [any UsageProviderProtocol]
+    private let historyStore: UsageHistoryStoreProtocol
     private let refreshInterval: TimeInterval
     private var timerCancellable: AnyCancellable?
     private var limitsCancellable: AnyCancellable?
     init(
         providers: [any UsageProviderProtocol]? = nil,
-        refreshInterval: TimeInterval = 60
+        refreshInterval: TimeInterval = 60,
+        historyStore: UsageHistoryStoreProtocol = UsageHistoryStore()
     ) {
         self.refreshInterval = refreshInterval
         self.providers = providers ?? Self.buildProviders()
+        self.historyStore = historyStore
 
         if providers == nil {
             limitsCancellable = NotificationCenter.default
@@ -61,23 +64,31 @@ final class UsageViewModel: ObservableObject {
         defer { isLoading = false }
 
         var results: [UsageData] = []
+        var successfulResults: [UsageData] = []
 
-        await withTaskGroup(of: UsageData?.self) { group in
+        await withTaskGroup(of: ProviderFetchOutcome?.self) { group in
             for provider in providers {
                 group.addTask {
                     guard await provider.isConfigured() else { return nil }
                     do {
-                        return try await provider.fetchUsage()
+                        let usage = try await provider.fetchUsage()
+                        return ProviderFetchOutcome(data: usage, shouldRecordHistory: true)
                     } catch {
                         // Return zero usage so the bar stays visible
-                        return Self.zeroUsageData(for: provider.serviceType)
+                        return ProviderFetchOutcome(
+                            data: Self.zeroUsageData(for: provider.serviceType),
+                            shouldRecordHistory: false
+                        )
                     }
                 }
             }
 
             for await result in group {
-                if let data = result {
-                    results.append(data)
+                if let result {
+                    results.append(result.data)
+                    if result.shouldRecordHistory {
+                        successfulResults.append(result.data)
+                    }
                 }
             }
         }
@@ -88,6 +99,10 @@ final class UsageViewModel: ObservableObject {
 
         usageData = results
         lastError = results.isEmpty ? "No data available" : nil
+
+        guard !successfulResults.isEmpty else { return }
+        await historyStore.record(samples: successfulResults, recordedAt: Date())
+        NotificationCenter.default.post(name: .usageHistoryChanged, object: nil)
     }
 
     private static func sortIndex(for service: ServiceType) -> Int {
@@ -174,6 +189,11 @@ final class UsageViewModel: ObservableObject {
         }
         return plan.monthlyRequestEstimate
     }
+}
+
+private struct ProviderFetchOutcome: Sendable {
+    let data: UsageData
+    let shouldRecordHistory: Bool
 }
 
 private extension Double {

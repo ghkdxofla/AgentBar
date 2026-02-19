@@ -3,6 +3,7 @@ import SwiftUI
 extension Notification.Name {
     static let limitsChanged = Notification.Name("AgentBarLimitsChanged")
     static let notificationsSettingsChanged = Notification.Name("AgentBarNotificationsSettingsChanged")
+    static let usageHistoryChanged = Notification.Name("AgentBarUsageHistoryChanged")
 }
 
 struct SettingsView: View {

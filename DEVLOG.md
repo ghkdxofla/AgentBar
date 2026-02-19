@@ -1,5 +1,14 @@
 # AgentBar Development Log
 
+## Iteration 73: Usage History Step 2 - fetch pipeline integration
+- `UsageViewModel` now accepts `historyStore: UsageHistoryStoreProtocol` for dependency injection
+- `fetchAllUsage()` now tracks provider outcomes as success/failure separately
+- Only successful fetch results are recorded to history via `historyStore.record(samples:recordedAt:)`
+- Failure fallback rows (`zeroUsageData`) remain visible in UI but are excluded from history recording
+- Added `Notification.Name.usageHistoryChanged` broadcast after successful history writes
+- Regenerated Xcode project with `xcodegen generate` to include newly added history source files in build
+- Build passes
+
 ## Iteration 72: Usage History Step 1 - Models and persistent store
 - Added `UsageHistory` models in `AgentBar/Models/UsageHistory.swift`:
   - `UsageHistoryDayRecord`
