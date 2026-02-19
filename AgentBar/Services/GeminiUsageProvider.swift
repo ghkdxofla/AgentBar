@@ -13,16 +13,19 @@ final class GeminiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     private let dailyRequestLimit: Double
     private let nowProvider: @Sendable () -> Date
     private let calendar: Calendar
+    private let defaults: UserDefaults
 
     init(
         logsRootDir: URL? = nil,
         dailyRequestLimit: Double = 1_000,
-        nowProvider: @escaping @Sendable () -> Date = Date.init
+        nowProvider: @escaping @Sendable () -> Date = Date.init,
+        defaults: UserDefaults = .standard
     ) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         self.logsRootDir = logsRootDir ?? home.appendingPathComponent(".gemini/tmp")
         self.dailyRequestLimit = dailyRequestLimit
         self.nowProvider = nowProvider
+        self.defaults = defaults
 
         var pacificCalendar = Calendar(identifier: .gregorian)
         pacificCalendar.timeZone = TimeZone(identifier: "America/Los_Angeles") ?? .current
@@ -42,18 +45,68 @@ final class GeminiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
         let dayReset = calendar.date(byAdding: .day, value: 1, to: dayStart)
 
+        let incoming = UsageMetric(
+            used: Double(dayEvents.count),
+            total: dailyRequestLimit,
+            unit: .requests,
+            resetTime: dayReset
+        )
+        let metric = resolveMetric(incoming: incoming, cacheKey: "geminiUsageCache.daily", now: now)
+
         return UsageData(
             service: .gemini,
-            fiveHourUsage: UsageMetric(
-                used: Double(dayEvents.count),
-                total: dailyRequestLimit,
-                unit: .requests,
-                resetTime: dayReset
-            ),
+            fiveHourUsage: metric,
             weeklyUsage: nil,
             lastUpdated: now,
             isAvailable: true
         )
+    }
+
+    // MARK: - Usage Caching
+
+    private func resolveMetric(incoming: UsageMetric, cacheKey: String, now: Date) -> UsageMetric {
+        let cached = validCachedMetric(forKey: cacheKey, now: now)
+
+        if incoming.used <= 0, let cached, cached.used > 0,
+           let cachedReset = cached.resetTime, cachedReset > now {
+            return cached
+        }
+
+        if incoming.used > 0 {
+            saveMetricCache(incoming, forKey: cacheKey)
+        }
+        return incoming
+    }
+
+    private func validCachedMetric(forKey key: String, now: Date) -> UsageMetric? {
+        guard defaults.object(forKey: "\(key).used") != nil else { return nil }
+        let used = defaults.double(forKey: "\(key).used")
+        let total = defaults.object(forKey: "\(key).total") != nil
+            ? defaults.double(forKey: "\(key).total") : dailyRequestLimit
+        let resetTimestamp = defaults.object(forKey: "\(key).resetTime") as? Double
+        let resetTime = resetTimestamp.map { Date(timeIntervalSince1970: $0) }
+
+        if let resetTime, resetTime <= now {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+        if used <= 0, resetTime == nil {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+        return UsageMetric(used: used, total: total, unit: .requests, resetTime: resetTime)
+    }
+
+    private func saveMetricCache(_ metric: UsageMetric, forKey key: String) {
+        defaults.set(metric.used, forKey: "\(key).used")
+        defaults.set(metric.total, forKey: "\(key).total")
+        defaults.set(metric.resetTime?.timeIntervalSince1970, forKey: "\(key).resetTime")
+    }
+
+    private func clearMetricCache(forKey key: String) {
+        defaults.removeObject(forKey: "\(key).used")
+        defaults.removeObject(forKey: "\(key).total")
+        defaults.removeObject(forKey: "\(key).resetTime")
     }
 
     // MARK: - Private

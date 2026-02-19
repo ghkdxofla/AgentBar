@@ -5,6 +5,8 @@ import Darwin
 final class CopilotUsageProviderTests: XCTestCase {
     private var originalGHCLICommandRunner: (@Sendable (TimeInterval) -> String?)!
     private var originalGHCLICommandConfiguration: GHCLICommandConfiguration!
+    private var testDefaults: UserDefaults!
+    private var suiteName: String!
 
     override func setUp() {
         super.setUp()
@@ -12,6 +14,8 @@ final class CopilotUsageProviderTests: XCTestCase {
         CopilotUsageProvider.resetGHCLITokenCache()
         originalGHCLICommandRunner = CopilotUsageProvider.ghCLICommandRunner
         originalGHCLICommandConfiguration = CopilotUsageProvider.ghCLICommandConfiguration
+        suiteName = "CopilotUsageProviderTests.\(UUID().uuidString)"
+        testDefaults = UserDefaults(suiteName: suiteName)!
     }
 
     override func tearDown() {
@@ -19,6 +23,7 @@ final class CopilotUsageProviderTests: XCTestCase {
         CopilotUsageProvider.resetGHCLITokenCache()
         CopilotUsageProvider.ghCLICommandRunner = originalGHCLICommandRunner
         CopilotUsageProvider.ghCLICommandConfiguration = originalGHCLICommandConfiguration
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         super.tearDown()
     }
 
@@ -42,7 +47,8 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         let provider = CopilotUsageProvider(
             session: CopilotMockURLProtocol.session(),
-            credentialProvider: { "ghp_test_token" }
+            credentialProvider: { "ghp_test_token" },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -69,7 +75,8 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         let provider = CopilotUsageProvider(
             session: CopilotMockURLProtocol.session(),
-            credentialProvider: { "ghp_test" }
+            credentialProvider: { "ghp_test" },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -96,7 +103,8 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         let provider = CopilotUsageProvider(
             session: CopilotMockURLProtocol.session(),
-            credentialProvider: { "ghp_test" }
+            credentialProvider: { "ghp_test" },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -119,7 +127,8 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         let provider = CopilotUsageProvider(
             session: CopilotMockURLProtocol.session(),
-            credentialProvider: { "ghp_test" }
+            credentialProvider: { "ghp_test" },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -130,7 +139,8 @@ final class CopilotUsageProviderTests: XCTestCase {
 
     func testHandlesMissingCredentials() async {
         let provider = CopilotUsageProvider(
-            credentialProvider: { nil }
+            credentialProvider: { nil },
+            defaults: testDefaults
         )
 
         let isConfigured = await provider.isConfigured()
@@ -142,7 +152,8 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         let provider = CopilotUsageProvider(
             session: CopilotMockURLProtocol.session(),
-            credentialProvider: { "expired_token" }
+            credentialProvider: { "expired_token" },
+            defaults: testDefaults
         )
 
         do {
@@ -185,7 +196,8 @@ final class CopilotUsageProviderTests: XCTestCase {
         let provider = CopilotUsageProvider(
             session: CopilotMockURLProtocol.session(),
             credentialProvider: { "gh_cli_token" },
-            fallbackCredentialProvider: { "ghp_manual_pat" }
+            fallbackCredentialProvider: { "ghp_manual_pat" },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -396,7 +408,8 @@ final class CopilotUsageProviderTests: XCTestCase {
 
         let provider = CopilotUsageProvider(
             session: CopilotMockURLProtocol.session(),
-            credentialProvider: { "ghp_my_token" }
+            credentialProvider: { "ghp_my_token" },
+            defaults: testDefaults
         )
 
         _ = try await provider.fetchUsage()

@@ -3,16 +3,21 @@ import XCTest
 
 final class GeminiUsageProviderTests: XCTestCase {
     private var tempDir: URL!
+    private var testDefaults: UserDefaults!
+    private var suiteName: String!
 
     override func setUp() {
         super.setUp()
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
         try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        suiteName = "GeminiUsageProviderTests.\(UUID().uuidString)"
+        testDefaults = UserDefaults(suiteName: suiteName)!
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: tempDir)
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         super.tearDown()
     }
 
@@ -30,7 +35,8 @@ final class GeminiUsageProviderTests: XCTestCase {
         let provider = GeminiUsageProvider(
             logsRootDir: tempDir,
             dailyRequestLimit: 1_000,
-            nowProvider: { now }
+            nowProvider: { now },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -52,7 +58,8 @@ final class GeminiUsageProviderTests: XCTestCase {
         let provider = GeminiUsageProvider(
             logsRootDir: tempDir,
             dailyRequestLimit: 1_000,
-            nowProvider: { now }
+            nowProvider: { now },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -74,7 +81,8 @@ final class GeminiUsageProviderTests: XCTestCase {
 
     func testHandlesMissingDirectory() async {
         let provider = GeminiUsageProvider(
-            logsRootDir: URL(fileURLWithPath: "/nonexistent/path")
+            logsRootDir: URL(fileURLWithPath: "/nonexistent/path"),
+            defaults: testDefaults
         )
         let configured = await provider.isConfigured()
         XCTAssertFalse(configured)

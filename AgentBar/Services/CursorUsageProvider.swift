@@ -39,6 +39,7 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     private let session: URLSession
     private let monthlyRequestLimit: Double
     private let dbPathProvider: @Sendable () -> String
+    private let defaults: UserDefaults
 
     static let apiBaseURL = "https://www.cursor.com/api/usage"
     static let defaultDBPath: String = {
@@ -49,11 +50,13 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     init(
         monthlyRequestLimit: Double = CursorPlan.pro.monthlyRequestEstimate,
         session: URLSession = .shared,
-        dbPathProvider: (@Sendable () -> String)? = nil
+        dbPathProvider: (@Sendable () -> String)? = nil,
+        defaults: UserDefaults = .standard
     ) {
         self.monthlyRequestLimit = monthlyRequestLimit
         self.session = session
         self.dbPathProvider = dbPathProvider ?? { Self.defaultDBPath }
+        self.defaults = defaults
     }
 
     func isConfigured() async -> Bool {
@@ -61,6 +64,14 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
 
     func fetchUsage() async throws -> UsageData {
+        do {
+            return try await fetchUsageFromAPI()
+        } catch {
+            return try cachedOrThrow(error)
+        }
+    }
+
+    private func fetchUsageFromAPI() async throws -> UsageData {
         let dbPath = dbPathProvider()
 
         // 1. Read JWT from SQLite
@@ -116,22 +127,75 @@ final class CursorUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             resetTime = CopilotUsageProvider.firstOfNextMonthUTC()
         }
 
-        let planName = (UserDefaults.standard.string(forKey: "cursorPlan")
+        let metric = UsageMetric(
+            used: Double(totalRequests),
+            total: total,
+            unit: .requests,
+            resetTime: resetTime
+        )
+        saveMetricCache(metric, forKey: "cursorUsageCache.monthly")
+
+        let planName = (defaults.string(forKey: "cursorPlan")
             .flatMap { CursorPlan(rawValue: $0) } ?? .pro).rawValue
 
         return UsageData(
             service: .cursor,
-            fiveHourUsage: UsageMetric(
-                used: Double(totalRequests),
-                total: total,
-                unit: .requests,
-                resetTime: resetTime
-            ),
+            fiveHourUsage: metric,
             weeklyUsage: nil,
             lastUpdated: Date(),
             isAvailable: true,
             planName: planName
         )
+    }
+
+    // MARK: - Usage Caching
+
+    private func cachedOrThrow(_ error: Error) throws -> UsageData {
+        let now = Date()
+        guard let cached = validCachedMetric(forKey: "cursorUsageCache.monthly", now: now) else {
+            throw error
+        }
+        let planName = (defaults.string(forKey: "cursorPlan")
+            .flatMap { CursorPlan(rawValue: $0) } ?? .pro).rawValue
+        return UsageData(
+            service: .cursor,
+            fiveHourUsage: cached,
+            weeklyUsage: nil,
+            lastUpdated: now,
+            isAvailable: true,
+            planName: planName
+        )
+    }
+
+    private func validCachedMetric(forKey key: String, now: Date) -> UsageMetric? {
+        guard defaults.object(forKey: "\(key).used") != nil else { return nil }
+        let used = defaults.double(forKey: "\(key).used")
+        let total = defaults.object(forKey: "\(key).total") != nil
+            ? defaults.double(forKey: "\(key).total") : monthlyRequestLimit
+        let resetTimestamp = defaults.object(forKey: "\(key).resetTime") as? Double
+        let resetTime = resetTimestamp.map { Date(timeIntervalSince1970: $0) }
+
+        if let resetTime, resetTime <= now {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+        if used <= 0, resetTime == nil {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+        return UsageMetric(used: used, total: total, unit: .requests, resetTime: resetTime)
+    }
+
+    private func saveMetricCache(_ metric: UsageMetric, forKey key: String) {
+        defaults.set(metric.used, forKey: "\(key).used")
+        defaults.set(metric.total, forKey: "\(key).total")
+        defaults.set(metric.resetTime?.timeIntervalSince1970, forKey: "\(key).resetTime")
+    }
+
+    private func clearMetricCache(forKey key: String) {
+        defaults.removeObject(forKey: "\(key).used")
+        defaults.removeObject(forKey: "\(key).total")
+        defaults.removeObject(forKey: "\(key).resetTime")
     }
 
     // MARK: - SQLite Token Reading

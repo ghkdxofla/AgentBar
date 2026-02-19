@@ -3,14 +3,19 @@ import SQLite3
 @testable import AgentBar
 
 final class CursorUsageProviderTests: XCTestCase {
+    private var testDefaults: UserDefaults!
+    private var suiteName: String!
 
     override func setUp() {
         super.setUp()
         CursorMockURLProtocol.reset()
+        suiteName = "CursorUsageProviderTests.\(UUID().uuidString)"
+        testDefaults = UserDefaults(suiteName: suiteName)!
     }
 
     override func tearDown() {
         CursorMockURLProtocol.reset()
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         super.tearDown()
     }
 
@@ -31,7 +36,8 @@ final class CursorUsageProviderTests: XCTestCase {
         let provider = CursorUsageProvider(
             monthlyRequestLimit: 500,
             session: CursorMockURLProtocol.session(),
-            dbPathProvider: { dbPath }
+            dbPathProvider: { dbPath },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -57,7 +63,8 @@ final class CursorUsageProviderTests: XCTestCase {
 
         let provider = CursorUsageProvider(
             session: CursorMockURLProtocol.session(),
-            dbPathProvider: { dbPath }
+            dbPathProvider: { dbPath },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -74,7 +81,8 @@ final class CursorUsageProviderTests: XCTestCase {
 
     func testHandlesMissingDatabase() async {
         let provider = CursorUsageProvider(
-            dbPathProvider: { "/nonexistent/path/state.vscdb" }
+            dbPathProvider: { "/nonexistent/path/state.vscdb" },
+            defaults: testDefaults
         )
 
         let isConfigured = await provider.isConfigured()
@@ -95,7 +103,8 @@ final class CursorUsageProviderTests: XCTestCase {
         let provider = CursorUsageProvider(
             monthlyRequestLimit: 500,
             session: CursorMockURLProtocol.session(),
-            dbPathProvider: { dbPath }
+            dbPathProvider: { dbPath },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -136,7 +145,8 @@ final class CursorUsageProviderTests: XCTestCase {
 
         let provider = CursorUsageProvider(
             session: CursorMockURLProtocol.session(),
-            dbPathProvider: { dbPath }
+            dbPathProvider: { dbPath },
+            defaults: testDefaults
         )
 
         _ = try await provider.fetchUsage()
@@ -157,7 +167,8 @@ final class CursorUsageProviderTests: XCTestCase {
         let provider = CursorUsageProvider(
             monthlyRequestLimit: 500,
             session: CursorMockURLProtocol.session(),
-            dbPathProvider: { dbPath }
+            dbPathProvider: { dbPath },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()
@@ -180,7 +191,8 @@ final class CursorUsageProviderTests: XCTestCase {
         let provider = CursorUsageProvider(
             monthlyRequestLimit: 500,
             session: CursorMockURLProtocol.session(),
-            dbPathProvider: { dbPath }
+            dbPathProvider: { dbPath },
+            defaults: testDefaults
         )
 
         let usage = try await provider.fetchUsage()

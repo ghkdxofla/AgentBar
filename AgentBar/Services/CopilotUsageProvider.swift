@@ -32,6 +32,7 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     private let session: URLSession
     private let primaryCredentialProvider: @Sendable () -> String?
     private let fallbackCredentialProvider: @Sendable () -> String?
+    private let defaults: UserDefaults
 
     static let apiURL = URL(string: "https://api.github.com/copilot_internal/user")!
     private static let defaultGHTokenCacheTTL: TimeInterval = 60
@@ -49,9 +50,11 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     init(
         session: URLSession = .shared,
         credentialProvider: (@Sendable () -> String?)? = nil,
-        fallbackCredentialProvider: (@Sendable () -> String?)? = nil
+        fallbackCredentialProvider: (@Sendable () -> String?)? = nil,
+        defaults: UserDefaults = .standard
     ) {
         self.session = session
+        self.defaults = defaults
         if let credentialProvider {
             self.primaryCredentialProvider = credentialProvider
             self.fallbackCredentialProvider = fallbackCredentialProvider ?? { nil }
@@ -74,6 +77,14 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
 
     func fetchUsage() async throws -> UsageData {
+        do {
+            return try await fetchUsageFromAPI()
+        } catch {
+            return try cachedOrThrow(error)
+        }
+    }
+
+    private func fetchUsageFromAPI() async throws -> UsageData {
         if let primaryToken = primaryCredentialProvider() {
             do {
                 return try await fetchUsage(using: primaryToken)
@@ -140,21 +151,72 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         // Reset = 1st of next month 00:00 UTC
         let resetTime = Self.firstOfNextMonthUTC()
 
+        let metric = UsageMetric(
+            used: used,
+            total: total,
+            unit: .requests,
+            resetTime: resetTime
+        )
+        saveMetricCache(metric, forKey: "copilotUsageCache.monthly")
+
         let planName = apiResponse.copilot_plan.map { Self.capitalizedPlanName($0) } ?? "Free"
 
         return UsageData(
             service: .copilot,
-            fiveHourUsage: UsageMetric(
-                used: used,
-                total: total,
-                unit: .requests,
-                resetTime: resetTime
-            ),
+            fiveHourUsage: metric,
             weeklyUsage: nil,
             lastUpdated: Date(),
             isAvailable: true,
             planName: planName
         )
+    }
+
+    // MARK: - Usage Caching
+
+    private func cachedOrThrow(_ error: Error) throws -> UsageData {
+        let now = Date()
+        guard let cached = validCachedMetric(forKey: "copilotUsageCache.monthly", now: now) else {
+            throw error
+        }
+        return UsageData(
+            service: .copilot,
+            fiveHourUsage: cached,
+            weeklyUsage: nil,
+            lastUpdated: now,
+            isAvailable: true,
+            planName: "Pro"
+        )
+    }
+
+    private func validCachedMetric(forKey key: String, now: Date) -> UsageMetric? {
+        guard defaults.object(forKey: "\(key).used") != nil else { return nil }
+        let used = defaults.double(forKey: "\(key).used")
+        let total = defaults.object(forKey: "\(key).total") != nil
+            ? defaults.double(forKey: "\(key).total") : 300
+        let resetTimestamp = defaults.object(forKey: "\(key).resetTime") as? Double
+        let resetTime = resetTimestamp.map { Date(timeIntervalSince1970: $0) }
+
+        if let resetTime, resetTime <= now {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+        if used <= 0, resetTime == nil {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+        return UsageMetric(used: used, total: total, unit: .requests, resetTime: resetTime)
+    }
+
+    private func saveMetricCache(_ metric: UsageMetric, forKey key: String) {
+        defaults.set(metric.used, forKey: "\(key).used")
+        defaults.set(metric.total, forKey: "\(key).total")
+        defaults.set(metric.resetTime?.timeIntervalSince1970, forKey: "\(key).resetTime")
+    }
+
+    private func clearMetricCache(forKey key: String) {
+        defaults.removeObject(forKey: "\(key).used")
+        defaults.removeObject(forKey: "\(key).total")
+        defaults.removeObject(forKey: "\(key).resetTime")
     }
 
     // MARK: - gh CLI Token

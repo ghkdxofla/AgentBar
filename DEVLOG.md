@@ -1,5 +1,11 @@
 # AgentBar Development Log
 
+## Iteration 90: Cache usage metrics for Cursor, Copilot, Gemini
+- **Cursor/Copilot (`cachedOrThrow`)**: On API failure (network error, 401, etc.), returns last cached UsageMetric from UserDefaults if reset time hasn't passed. Previously, any API error immediately threw and ViewModel showed zero.
+- **Gemini (`resolveMetric`)**: When no log events found in current daily window, prefers cached non-zero value until daily reset passes. Same pattern as Codex (Iteration 89).
+- **Test isolation**: All three test suites now use per-test `UserDefaults(suiteName:)` to prevent cross-test cache pollution.
+- All 279 tests passing
+
 ## Iteration 89: Cache Codex usage across idle sessions
 - **Idle-session cache**: `CodexUsageProvider` now caches last non-zero usage metrics in UserDefaults (`codexUsageCache.fiveHour`, `codexUsageCache.weekly`). When rate_limits window becomes stale (no active session), cached values are preserved until reset time passes — matching Claude provider's existing pattern (Iteration 35-36)
 - **resolveMetric()**: New method wraps window resolution with cache logic: save non-zero results, prefer cached over zero when cache reset time is still in the future
