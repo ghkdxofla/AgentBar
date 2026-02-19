@@ -1,5 +1,12 @@
 # AgentBar Development Log
 
+## Iteration 89: Cache Codex usage across idle sessions
+- **Idle-session cache**: `CodexUsageProvider` now caches last non-zero usage metrics in UserDefaults (`codexUsageCache.fiveHour`, `codexUsageCache.weekly`). When rate_limits window becomes stale (no active session), cached values are preserved until reset time passes — matching Claude provider's existing pattern (Iteration 35-36)
+- **resolveMetric()**: New method wraps window resolution with cache logic: save non-zero results, prefer cached over zero when cache reset time is still in the future
+- **Test isolation**: `CodexUsageProviderTests` now uses per-test `UserDefaults(suiteName:)` to prevent cross-test cache pollution
+- **New tests**: `testPrefersCachedUsageWhenWindowBecomesStale`, `testCacheExpiredWhenResetTimePasses`
+- All 279 tests passing
+
 ## Iteration 88: Prevent multiple app instances
 - **Single-instance guard**: `AppDelegate.terminateIfAlreadyRunning()` checks `NSRunningApplication` for other processes with the same bundle ID and calls `NSApp.terminate(nil)` if found
 - **Test-safe**: Skips the check when `XCTestConfigurationFilePath` environment variable is present (test host shares bundle ID)

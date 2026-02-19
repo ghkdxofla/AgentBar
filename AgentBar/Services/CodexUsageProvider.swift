@@ -54,16 +54,19 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     private let sessionsDir: URL
     private let fiveHourTokenLimit: Double
     private let weeklyTokenLimit: Double
+    private let defaults: UserDefaults
 
     init(
         sessionsDir: URL? = nil,
         fiveHourTokenLimit: Double = 10_000_000,
-        weeklyTokenLimit: Double = 100_000_000
+        weeklyTokenLimit: Double = 100_000_000,
+        defaults: UserDefaults = .standard
     ) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         self.sessionsDir = sessionsDir ?? home.appendingPathComponent(".codex/sessions")
         self.fiveHourTokenLimit = fiveHourTokenLimit
         self.weeklyTokenLimit = weeklyTokenLimit
+        self.defaults = defaults
     }
 
     func isConfigured() async -> Bool {
@@ -76,10 +79,8 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         // Find the most recent rate_limits from session files
         let latestRateLimits = findLatestRateLimits(now: now)
 
-        var fiveHourUsed: Double = 0
-        var weeklyUsed: Double = 0
-        var fiveHourResetTime: Date?
-        var weeklyResetTime: Date?
+        let fiveHourMetric: UsageMetric
+        let weeklyMetric: UsageMetric
 
         if let rateLimits = latestRateLimits {
             let (primaryUsed, primaryReset) = resolveAggregatedWindow(
@@ -87,44 +88,112 @@ final class CodexUsageProvider: UsageProviderProtocol, @unchecked Sendable {
                 tokenLimit: fiveHourTokenLimit,
                 now: now
             )
-            fiveHourUsed = primaryUsed
-            fiveHourResetTime = primaryReset
+            fiveHourMetric = resolveMetric(
+                used: primaryUsed, total: fiveHourTokenLimit,
+                resetTime: primaryReset, cacheKey: "codexUsageCache.fiveHour", now: now
+            )
 
             let (secondaryUsed, secondaryReset) = resolveAggregatedWindow(
                 windows: rateLimits.compactMap(\.secondary),
                 tokenLimit: weeklyTokenLimit,
                 now: now
             )
-            weeklyUsed = secondaryUsed
-            weeklyResetTime = secondaryReset
+            weeklyMetric = resolveMetric(
+                used: secondaryUsed, total: weeklyTokenLimit,
+                resetTime: secondaryReset, cacheKey: "codexUsageCache.weekly", now: now
+            )
         } else {
             // Fallback: sum tokens from session files
             let (fiveHour, weekly) = sumTokensFromSessions(now: now)
-            fiveHourUsed = Double(fiveHour)
-            weeklyUsed = Double(weekly)
+            fiveHourMetric = resolveMetric(
+                used: Double(fiveHour), total: fiveHourTokenLimit,
+                resetTime: nil, cacheKey: "codexUsageCache.fiveHour", now: now
+            )
+            weeklyMetric = resolveMetric(
+                used: Double(weekly), total: weeklyTokenLimit,
+                resetTime: nil, cacheKey: "codexUsageCache.weekly", now: now
+            )
         }
 
-        let planName = (UserDefaults.standard.string(forKey: "codexPlan")
+        let planName = (defaults.string(forKey: "codexPlan")
             .flatMap { CodexPlan(rawValue: $0) } ?? .pro).rawValue
 
         return UsageData(
             service: .codex,
-            fiveHourUsage: UsageMetric(
-                used: fiveHourUsed,
-                total: fiveHourTokenLimit,
-                unit: .tokens,
-                resetTime: fiveHourResetTime
-            ),
-            weeklyUsage: UsageMetric(
-                used: weeklyUsed,
-                total: weeklyTokenLimit,
-                unit: .tokens,
-                resetTime: weeklyResetTime
-            ),
+            fiveHourUsage: fiveHourMetric,
+            weeklyUsage: weeklyMetric,
             lastUpdated: now,
             isAvailable: true,
             planName: planName
         )
+    }
+
+    // MARK: - Metric Caching
+
+    private func resolveMetric(
+        used: Double, total: Double, resetTime: Date?,
+        cacheKey: String, now: Date
+    ) -> UsageMetric {
+        let cached = validCachedMetric(forKey: cacheKey, now: now)
+        let incoming = UsageMetric(used: used, total: total, unit: .tokens, resetTime: resetTime)
+
+        if shouldPreferCachedMetric(cached, over: incoming, now: now) {
+            return cached!
+        }
+
+        if incoming.used > 0 {
+            saveMetricCache(incoming, forKey: cacheKey)
+        }
+        return incoming
+    }
+
+    private func shouldPreferCachedMetric(
+        _ cached: UsageMetric?, over incoming: UsageMetric, now: Date
+    ) -> Bool {
+        guard let cached, cached.used > 0 else { return false }
+        guard let cachedReset = cached.resetTime, cachedReset > now else { return false }
+        guard incoming.used <= 0 else { return false }
+        // Cached value still valid (reset not yet passed) and incoming is zero —
+        // prefer cached. validCachedMetric already clears expired entries.
+        return true
+    }
+
+    private func validCachedMetric(forKey key: String, now: Date) -> UsageMetric? {
+        guard let cached = loadMetricCache(forKey: key) else { return nil }
+
+        if let reset = cached.resetTime, reset <= now {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+
+        if cached.used <= 0, cached.resetTime == nil {
+            clearMetricCache(forKey: key)
+            return nil
+        }
+
+        return cached
+    }
+
+    private func saveMetricCache(_ metric: UsageMetric, forKey key: String) {
+        defaults.set(metric.used, forKey: "\(key).used")
+        defaults.set(metric.total, forKey: "\(key).total")
+        defaults.set(metric.resetTime?.timeIntervalSince1970, forKey: "\(key).resetTime")
+    }
+
+    private func loadMetricCache(forKey key: String) -> UsageMetric? {
+        guard defaults.object(forKey: "\(key).used") != nil else { return nil }
+        let used = defaults.double(forKey: "\(key).used")
+        let total = defaults.object(forKey: "\(key).total") != nil
+            ? defaults.double(forKey: "\(key).total") : fiveHourTokenLimit
+        let resetTimestamp = defaults.object(forKey: "\(key).resetTime") as? Double
+        let resetTime = resetTimestamp.map { Date(timeIntervalSince1970: $0) }
+        return UsageMetric(used: used, total: total, unit: .tokens, resetTime: resetTime)
+    }
+
+    private func clearMetricCache(forKey key: String) {
+        defaults.removeObject(forKey: "\(key).used")
+        defaults.removeObject(forKey: "\(key).total")
+        defaults.removeObject(forKey: "\(key).resetTime")
     }
 
     // MARK: - Window Resolution

@@ -4,16 +4,21 @@ import XCTest
 final class CodexUsageProviderTests: XCTestCase {
 
     var tempDir: URL!
+    var testDefaults: UserDefaults!
+    private var suiteName: String!
 
     override func setUp() {
         super.setUp()
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
         try! FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        suiteName = "CodexUsageProviderTests.\(UUID().uuidString)"
+        testDefaults = UserDefaults(suiteName: suiteName)!
     }
 
     override func tearDown() {
         try? FileManager.default.removeItem(at: tempDir)
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
         super.tearDown()
     }
 
@@ -34,7 +39,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -69,7 +75,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -95,7 +102,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -125,7 +133,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -152,7 +161,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -186,7 +196,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -221,7 +232,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -252,7 +264,8 @@ final class CodexUsageProviderTests: XCTestCase {
         let provider = CodexUsageProvider(
             sessionsDir: tempDir,
             fiveHourTokenLimit: 10_000_000,
-            weeklyTokenLimit: 100_000_000
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
         )
         let usage = try await provider.fetchUsage()
 
@@ -265,19 +278,80 @@ final class CodexUsageProviderTests: XCTestCase {
 
     func testHandlesMissingDirectory() async {
         let provider = CodexUsageProvider(
-            sessionsDir: URL(fileURLWithPath: "/nonexistent/path")
+            sessionsDir: URL(fileURLWithPath: "/nonexistent/path"),
+            defaults: testDefaults
         )
         let isConfigured = await provider.isConfigured()
         XCTAssertFalse(isConfigured)
     }
 
     func testHandlesEmptyDirectory() async throws {
-        let provider = CodexUsageProvider(sessionsDir: tempDir)
+        let provider = CodexUsageProvider(sessionsDir: tempDir, defaults: testDefaults)
         let usage = try await provider.fetchUsage()
 
         XCTAssertEqual(usage.fiveHourUsage.used, 0)
         XCTAssertEqual(usage.weeklyUsage!.used, 0)
         XCTAssertTrue(usage.isAvailable)
+    }
+
+    // MARK: - Idle Session Caching
+
+    func testPrefersCachedUsageWhenWindowBecomesStale() async throws {
+        let dateDir = tempDir.appendingPathComponent("2026/02/14")
+        try FileManager.default.createDirectory(at: dateDir, withIntermediateDirectories: true)
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        let futureReset = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let weeklyReset = Int(Date().addingTimeInterval(7 * 24 * 3600).timeIntervalSince1970)
+
+        // First fetch: active session with 10% usage
+        let activeContent = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"primary":{"used_percent":10.0,"window_minutes":300,"resets_at":\(futureReset)},"secondary":{"used_percent":5.0,"window_minutes":10080,"resets_at":\(weeklyReset)}}}}
+        """
+        let file = dateDir.appendingPathComponent("rollout-test.jsonl")
+        try activeContent.write(to: file, atomically: true, encoding: .utf8)
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
+        )
+        let firstUsage = try await provider.fetchUsage()
+        XCTAssertEqual(firstUsage.fiveHourUsage.used, 1_000_000, accuracy: 1)
+
+        // Second fetch: rewrite with stale resets_at but same future reset (simulates idle)
+        // The window rolled over, resolveWindow returns 0, but cache should preserve value
+        let staleReset = Int(Date().addingTimeInterval(-60).timeIntervalSince1970)
+        let staleContent = """
+        {"timestamp":"\(now)","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"primary":{"used_percent":10.0,"window_minutes":300,"resets_at":\(staleReset)},"secondary":{"used_percent":5.0,"window_minutes":10080,"resets_at":\(staleReset)}}}}
+        """
+        try staleContent.write(to: file, atomically: true, encoding: .utf8)
+
+        let secondUsage = try await provider.fetchUsage()
+
+        // Cache should preserve the non-zero 5h value (reset time still in the future)
+        XCTAssertEqual(secondUsage.fiveHourUsage.used, 1_000_000, accuracy: 1)
+        XCTAssertNotNil(secondUsage.fiveHourUsage.resetTime)
+    }
+
+    func testCacheExpiredWhenResetTimePasses() async throws {
+        // Pre-seed cache with usage that has an already-expired reset time
+        let pastReset = Date().addingTimeInterval(-60)
+        testDefaults.set(Double(500_000), forKey: "codexUsageCache.fiveHour.used")
+        testDefaults.set(Double(10_000_000), forKey: "codexUsageCache.fiveHour.total")
+        testDefaults.set(pastReset.timeIntervalSince1970, forKey: "codexUsageCache.fiveHour.resetTime")
+
+        let provider = CodexUsageProvider(
+            sessionsDir: tempDir,
+            fiveHourTokenLimit: 10_000_000,
+            weeklyTokenLimit: 100_000_000,
+            defaults: testDefaults
+        )
+        let usage = try await provider.fetchUsage()
+
+        // Cache expired → should return 0, not cached value
+        XCTAssertEqual(usage.fiveHourUsage.used, 0)
     }
 
     func testResetTimeFromRateLimits() async throws {
@@ -293,7 +367,7 @@ final class CodexUsageProviderTests: XCTestCase {
         let file = dateDir.appendingPathComponent("rollout-test.jsonl")
         try content.write(to: file, atomically: true, encoding: .utf8)
 
-        let provider = CodexUsageProvider(sessionsDir: tempDir)
+        let provider = CodexUsageProvider(sessionsDir: tempDir, defaults: testDefaults)
         let usage = try await provider.fetchUsage()
 
         XCTAssertNotNil(usage.fiveHourUsage.resetTime)
