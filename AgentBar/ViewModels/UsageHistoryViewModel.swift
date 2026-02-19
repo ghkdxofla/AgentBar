@@ -58,19 +58,26 @@ struct UsageHistoryCycleSummary: Sendable, Equatable {
     )
 }
 
+struct UsageHistoryServicePanel: Identifiable, Sendable {
+    let id: ServiceType
+    let service: ServiceType
+    let displayWindow: UsageHistoryWindow
+    let isSecondaryAvailable: Bool
+    let heatmapCells: [UsageHistoryHeatmapCell]
+    let dailySummary: UsageHistorySummary
+    let cycleSummary: UsageHistoryCycleSummary
+    let cycleCells: [UsageHistoryCycleCell]
+    let isSevenDayCycleAvailable: Bool
+    let usageFrequencyDays: Int
+}
+
 @MainActor
 final class UsageHistoryViewModel: ObservableObject {
-    @Published var selectedService: ServiceType?
     @Published var selectedWindow: UsageHistoryWindow = .primary
     @Published var selectedRangeWeeks: Int = 8
 
     @Published private(set) var availableServices: [ServiceType] = []
-    @Published private(set) var isSecondaryAvailable = false
-    @Published private(set) var isSevenDayCycleAvailable = false
-    @Published private(set) var heatmapCells: [UsageHistoryHeatmapCell] = []
-    @Published private(set) var dailySummary: UsageHistorySummary = .empty
-    @Published private(set) var cycleSummary: UsageHistoryCycleSummary = .empty
-    @Published private(set) var cycleCells: [UsageHistoryCycleCell] = []
+    @Published private(set) var servicePanels: [UsageHistoryServicePanel] = []
 
     private let store: UsageHistoryStoreProtocol
     private var calendar: Calendar
@@ -120,83 +127,111 @@ final class UsageHistoryViewModel: ObservableObject {
         ) ?? now
 
         let services = await store.availableServices(since: gridStart, until: now)
-        availableServices = services.sorted {
+        let orderedServices = services.sorted {
             Self.serviceOrderIndex(for: $0) < Self.serviceOrderIndex(for: $1)
         }
+        availableServices = orderedServices
 
-        guard !availableServices.isEmpty else {
+        guard !orderedServices.isEmpty else {
             resetStateForEmptyHistory()
             return
         }
-
-        let resolvedService = resolveSelectedService()
-        guard let selectedService = resolvedService else {
-            resetStateForEmptyHistory()
-            return
-        }
-
-        let dayRecords = await store.dayRecords(
-            for: selectedService,
-            since: gridStart,
-            until: gridEnd
-        )
 
         let secondarySamplesSince = calendar.date(
             byAdding: .day,
             value: -Self.secondarySampleWindowDays,
             to: now
         ) ?? gridStart
-        let secondarySamples = await store.secondarySamples(
-            for: selectedService,
-            since: secondarySamplesSince,
-            until: now
-        )
 
-        isSecondaryAvailable = dayRecords.contains {
-            $0.secondaryPeakRatio != nil || $0.secondaryAverageRatio != nil
-        } || !secondarySamples.isEmpty
+        var panels: [UsageHistoryServicePanel] = []
+        for service in orderedServices {
+            let dayRecords = await store.dayRecords(
+                for: service,
+                since: gridStart,
+                until: gridEnd
+            )
 
-        if selectedWindow == .secondary, !isSecondaryAvailable {
-            selectedWindow = .primary
-            return
+            let secondarySamples = await store.secondarySamples(
+                for: service,
+                since: secondarySamplesSince,
+                until: now
+            )
+
+            let isSecondaryAvailable = dayRecords.contains {
+                $0.secondaryPeakRatio != nil || $0.secondaryAverageRatio != nil
+            } || !secondarySamples.isEmpty
+
+            let displayWindow: UsageHistoryWindow = (
+                selectedWindow == .secondary && isSecondaryAvailable
+            ) ? .secondary : .primary
+
+            let heatmapCells = buildHeatmapCells(
+                dayRecords: dayRecords,
+                window: displayWindow,
+                gridStart: gridStart,
+                totalDays: selectedRangeWeeks * 7,
+                now: now
+            )
+            let dailySummary = makeDailySummary(from: heatmapCells, now: now)
+
+            let isSevenDayCycleAvailable = (
+                displayWindow == .secondary &&
+                service.weeklyLabel == "7d"
+            )
+
+            let allClosedCycles = isSevenDayCycleAvailable
+                ? buildClosedCycleCells(from: secondarySamples, now: now)
+                : []
+            let cycleCells = isSevenDayCycleAvailable
+                ? Array(allClosedCycles.suffix(Self.cyclePanelMaxCycles))
+                : []
+            let cycleSummary = isSevenDayCycleAvailable
+                ? makeCycleSummary(from: allClosedCycles)
+                : .empty
+
+            let frequencyDays: Int = {
+                switch selectedWindow {
+                case .primary:
+                    return dayRecords.filter { $0.primaryPeakRatio > 0 }.count
+                case .secondary:
+                    guard isSecondaryAvailable else { return 0 }
+                    return dayRecords.filter { ($0.secondaryPeakRatio ?? 0) > 0 }.count
+                }
+            }()
+
+            panels.append(
+                UsageHistoryServicePanel(
+                    id: service,
+                    service: service,
+                    displayWindow: displayWindow,
+                    isSecondaryAvailable: isSecondaryAvailable,
+                    heatmapCells: heatmapCells,
+                    dailySummary: dailySummary,
+                    cycleSummary: cycleSummary,
+                    cycleCells: cycleCells,
+                    isSevenDayCycleAvailable: isSevenDayCycleAvailable,
+                    usageFrequencyDays: frequencyDays
+                )
+            )
         }
 
-        let effectiveWindow = selectedWindow
-        let cells = buildHeatmapCells(
-            dayRecords: dayRecords,
-            window: effectiveWindow,
-            gridStart: gridStart,
-            totalDays: selectedRangeWeeks * 7,
-            now: now
-        )
-        heatmapCells = cells
-        dailySummary = makeDailySummary(from: cells, now: now)
+        panels.sort {
+            if $0.usageFrequencyDays != $1.usageFrequencyDays {
+                return $0.usageFrequencyDays > $1.usageFrequencyDays
+            }
 
-        isSevenDayCycleAvailable = (
-            effectiveWindow == .secondary &&
-            selectedService.weeklyLabel == "7d"
-        )
+            if $0.dailySummary.averageDailyPeakRatio != $1.dailySummary.averageDailyPeakRatio {
+                return $0.dailySummary.averageDailyPeakRatio > $1.dailySummary.averageDailyPeakRatio
+            }
 
-        if isSevenDayCycleAvailable {
-            let allClosedCycles = buildClosedCycleCells(from: secondarySamples, now: now)
-            cycleCells = Array(allClosedCycles.suffix(Self.cyclePanelMaxCycles))
-            cycleSummary = makeCycleSummary(from: allClosedCycles)
-        } else {
-            cycleCells = []
-            cycleSummary = .empty
+            return Self.serviceOrderIndex(for: $0.service) < Self.serviceOrderIndex(for: $1.service)
         }
+
+        servicePanels = panels
+        availableServices = panels.map(\.service)
     }
 
     private func bindInputs() {
-        $selectedService
-            .dropFirst()
-            .sink { [weak self] _ in
-                Task { [weak self] in
-                    await self?.refresh()
-                }
-            }
-            .store(in: &cancellables)
-
         $selectedWindow
             .dropFirst()
             .sink { [weak self] _ in
@@ -227,31 +262,9 @@ final class UsageHistoryViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func resolveSelectedService() -> ServiceType? {
-        guard let current = selectedService else {
-            selectedService = availableServices.first
-            return selectedService
-        }
-
-        if availableServices.contains(current) {
-            return current
-        }
-
-        selectedService = availableServices.first
-        return selectedService
-    }
-
     private func resetStateForEmptyHistory() {
-        selectedService = nil
-        isSecondaryAvailable = false
-        isSevenDayCycleAvailable = false
-        heatmapCells = []
-        dailySummary = .empty
-        cycleCells = []
-        cycleSummary = .empty
-        if selectedWindow == .secondary {
-            selectedWindow = .primary
-        }
+        availableServices = []
+        servicePanels = []
     }
 
     // MARK: - Daily Heatmap

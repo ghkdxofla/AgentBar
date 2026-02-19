@@ -207,7 +207,7 @@ struct UsageHistoryCycleSummary: Sendable, Equatable {
 ### 7.4 7d 사이클 계산
 
 입력:
-- `secondarySamples` (selected service)
+- `secondarySamples` (service panel 단위)
 
 사이클 그룹 키:
 - `resetAt` (minute-truncated 값)
@@ -245,19 +245,25 @@ struct UsageHistoryCycleSummary: Sendable, Equatable {
 
 구성:
 1. 상단 컨트롤
-- 서비스 Picker
 - 윈도우 Picker (`primary`/`secondary`)
 - 기간 Picker (`4w`/`8w`/`12w`)
 
-2. Daily Heatmap 섹션
-- 기존 contribution 스타일 타일
+2. 서비스 패널 목록
+- 선택 가능한 모든 서비스를 한 화면에 동시 표시
+- 정렬 기준:
+  - 1순위: 사용 빈도(활성 일수) 내림차순
+  - 2순위: 평균 일별 피크 내림차순
+  - 3순위: 기존 서비스 우선순위
+
+3. Daily Heatmap 섹션 (서비스별)
+- contribution 스타일 타일
 - 요약 4개:
   - `Limit Hit Days`
   - `Near Limit Days`
   - `Avg Daily Peak`
   - `Last Hit Date`
 
-3. 7d Cycle Consistency 섹션 (조건부 표시)
+4. 7d Cycle Consistency 섹션 (서비스별 조건부 표시)
 - 조건: `isSevenDayCycleAvailable == true`
 - `UsageHistoryCycleStripView` (신규 내부 컴포넌트)
   - 최근 12사이클 타일/스트립
@@ -271,7 +277,7 @@ struct UsageHistoryCycleSummary: Sendable, Equatable {
 - 보조 지표:
   - `Avg High-Band Hours (>=80%)`
 
-4. 빈 상태
+5. 빈 상태
 - 데이터 없음: `"No history yet. Keep AgentBar running to collect usage."`
 - 사이클 없음: `"Not enough 7d cycle data yet."`
 
@@ -288,7 +294,7 @@ struct UsageHistoryCycleSummary: Sendable, Equatable {
 수정 파일: `AgentBar/Views/Settings/SettingsView.swift`
 
 - `SettingsTab`에 `.history` 추가
-- `TabView`에 `History` 탭 추가
+- `TabView`에 `History` 탭 추가 (가장 오른쪽)
 - `historyTab`에서 `UsageHistoryTabView` 렌더링
 
 ## 10. 변경 파일 목록

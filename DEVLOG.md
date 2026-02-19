@@ -1,5 +1,21 @@
 # AgentBar Development Log
 
+## Iteration 79: History tab refinement - all services view and ordering
+- Moved `History` tab to the rightmost position in Settings (`Usage` -> `Notifications` -> `History`)
+- Reworked `UsageHistoryViewModel` from single-service state to all-service panels
+  - added `UsageHistoryServicePanel`
+  - computes panel data for every available service in one refresh
+  - sorts panels by usage frequency (active days) descending
+  - tie-breakers: average daily peak, then stable service order
+- Updated `UsageHistoryTabView`
+  - removed service dropdown
+  - renders all services in one screen (service sections stacked vertically)
+  - keeps global window/range controls
+  - keeps per-service daily heatmap summary and conditional 7d cycle consistency block
+- Updated `UsageHistoryViewModelTests` to new multi-panel API and added frequency ordering test
+- Updated `docs/USAGE_HISTORY_IMPLEMENTATION_PLAN.md` to match UI behavior (all services + frequency order + rightmost History tab)
+- Build and tests pass
+
 ## Iteration 78: Test execution optimization with xctestplan
 - **AgentBar.xctestplan (Fast)**: Excludes 3 slow integration test classes (NotifySocketListenerLifecycleTests, HookScriptFallbackTests, AgentNotifyMonitorSocketReceiveTests). Parallel execution enabled. 249 tests, ~15s.
 - **AgentBarFull.xctestplan (Full)**: All 267 tests with parallel execution. ~22s. For pre-commit validation.

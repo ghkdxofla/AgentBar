@@ -12,16 +12,16 @@ struct UsageHistoryTabView: View {
             VStack(alignment: .leading, spacing: 18) {
                 controlsSection
 
-                if viewModel.availableServices.isEmpty {
+                if viewModel.servicePanels.isEmpty {
                     Text("No history yet. Keep AgentBar running to collect usage.")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 24)
                 } else {
-                    dailyHeatmapSection
+                    legend
 
-                    if viewModel.isSevenDayCycleAvailable {
-                        cycleConsistencySection
+                    ForEach(viewModel.servicePanels) { panel in
+                        servicePanelSection(panel)
                     }
                 }
             }
@@ -33,143 +33,146 @@ struct UsageHistoryTabView: View {
     }
 
     private var controlsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Picker("Service", selection: $viewModel.selectedService) {
-                    ForEach(viewModel.availableServices, id: \.self) { service in
-                        Text(service.rawValue).tag(Optional(service))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Picker("Range", selection: $viewModel.selectedRangeWeeks) {
-                    Text("4w").tag(4)
-                    Text("8w").tag(8)
-                    Text("12w").tag(12)
-                }
-                .frame(width: 140)
+        HStack(spacing: 12) {
+            Picker("Window", selection: $viewModel.selectedWindow) {
+                Text("Primary").tag(UsageHistoryWindow.primary)
+                Text("Secondary").tag(UsageHistoryWindow.secondary)
             }
+            .pickerStyle(.segmented)
 
-            if let selectedService = viewModel.selectedService {
-                Picker("Window", selection: $viewModel.selectedWindow) {
-                    Text(selectedService.fiveHourLabel).tag(UsageHistoryWindow.primary)
-                    Text(selectedService.weeklyLabel).tag(UsageHistoryWindow.secondary)
-                }
-                .pickerStyle(.segmented)
-                .disabled(!viewModel.isSecondaryAvailable)
+            Picker("Range", selection: $viewModel.selectedRangeWeeks) {
+                Text("4w").tag(4)
+                Text("8w").tag(8)
+                Text("12w").tag(12)
             }
+            .frame(width: 140)
         }
     }
 
-    private var dailyHeatmapSection: some View {
+    private func servicePanelSection(_ panel: UsageHistoryServicePanel) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Daily Heatmap")
-                .font(.headline)
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(panel.service.darkColor)
+                    .frame(width: 8, height: 8)
+                Text(panel.service.rawValue)
+                    .font(.headline)
+                Text(panelWindowTitle(panel))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Active days: \(panel.usageFrequencyDays)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
 
-            HStack(alignment: .top, spacing: 6) {
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text("Sun").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
-                    spacerLabel
-                    Text("Tue").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
-                    spacerLabel
-                    Text("Thu").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
-                    spacerLabel
-                    Text("Sat").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
-                }
-                .padding(.top, 1)
+            heatmapSection(panel)
+            dailySummarySection(panel)
 
-                HStack(alignment: .top, spacing: 3) {
-                    ForEach(groupedHeatmapCells.indices, id: \.self) { weekIndex in
-                        VStack(spacing: 3) {
-                            ForEach(groupedHeatmapCells[weekIndex]) { cell in
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(tileColor(level: cell.level))
-                                    .frame(width: 12, height: 12)
-                                    .help(dayTooltip(for: cell))
-                            }
+            if panel.isSevenDayCycleAvailable {
+                cycleConsistencySection(panel)
+            }
+
+            Divider()
+        }
+    }
+
+    private func heatmapSection(_ panel: UsageHistoryServicePanel) -> some View {
+        let groups = groupedHeatmapCells(panel.heatmapCells)
+        return HStack(alignment: .top, spacing: 6) {
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("Sun").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+                spacerLabel
+                Text("Tue").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+                spacerLabel
+                Text("Thu").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+                spacerLabel
+                Text("Sat").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+            }
+            .padding(.top, 1)
+
+            HStack(alignment: .top, spacing: 3) {
+                ForEach(groups.indices, id: \.self) { weekIndex in
+                    VStack(spacing: 3) {
+                        ForEach(groups[weekIndex]) { cell in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(tileColor(level: cell.level, service: panel.service))
+                                .frame(width: 12, height: 12)
+                                .help(dayTooltip(for: cell))
                         }
                     }
                 }
             }
-
-            dailySummarySection
-            legend
         }
     }
 
-    private var cycleConsistencySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func cycleConsistencySection(_ panel: UsageHistoryServicePanel) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("7d Cycle Consistency")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
 
-            if viewModel.cycleCells.isEmpty {
+            if panel.cycleCells.isEmpty {
                 Text("Not enough 7d cycle data yet.")
                     .foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 4) {
-                    ForEach(viewModel.cycleCells) { cell in
+                    ForEach(panel.cycleCells) { cell in
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(tileColor(level: cell.level))
+                            .fill(tileColor(level: cell.level, service: panel.service))
                             .frame(width: 16, height: 16)
                             .help(cycleTooltip(for: cell))
                     }
                 }
 
-                cycleSummarySection
+                cycleSummarySection(panel.cycleSummary)
             }
         }
     }
 
-    private var dailySummarySection: some View {
+    private func dailySummarySection(_ panel: UsageHistoryServicePanel) -> some View {
         HStack(spacing: 14) {
-            summaryItem(
-                title: "Limit Hit Days",
-                value: "\(viewModel.dailySummary.limitHitDays)"
-            )
-            summaryItem(
-                title: "Near Limit Days",
-                value: "\(viewModel.dailySummary.nearLimitDays)"
-            )
+            summaryItem(title: "Limit Hit Days", value: "\(panel.dailySummary.limitHitDays)")
+            summaryItem(title: "Near Limit Days", value: "\(panel.dailySummary.nearLimitDays)")
             summaryItem(
                 title: "Avg Daily Peak",
-                value: percentString(viewModel.dailySummary.averageDailyPeakRatio)
+                value: percentString(panel.dailySummary.averageDailyPeakRatio)
             )
             summaryItem(
                 title: "Last Hit Date",
-                value: viewModel.dailySummary.lastHitDate.map(dateString) ?? "-"
+                value: panel.dailySummary.lastHitDate.map(dateString) ?? "-"
             )
         }
     }
 
-    private var cycleSummarySection: some View {
+    private func cycleSummarySection(_ summary: UsageHistoryCycleSummary) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 14) {
                 summaryItem(
                     title: "Cycle Completion Rate",
-                    value: percentString(viewModel.cycleSummary.completionRate)
+                    value: percentString(summary.completionRate)
                 )
                 summaryItem(
                     title: "Completed Cycles",
-                    value: "\(viewModel.cycleSummary.completedCycles) / \(viewModel.cycleSummary.totalClosedCycles)"
+                    value: "\(summary.completedCycles) / \(summary.totalClosedCycles)"
                 )
                 summaryItem(
                     title: "Avg Days to 80%",
-                    value: viewModel.cycleSummary.averageDaysTo80.map { formatOneDecimal($0) } ?? "-"
+                    value: summary.averageDaysTo80.map { formatOneDecimal($0) } ?? "-"
                 )
             }
 
             HStack(spacing: 14) {
                 summaryItem(
                     title: "Avg Days to 100%",
-                    value: viewModel.cycleSummary.averageDaysTo100.map { formatOneDecimal($0) } ?? "-"
+                    value: summary.averageDaysTo100.map { formatOneDecimal($0) } ?? "-"
                 )
                 summaryItem(
                     title: "Current Completion Streak",
-                    value: "\(viewModel.cycleSummary.currentCompletionStreak)"
+                    value: "\(summary.currentCompletionStreak)"
                 )
                 summaryItem(
                     title: "Avg High-Band Hours",
-                    value: formatOneDecimal(viewModel.cycleSummary.averageHighBandHours)
+                    value: formatOneDecimal(summary.averageHighBandHours)
                 )
             }
         }
@@ -183,7 +186,7 @@ struct UsageHistoryTabView: View {
 
             ForEach(0..<5, id: \.self) { level in
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(tileColor(level: level))
+                    .fill(tileColor(level: level, service: viewModel.servicePanels.first?.service))
                     .frame(width: 12, height: 12)
             }
 
@@ -193,26 +196,38 @@ struct UsageHistoryTabView: View {
         }
     }
 
-    private var groupedHeatmapCells: [[UsageHistoryHeatmapCell]] {
-        guard !viewModel.heatmapCells.isEmpty else { return [] }
-        let weekCount = max(1, viewModel.selectedRangeWeeks)
-        var groups: [[UsageHistoryHeatmapCell]] = Array(repeating: [], count: weekCount)
-
-        for (index, cell) in viewModel.heatmapCells.enumerated() {
-            let weekIndex = min(index / 7, weekCount - 1)
-            groups[weekIndex].append(cell)
-        }
-        return groups
-    }
-
     private var spacerLabel: some View {
         Text(" ")
             .font(.caption2)
             .frame(height: 12)
     }
 
-    private func tileColor(level: Int) -> Color {
-        let base = viewModel.selectedService?.darkColor ?? .accentColor
+    private func panelWindowTitle(_ panel: UsageHistoryServicePanel) -> String {
+        switch panel.displayWindow {
+        case .primary:
+            if viewModel.selectedWindow == .secondary && !panel.isSecondaryAvailable {
+                return "\(panel.service.fiveHourLabel) (secondary unavailable)"
+            }
+            return panel.service.fiveHourLabel
+        case .secondary:
+            return panel.service.weeklyLabel
+        }
+    }
+
+    private func groupedHeatmapCells(_ cells: [UsageHistoryHeatmapCell]) -> [[UsageHistoryHeatmapCell]] {
+        guard !cells.isEmpty else { return [] }
+        let weekCount = max(1, viewModel.selectedRangeWeeks)
+        var groups: [[UsageHistoryHeatmapCell]] = Array(repeating: [], count: weekCount)
+
+        for (index, cell) in cells.enumerated() {
+            let weekIndex = min(index / 7, weekCount - 1)
+            groups[weekIndex].append(cell)
+        }
+        return groups
+    }
+
+    private func tileColor(level: Int, service: ServiceType?) -> Color {
+        let base = service?.darkColor ?? .accentColor
         switch level {
         case 0:
             return Color.gray.opacity(0.15)

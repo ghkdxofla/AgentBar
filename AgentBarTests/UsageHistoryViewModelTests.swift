@@ -27,13 +27,16 @@ final class UsageHistoryViewModelTests: XCTestCase {
         let store = MockUsageHistoryStore(dayRecordsStorage: records, secondarySamplesStorage: [])
         let vm = UsageHistoryViewModel(store: store, calendar: calendar, nowProvider: { now })
         vm.selectedRangeWeeks = 4
-        vm.selectedService = service
         vm.selectedWindow = .primary
         await vm.refresh()
 
-        XCTAssertEqual(vm.heatmapCells.count, 28)
+        guard let panel = panel(for: service, in: vm) else {
+            XCTFail("Expected a panel for \(service.rawValue)")
+            return
+        }
+        XCTAssertEqual(panel.heatmapCells.count, 28)
 
-        let byDay = Dictionary(uniqueKeysWithValues: vm.heatmapCells.map { (calendar.startOfDay(for: $0.date), $0) })
+        let byDay = Dictionary(uniqueKeysWithValues: panel.heatmapCells.map { (calendar.startOfDay(for: $0.date), $0) })
         XCTAssertEqual(byDay[makeDate(2026, 2, 15, 0, 0)]?.level, 0)
         XCTAssertEqual(byDay[makeDate(2026, 2, 16, 0, 0)]?.level, 1)
         XCTAssertEqual(byDay[makeDate(2026, 2, 17, 0, 0)]?.level, 2)
@@ -56,13 +59,16 @@ final class UsageHistoryViewModelTests: XCTestCase {
         let store = MockUsageHistoryStore(dayRecordsStorage: records, secondarySamplesStorage: [])
         let vm = UsageHistoryViewModel(store: store, calendar: calendar, nowProvider: { now })
         vm.selectedRangeWeeks = 4
-        vm.selectedService = service
         vm.selectedWindow = .primary
         await vm.refresh()
 
-        XCTAssertEqual(vm.dailySummary.limitHitDays, 2)
-        XCTAssertEqual(vm.dailySummary.nearLimitDays, 3)
-        XCTAssertEqual(vm.dailySummary.lastHitDate, makeDate(2026, 2, 19, 0, 0))
+        guard let panel = panel(for: service, in: vm) else {
+            XCTFail("Expected a panel for \(service.rawValue)")
+            return
+        }
+        XCTAssertEqual(panel.dailySummary.limitHitDays, 2)
+        XCTAssertEqual(panel.dailySummary.nearLimitDays, 3)
+        XCTAssertEqual(panel.dailySummary.lastHitDate, makeDate(2026, 2, 19, 0, 0))
     }
 
     @MainActor
@@ -92,19 +98,23 @@ final class UsageHistoryViewModelTests: XCTestCase {
 
         let store = MockUsageHistoryStore(dayRecordsStorage: records, secondarySamplesStorage: samples)
         let vm = UsageHistoryViewModel(store: store, calendar: calendar, nowProvider: { now })
-        vm.selectedService = service
         vm.selectedWindow = .secondary
         await vm.refresh()
 
-        XCTAssertTrue(vm.isSevenDayCycleAvailable)
-        XCTAssertEqual(vm.cycleSummary.totalClosedCycles, 2)
-        XCTAssertEqual(vm.cycleSummary.completedCycles, 1)
-        XCTAssertEqual(vm.cycleSummary.completionRate, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(vm.cycleSummary.averageDaysTo80 ?? -1, 3.5, accuracy: 0.0001)
-        XCTAssertEqual(vm.cycleSummary.averageDaysTo100 ?? -1, 4.0, accuracy: 0.0001)
-        XCTAssertEqual(vm.cycleSummary.currentCompletionStreak, 0)
-        XCTAssertEqual(vm.cycleSummary.averageHighBandHours, 0.25, accuracy: 0.0001)
-        XCTAssertEqual(vm.cycleCells.count, 2)
+        guard let panel = panel(for: service, in: vm) else {
+            XCTFail("Expected a panel for \(service.rawValue)")
+            return
+        }
+
+        XCTAssertTrue(panel.isSevenDayCycleAvailable)
+        XCTAssertEqual(panel.cycleSummary.totalClosedCycles, 2)
+        XCTAssertEqual(panel.cycleSummary.completedCycles, 1)
+        XCTAssertEqual(panel.cycleSummary.completionRate, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(panel.cycleSummary.averageDaysTo80 ?? -1, 3.5, accuracy: 0.0001)
+        XCTAssertEqual(panel.cycleSummary.averageDaysTo100 ?? -1, 4.0, accuracy: 0.0001)
+        XCTAssertEqual(panel.cycleSummary.currentCompletionStreak, 0)
+        XCTAssertEqual(panel.cycleSummary.averageHighBandHours, 0.25, accuracy: 0.0001)
+        XCTAssertEqual(panel.cycleCells.count, 2)
     }
 
     @MainActor
@@ -130,13 +140,41 @@ final class UsageHistoryViewModelTests: XCTestCase {
 
         let store = MockUsageHistoryStore(dayRecordsStorage: records, secondarySamplesStorage: samples)
         let vm = UsageHistoryViewModel(store: store, calendar: calendar, nowProvider: { now })
-        vm.selectedService = service
         vm.selectedWindow = .secondary
         await vm.refresh()
 
-        XCTAssertFalse(vm.isSevenDayCycleAvailable)
-        XCTAssertTrue(vm.cycleCells.isEmpty)
-        XCTAssertEqual(vm.cycleSummary, .empty)
+        guard let panel = panel(for: service, in: vm) else {
+            XCTFail("Expected a panel for \(service.rawValue)")
+            return
+        }
+        XCTAssertFalse(panel.isSevenDayCycleAvailable)
+        XCTAssertTrue(panel.cycleCells.isEmpty)
+        XCTAssertEqual(panel.cycleSummary, .empty)
+    }
+
+    @MainActor
+    func testPanelsAreSortedByUsageFrequencyDescending() async {
+        let now = makeDate(2026, 2, 19, 12, 0)
+        let claude: ServiceType = .claude
+        let codex: ServiceType = .codex
+
+        let records = [
+            makeDayRecord(service: claude, dayStart: makeDate(2026, 2, 15, 0, 0), primaryPeak: 0.4),
+            makeDayRecord(service: claude, dayStart: makeDate(2026, 2, 16, 0, 0), primaryPeak: 0.5),
+            makeDayRecord(service: codex, dayStart: makeDate(2026, 2, 15, 0, 0), primaryPeak: 0.4),
+            makeDayRecord(service: codex, dayStart: makeDate(2026, 2, 16, 0, 0), primaryPeak: 0.5),
+            makeDayRecord(service: codex, dayStart: makeDate(2026, 2, 17, 0, 0), primaryPeak: 0.3),
+            makeDayRecord(service: codex, dayStart: makeDate(2026, 2, 18, 0, 0), primaryPeak: 0.6)
+        ]
+
+        let store = MockUsageHistoryStore(dayRecordsStorage: records, secondarySamplesStorage: [])
+        let vm = UsageHistoryViewModel(store: store, calendar: calendar, nowProvider: { now })
+        vm.selectedWindow = .primary
+        await vm.refresh()
+
+        XCTAssertEqual(vm.servicePanels.map(\.service), [.codex, .claude])
+        XCTAssertEqual(vm.servicePanels.first?.usageFrequencyDays, 4)
+        XCTAssertEqual(vm.servicePanels.last?.usageFrequencyDays, 2)
     }
 
     private func makeDayRecord(
@@ -168,6 +206,11 @@ final class UsageHistoryViewModelTests: XCTestCase {
             minute: minute
         )
         return components.date ?? Date(timeIntervalSince1970: 0)
+    }
+
+    @MainActor
+    private func panel(for service: ServiceType, in vm: UsageHistoryViewModel) -> UsageHistoryServicePanel? {
+        vm.servicePanels.first { $0.service == service }
     }
 }
 

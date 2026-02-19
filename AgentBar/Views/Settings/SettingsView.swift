@@ -70,13 +70,13 @@ struct SettingsView: View {
                 .tabItem { Label("Usage", systemImage: "chart.bar") }
                 .tag(SettingsTab.usage)
 
-            historyTab
-                .tabItem { Label("History", systemImage: "calendar") }
-                .tag(SettingsTab.history)
-
             notificationsTab
                 .tabItem { Label("Notifications", systemImage: "bell") }
                 .tag(SettingsTab.notifications)
+
+            historyTab
+                .tabItem { Label("History", systemImage: "calendar") }
+                .tag(SettingsTab.history)
         }
         .frame(width: 450, height: 750)
         .onAppear {
