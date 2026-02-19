@@ -1,5 +1,9 @@
 # AgentBar Development Log
 
+## Iteration 84: Show plan name in zero-usage fallback
+- **UsageViewModel.storedPlanName(for:)**: Read plan name from UserDefaults for Claude/Codex/Cursor when fetchUsage() fails, so the plan label still appears next to the service name
+- All 273 tests passing
+
 ## Iteration 83: Change Codex color from emerald to gray
 - **ServiceType darkColor/lightColor**: Codex changed from emerald-500/300 to gray-500/300 (`0.42, 0.45, 0.49` / `0.71, 0.73, 0.76`)
 - Test updated: `testCodexDarkColorIsGray500`

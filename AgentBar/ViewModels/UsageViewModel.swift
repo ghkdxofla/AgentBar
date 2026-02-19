@@ -115,8 +115,23 @@ final class UsageViewModel: ObservableObject {
             fiveHourUsage: UsageMetric(used: 0, total: 100, unit: .percent, resetTime: nil),
             weeklyUsage: nil,
             lastUpdated: Date(),
-            isAvailable: true
+            isAvailable: true,
+            planName: storedPlanName(for: service)
         )
+    }
+
+    nonisolated private static func storedPlanName(for service: ServiceType) -> String? {
+        let defaults = UserDefaults.standard
+        switch service {
+        case .claude:
+            return defaults.string(forKey: "claudePlan")
+        case .codex:
+            return defaults.string(forKey: "codexPlan")
+        case .cursor:
+            return defaults.string(forKey: "cursorPlan")
+        default:
+            return nil
+        }
     }
 
     // MARK: - Provider Factory
