@@ -92,6 +92,8 @@ final class UsageHistoryViewModel: ObservableObject {
     private var calendar: Calendar
     private let nowProvider: @Sendable () -> Date
     private var cancellables: Set<AnyCancellable> = []
+    private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration: UInt64 = 0
 
     private static let cyclePanelMaxCycles = 12
     private static let secondarySampleWindowDays = 130
@@ -115,13 +117,18 @@ final class UsageHistoryViewModel: ObservableObject {
 
         bindInputs()
         observeHistoryUpdates()
-
-        Task {
-            await self.refresh()
-        }
+        scheduleRefresh()
     }
 
     func refresh() async {
+        refreshTask?.cancel()
+        refreshTask = nil
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
+        await refresh(generation: generation)
+    }
+
+    private func refresh(generation: UInt64) async {
         let now = nowProvider()
         let currentWeekStart = startOfWeek(containing: now) ?? calendar.startOfDay(for: now)
         let gridStart = calendar.date(
@@ -136,6 +143,8 @@ final class UsageHistoryViewModel: ObservableObject {
         ) ?? now
 
         let allServices = await store.availableServices(since: gridStart, until: now)
+        guard !isStale(generation) else { return }
+
         let services = selectedWindow == .secondary
             ? allServices.filter(\.hasFiveHourSevenDayStructure)
             : allServices
@@ -145,6 +154,7 @@ final class UsageHistoryViewModel: ObservableObject {
         availableServices = orderedServices
 
         guard !orderedServices.isEmpty else {
+            guard !isStale(generation) else { return }
             resetStateForEmptyHistory()
             return
         }
@@ -162,12 +172,14 @@ final class UsageHistoryViewModel: ObservableObject {
                 since: gridStart,
                 until: gridEnd
             )
+            guard !isStale(generation) else { return }
 
             let secondarySamples = await store.secondarySamples(
                 for: service,
                 since: secondarySamplesSince,
                 until: now
             )
+            guard !isStale(generation) else { return }
 
             let isSecondaryAvailable = dayRecords.contains {
                 $0.secondaryPeakRatio != nil || $0.secondaryAverageRatio != nil
@@ -235,6 +247,8 @@ final class UsageHistoryViewModel: ObservableObject {
             )
         }
 
+        guard !isStale(generation) else { return }
+
         panels.sort {
             if $0.usageFrequencyDays != $1.usageFrequencyDays {
                 return $0.usageFrequencyDays > $1.usageFrequencyDays
@@ -255,18 +269,14 @@ final class UsageHistoryViewModel: ObservableObject {
         $selectedWindow
             .dropFirst()
             .sink { [weak self] _ in
-                Task { [weak self] in
-                    await self?.refresh()
-                }
+                self?.scheduleRefresh()
             }
             .store(in: &cancellables)
 
         $selectedRangeWeeks
             .dropFirst()
             .sink { [weak self] _ in
-                Task { [weak self] in
-                    await self?.refresh()
-                }
+                self?.scheduleRefresh()
             }
             .store(in: &cancellables)
     }
@@ -275,11 +285,22 @@ final class UsageHistoryViewModel: ObservableObject {
         NotificationCenter.default
             .publisher(for: .usageHistoryChanged)
             .sink { [weak self] _ in
-                Task { [weak self] in
-                    await self?.refresh()
-                }
+                self?.scheduleRefresh()
             }
             .store(in: &cancellables)
+    }
+
+    private func scheduleRefresh() {
+        refreshTask?.cancel()
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
+        refreshTask = Task { [weak self] in
+            await self?.refresh(generation: generation)
+        }
+    }
+
+    private func isStale(_ generation: UInt64) -> Bool {
+        Task.isCancelled || generation != refreshGeneration
     }
 
     private func resetStateForEmptyHistory() {
@@ -335,7 +356,7 @@ final class UsageHistoryViewModel: ObservableObject {
             case .secondary:
                 peakRatio = record?.secondaryPeakRatio ?? 0
                 averageRatio = record?.secondaryAverageRatio ?? 0
-                sampleCount = record?.sampleCount ?? 0
+                sampleCount = record?.secondarySampleCount ?? 0
                 usedValue = record?.secondaryPeakUsed ?? 0
                 unit = record?.secondaryUnitRawValue.flatMap(UsageUnit.init(rawValue:))
             }

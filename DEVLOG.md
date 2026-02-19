@@ -1,5 +1,26 @@
 # AgentBar Development Log
 
+## Iteration 85: Post-v0.5 reliability refactor (history + keychain)
+- **UsageHistoryStore**: snapshot + append-log(`usage-history.events.jsonl`) 구조로 전환
+  - 기록 시 전체 snapshot rewrite 대신 log append
+  - load 시 log replay
+  - 이벤트 수/파일 크기 임계치 기반 compact(정렬 + snapshot 저장 + log 제거)
+  - day/secondary upsert를 index map 기반으로 최적화
+- **UsageHistoryDayRecord**: `secondarySampleCount` 필드 추가
+  - secondary 평균 계산 분모를 `sampleCount`에서 분리해 희석 오류 방지
+  - 구버전 데이터 디코딩 하위호환 유지
+- **UsageHistoryViewModel**: `refreshGeneration` + 취소 가능한 단일 `refreshTask` 도입
+  - 겹치는 refresh 요청에서 stale 결과 반영 차단
+  - secondary 히트맵의 sample count는 `secondarySampleCount` 사용
+- **KeychainManager**: load 결과를 `LoadOutcome(value, shouldCache)`로 분리
+  - transient Keychain 오류(`errSecInteractionNotAllowed` 등)는 캐시하지 않음
+  - 안정 상태(`errSecItemNotFound` 등)만 캐시
+- **테스트 추가**
+  - `UsageHistoryStoreTests`: secondary 평균 분모 분리 검증
+  - `UsageHistoryViewModelTests`: refresh overlap 시 최신 generation 우선 반영 검증
+  - `UsageViewModelTests`: Keychain in-process cache의 안정/일시 오류 캐시 정책 검증
+- `./scripts/test.sh` 통과
+
 ## Iteration 84: Show plan name in zero-usage fallback
 - **UsageViewModel.storedPlanName(for:)**: Read plan name from UserDefaults for Claude/Codex/Cursor when fetchUsage() fails, so the plan label still appears next to the service name
 - All 273 tests passing

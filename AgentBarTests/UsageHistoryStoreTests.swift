@@ -48,6 +48,31 @@ final class UsageHistoryStoreTests: XCTestCase {
         XCTAssertEqual(record.secondaryAverageRatio ?? -1, 0.5, accuracy: 0.0001)
     }
 
+    func testSecondaryAverageUsesSecondarySampleCountInsteadOfTotalSamples() async {
+        let store = UsageHistoryStore(fileURL: historyFileURL, calendar: calendar)
+        let resetAt = makeDate(2026, 2, 20, 0, 0)
+
+        await store.record(
+            samples: [makeUsage(service: .codex, primaryRatio: 0.2, secondaryRatio: 0.4, resetAt: resetAt)],
+            recordedAt: makeDate(2026, 2, 19, 10, 0)
+        )
+
+        // Second sample has no secondary window and must not dilute secondary averages.
+        await store.record(
+            samples: [makeUsage(service: .codex, primaryRatio: 0.8, secondaryRatio: nil, resetAt: resetAt)],
+            recordedAt: makeDate(2026, 2, 19, 11, 0)
+        )
+
+        let dayStart = makeDate(2026, 2, 19, 0, 0)
+        let records = await store.dayRecords(for: .codex, since: dayStart, until: dayStart)
+
+        XCTAssertEqual(records.count, 1)
+        guard let record = records.first else { return }
+        XCTAssertEqual(record.sampleCount, 2)
+        XCTAssertEqual(record.secondarySampleCount, 1)
+        XCTAssertEqual(record.secondaryAverageRatio ?? -1, 0.4, accuracy: 0.0001)
+    }
+
     func testSecondarySampleUsesFiveMinuteBucketAndKeepsHighestRatio() async {
         let store = UsageHistoryStore(fileURL: historyFileURL, calendar: calendar)
         let resetAt = makeDate(2026, 2, 20, 0, 0)

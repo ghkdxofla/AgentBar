@@ -366,3 +366,30 @@ struct UsageHistoryCycleSummary: Sendable, Equatable {
 - 사이클 completion rate/streak/days-to-threshold/high-band 지표가 계산된다.
 - synthetic zero fallback은 히스토리에 기록되지 않는다.
 - 신규/기존 테스트가 모두 통과한다.
+
+## 14. v0.5 이후 리팩토링 메모 (2026-02-20)
+
+### 14.1 저장소 write 경량화
+- `UsageHistoryStore`는 snapshot(`usage-history.json`) + append log(`usage-history.events.jsonl`) 구조로 동작한다.
+- 신규 샘플 기록 시:
+  1. 메모리 state 반영
+  2. 이벤트를 append log에 추가
+  3. log가 임계치(이벤트 수/파일 크기) 도달 시 compact(정렬 + snapshot 저장 + log 제거)
+- 효과:
+  - 매 샘플마다 전체 JSON 파일 rewrite를 피함
+  - crash 이후에도 log replay로 복구 가능
+
+### 14.2 secondary 평균 분모 분리
+- `UsageHistoryDayRecord.secondarySampleCount` 추가.
+- secondary 평균(`secondaryAverageRatio`, `secondaryAverageUsed`)은 전체 `sampleCount`가 아니라 `secondarySampleCount` 기준으로 계산.
+- secondary가 없는 샘플이 섞여도 평균이 희석되지 않는다.
+
+### 14.3 History refresh 경쟁 상태 방지
+- `UsageHistoryViewModel`에 `refreshGeneration` + `refreshTask` 도입.
+- 새 refresh 요청이 오면 이전 task를 취소하고 generation mismatch 결과를 폐기한다.
+- 늦게 끝난 이전 refresh가 최신 UI 상태를 덮어쓰는 문제를 방지한다.
+
+### 14.4 Keychain load cache 안정화
+- `KeychainManager.load`는 load 결과를 `LoadOutcome(value, shouldCache)`로 처리한다.
+- `errSecInteractionNotAllowed` 등 transient 실패는 캐시하지 않는다.
+- `errSecItemNotFound` 등 안정 상태만 캐시하여, 일시 실패 후 복구 시 재시도가 가능하다.

@@ -32,6 +32,11 @@ enum KeychainManager {
     private static let loadCacheLock = NSLock()
     nonisolated(unsafe) private static var loadCache: [String: CachedValue] = [:]
 
+    private struct LoadOutcome {
+        let value: String?
+        let shouldCache: Bool
+    }
+
     enum Store {
         case dataProtection
         case legacy
@@ -105,6 +110,22 @@ enum KeychainManager {
     }
 
     static func load(account: String) -> String? {
+        load(account: account, securityAPI: SystemSecurityAPI(), useInProcessCache: true)
+    }
+
+    static func load(account: String, securityAPI: any SecurityAPI) -> String? {
+        load(account: account, securityAPI: securityAPI, useInProcessCache: false)
+    }
+
+    static func load(
+        account: String,
+        securityAPI: any SecurityAPI,
+        useInProcessCache: Bool
+    ) -> String? {
+        guard useInProcessCache else {
+            return loadOutcome(account: account, securityAPI: securityAPI).value
+        }
+
         loadCacheLock.lock()
         if let cached = loadCache[account] {
             loadCacheLock.unlock()
@@ -112,40 +133,48 @@ enum KeychainManager {
         }
         loadCacheLock.unlock()
 
-        let value: String?
+        let outcome: LoadOutcome
         if isDataProtectionUnavailable {
-            value = loadLegacyOnly(account: account, securityAPI: SystemSecurityAPI())
+            outcome = loadLegacyOnlyOutcome(account: account, securityAPI: securityAPI)
         } else {
-            value = load(account: account, securityAPI: SystemSecurityAPI())
+            outcome = loadOutcome(account: account, securityAPI: securityAPI)
         }
 
-        loadCacheLock.lock()
-        loadCache[account] = CachedValue(value: value)
-        loadCacheLock.unlock()
-
-        return value
+        if outcome.shouldCache {
+            loadCacheLock.lock()
+            loadCache[account] = CachedValue(value: outcome.value)
+            loadCacheLock.unlock()
+        }
+        return outcome.value
     }
 
-    static func load(account: String, securityAPI: any SecurityAPI) -> String? {
+    private static func loadOutcome(account: String, securityAPI: any SecurityAPI) -> LoadOutcome {
         let dataProtectionValue = copyValue(account: account, store: .dataProtection, securityAPI: securityAPI)
         if dataProtectionValue.status == errSecSuccess {
-            guard let data = dataProtectionValue.data else {
-                return nil
-            }
-            return String(data: data, encoding: .utf8)
+            return decodeValueOutcome(from: dataProtectionValue.data, status: dataProtectionValue.status)
         }
+
         if dataProtectionValue.status == errSecMissingEntitlement {
             markDataProtectionUnavailable()
         }
         guard shouldFallbackToLegacyLoad(for: dataProtectionValue.status) else {
-            return nil
+            return LoadOutcome(
+                value: nil,
+                shouldCache: shouldCacheLoadStatus(dataProtectionValue.status, for: .dataProtection)
+            )
         }
 
         let legacyValue = copyValue(account: account, store: .legacy, securityAPI: securityAPI)
-        guard legacyValue.status == errSecSuccess,
-              let legacyData = legacyValue.data,
+        guard legacyValue.status == errSecSuccess else {
+            return LoadOutcome(
+                value: nil,
+                shouldCache: shouldCacheLoadStatus(legacyValue.status, for: .legacy)
+            )
+        }
+
+        guard let legacyData = legacyValue.data,
               let value = String(data: legacyData, encoding: .utf8) else {
-            return nil
+            return LoadOutcome(value: nil, shouldCache: false)
         }
 
         let migrationStatus = upsert(
@@ -158,7 +187,7 @@ enum KeychainManager {
             _ = deleteStore(account: account, store: .legacy, securityAPI: securityAPI)
         }
 
-        return value
+        return LoadOutcome(value: value, shouldCache: true)
     }
 
     static func delete(account: String) throws {
@@ -249,6 +278,41 @@ enum KeychainManager {
         dataProtectionStatus == errSecItemNotFound || dataProtectionStatus == errSecMissingEntitlement
     }
 
+    private static func shouldCacheLoadStatus(_ status: OSStatus, for store: Store) -> Bool {
+        if status == errSecSuccess || status == errSecItemNotFound {
+            return true
+        }
+        if store == .dataProtection && status == errSecMissingEntitlement {
+            return true
+        }
+        return !isTransientLoadStatus(status)
+    }
+
+    private static func isTransientLoadStatus(_ status: OSStatus) -> Bool {
+        switch status {
+        case errSecInteractionNotAllowed,
+             errSecNotAvailable,
+             errSecAuthFailed,
+             errSecNoSuchKeychain:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func decodeValueOutcome(from data: Data?, status: OSStatus) -> LoadOutcome {
+        guard let data else {
+            return LoadOutcome(value: nil, shouldCache: false)
+        }
+        guard let value = String(data: data, encoding: .utf8) else {
+            return LoadOutcome(value: nil, shouldCache: false)
+        }
+        return LoadOutcome(
+            value: value,
+            shouldCache: shouldCacheLoadStatus(status, for: .dataProtection)
+        )
+    }
+
     // MARK: - Data Protection Availability Cache
 
     private static var isDataProtectionUnavailable: Bool {
@@ -269,13 +333,31 @@ enum KeychainManager {
         loadCacheLock.unlock()
     }
 
+    #if DEBUG
+    static func resetInProcessStateForTesting() {
+        dpLock.lock()
+        dataProtectionUnavailable = false
+        dpLock.unlock()
+
+        loadCacheLock.lock()
+        loadCache.removeAll()
+        loadCacheLock.unlock()
+    }
+    #endif
+
     /// Legacy-only fast path: skips dataProtection query entirely when entitlement is known to be missing.
-    private static func loadLegacyOnly(account: String, securityAPI: any SecurityAPI) -> String? {
+    private static func loadLegacyOnlyOutcome(account: String, securityAPI: any SecurityAPI) -> LoadOutcome {
         let legacyValue = copyValue(account: account, store: .legacy, securityAPI: securityAPI)
-        guard legacyValue.status == errSecSuccess,
-              let data = legacyValue.data else {
-            return nil
+        guard legacyValue.status == errSecSuccess else {
+            return LoadOutcome(
+                value: nil,
+                shouldCache: shouldCacheLoadStatus(legacyValue.status, for: .legacy)
+            )
         }
-        return String(data: data, encoding: .utf8)
+        guard let data = legacyValue.data,
+              let value = String(data: data, encoding: .utf8) else {
+            return LoadOutcome(value: nil, shouldCache: false)
+        }
+        return LoadOutcome(value: value, shouldCache: true)
     }
 }

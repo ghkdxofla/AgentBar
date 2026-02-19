@@ -408,6 +408,52 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(failAPI.legacyItems[account], tokenData)
     }
 
+    func testKeychainInProcessCacheCachesStableNotFoundResult() {
+        KeychainManager.resetInProcessStateForTesting()
+        let account = "tests.cache.notfound.\(UUID().uuidString)"
+        let securityAPI = MockKeychainSecurityAPI()
+
+        let first = KeychainManager.load(
+            account: account,
+            securityAPI: securityAPI,
+            useInProcessCache: true
+        )
+        XCTAssertNil(first)
+
+        securityAPI.legacyItems[account] = Data("late-token".utf8)
+        let second = KeychainManager.load(
+            account: account,
+            securityAPI: securityAPI,
+            useInProcessCache: true
+        )
+
+        XCTAssertNil(second, "Stable item-not-found should be cached for this process.")
+    }
+
+    func testKeychainInProcessCacheSkipsTransientFailures() {
+        KeychainManager.resetInProcessStateForTesting()
+        let account = "tests.cache.transient.\(UUID().uuidString)"
+        let securityAPI = MockKeychainSecurityAPI()
+        securityAPI.copyStatusByStore[.dataProtection] = errSecInteractionNotAllowed
+
+        let first = KeychainManager.load(
+            account: account,
+            securityAPI: securityAPI,
+            useInProcessCache: true
+        )
+        XCTAssertNil(first)
+
+        securityAPI.copyStatusByStore[.dataProtection] = errSecItemNotFound
+        securityAPI.legacyItems[account] = Data("available-now".utf8)
+
+        let second = KeychainManager.load(
+            account: account,
+            securityAPI: securityAPI,
+            useInProcessCache: true
+        )
+        XCTAssertEqual(second, "available-now")
+    }
+
     func testKeychainDeleteRemovesDataProtectionAndLegacyItems() throws {
         let account = "tests.delete.cleanup"
         let tokenData = Data("token".utf8)

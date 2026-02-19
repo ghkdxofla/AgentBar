@@ -172,6 +172,40 @@ final class UsageHistoryViewModelTests: XCTestCase {
         XCTAssertEqual(vm.servicePanels.last?.usageFrequencyDays, 2)
     }
 
+    @MainActor
+    func testLatestRefreshGenerationWinsWhenRefreshesOverlap() async {
+        let now = makeDate(2026, 2, 19, 12, 0)
+        let service: ServiceType = .codex
+        let records = [
+            makeDayRecord(
+                service: service,
+                dayStart: makeDate(2026, 2, 19, 0, 0),
+                primaryPeak: 0.4,
+                secondaryPeak: 0.8
+            )
+        ]
+
+        let store = DelayedMockUsageHistoryStore(
+            dayRecordsStorage: records,
+            secondarySamplesStorage: []
+        )
+        let vm = UsageHistoryViewModel(store: store, calendar: calendar, nowProvider: { now })
+        await vm.refresh()
+
+        await store.setDelayOnNextAvailableServicesCall(nanoseconds: 200_000_000)
+        vm.selectedWindow = .primary
+        let firstRefresh = Task { await vm.refresh() }
+
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        vm.selectedWindow = .secondary
+        let secondRefresh = Task { await vm.refresh() }
+
+        await firstRefresh.value
+        await secondRefresh.value
+
+        XCTAssertEqual(vm.servicePanels.first?.displayWindow, .secondary)
+    }
+
     private func makeDayRecord(
         service: ServiceType,
         dayStart: Date,
@@ -206,6 +240,57 @@ final class UsageHistoryViewModelTests: XCTestCase {
     @MainActor
     private func panel(for service: ServiceType, in vm: UsageHistoryViewModel) -> UsageHistoryServicePanel? {
         vm.servicePanels.first { $0.service == service }
+    }
+}
+
+private actor DelayedMockUsageHistoryStore: UsageHistoryStoreProtocol {
+    private let dayRecordsStorage: [UsageHistoryDayRecord]
+    private let secondarySamplesStorage: [UsageHistorySecondarySample]
+    private var delayOnNextAvailableServicesCall: UInt64 = 0
+
+    init(
+        dayRecordsStorage: [UsageHistoryDayRecord],
+        secondarySamplesStorage: [UsageHistorySecondarySample]
+    ) {
+        self.dayRecordsStorage = dayRecordsStorage
+        self.secondarySamplesStorage = secondarySamplesStorage
+    }
+
+    func setDelayOnNextAvailableServicesCall(nanoseconds: UInt64) {
+        delayOnNextAvailableServicesCall = nanoseconds
+    }
+
+    func record(samples: [UsageData], recordedAt: Date) async {
+        // no-op
+    }
+
+    func dayRecords(for service: ServiceType, since: Date, until: Date) async -> [UsageHistoryDayRecord] {
+        dayRecordsStorage
+            .filter { $0.service == service && $0.dayStart >= since && $0.dayStart <= until }
+            .sorted { $0.dayStart < $1.dayStart }
+    }
+
+    func secondarySamples(for service: ServiceType, since: Date, until: Date) async -> [UsageHistorySecondarySample] {
+        secondarySamplesStorage
+            .filter { $0.service == service && $0.sampledAt >= since && $0.sampledAt <= until }
+            .sorted { $0.sampledAt < $1.sampledAt }
+    }
+
+    func availableServices(since: Date, until: Date) async -> [ServiceType] {
+        if delayOnNextAvailableServicesCall > 0 {
+            let delay = delayOnNextAvailableServicesCall
+            delayOnNextAvailableServicesCall = 0
+            try? await Task.sleep(nanoseconds: delay)
+        }
+
+        var set = Set<ServiceType>()
+        for record in dayRecordsStorage where record.dayStart >= since && record.dayStart <= until {
+            set.insert(record.service)
+        }
+        for sample in secondarySamplesStorage where sample.sampledAt >= since && sample.sampledAt <= until {
+            set.insert(sample.service)
+        }
+        return Array(set)
     }
 }
 
