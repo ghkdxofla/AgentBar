@@ -28,4 +28,8 @@ final class SettingsViewBehaviorTests: XCTestCase {
             "Expected SettingsView.body to build a non-empty view hierarchy."
         )
     }
+
+    func testSettingsTabSupportsHistoryCase() {
+        XCTAssertEqual(SettingsTab.history, .history)
+    }
 }

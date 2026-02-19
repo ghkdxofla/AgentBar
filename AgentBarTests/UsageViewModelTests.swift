@@ -88,6 +88,46 @@ final class UsageViewModelTests: XCTestCase {
         XCTAssertEqual(vm.usageData[3].service, .zai)
     }
 
+    func testHistoryRecordsOnlySuccessfulProviderResults() async {
+        let historyStore = HistoryRecordingStoreSpy()
+        let successProvider = MockUsageProvider(
+            serviceType: .claude,
+            result: .success(UsageData.mock(service: .claude))
+        )
+        let failProvider = MockUsageProvider(
+            serviceType: .codex,
+            result: .failure(APIError.noData)
+        )
+
+        let vm = UsageViewModel(
+            providers: [successProvider, failProvider],
+            historyStore: historyStore
+        )
+        await vm.fetchAllUsage()
+
+        let snapshots = await historyStore.recordedSnapshots()
+        XCTAssertEqual(snapshots.count, 1)
+        XCTAssertEqual(snapshots.first?.count, 1)
+        XCTAssertEqual(snapshots.first?.first?.service, .claude)
+    }
+
+    func testHistorySkipsRecordingWhenAllProvidersFail() async {
+        let historyStore = HistoryRecordingStoreSpy()
+        let failProvider = MockUsageProvider(
+            serviceType: .codex,
+            result: .failure(APIError.noData)
+        )
+
+        let vm = UsageViewModel(
+            providers: [failProvider],
+            historyStore: historyStore
+        )
+        await vm.fetchAllUsage()
+
+        let snapshots = await historyStore.recordedSnapshots()
+        XCTAssertTrue(snapshots.isEmpty)
+    }
+
     func testLegacyCursorPlanBusinessMigratesToTeams() {
         let suiteName = "AgentBarTests.CursorPlanMigration"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
@@ -774,5 +814,29 @@ private final class DataProtectionUnavailableSystemSecurityAPI: KeychainManager.
 
     func delete(_ query: [String : Any]) -> OSStatus {
         systemAPI.delete(query)
+    }
+}
+
+private actor HistoryRecordingStoreSpy: UsageHistoryStoreProtocol {
+    private var snapshots: [[UsageData]] = []
+
+    func record(samples: [UsageData], recordedAt: Date) async {
+        snapshots.append(samples)
+    }
+
+    func dayRecords(for service: ServiceType, since: Date, until: Date) async -> [UsageHistoryDayRecord] {
+        []
+    }
+
+    func secondarySamples(for service: ServiceType, since: Date, until: Date) async -> [UsageHistorySecondarySample] {
+        []
+    }
+
+    func availableServices(since: Date, until: Date) async -> [ServiceType] {
+        []
+    }
+
+    func recordedSnapshots() async -> [[UsageData]] {
+        snapshots
     }
 }

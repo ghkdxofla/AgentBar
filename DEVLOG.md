@@ -1,5 +1,23 @@
 # AgentBar Development Log
 
+## Iteration 76: Usage History Step 5 - test coverage
+- Added `UsageHistoryStoreTests`:
+  - day record peak/average aggregation
+  - secondary 5-minute bucket upsert behavior
+  - retention pruning (day + sample windows)
+  - persistence round-trip
+  - corrupt store backup and reset
+- Added `UsageHistoryViewModelTests`:
+  - heatmap cell count and level mapping
+  - daily summary calculation
+  - 7d cycle grouping and summary metrics
+  - non-7d cycle panel disable behavior
+- Updated `UsageViewModelTests`:
+  - verifies history records only successful provider results
+  - verifies no history write when all providers fail
+- Updated `SettingsViewBehaviorTests` with `SettingsTab.history` coverage
+- Test suite passes via `./scripts/test.sh`
+
 ## Iteration 75: Usage History Step 4 - Settings History tab and UI
 - Added `UsageHistoryTabView` in `AgentBar/Views/Settings/UsageHistoryTabView.swift`
 - Added `History` tab in `SettingsView` with service/window/range controls
