@@ -19,6 +19,11 @@ enum BuyMeACoffeeSettings {
     static let hideButtonKey = "hideBuyMeACoffeeButton"
 }
 
+enum CopilotCredentialSettings {
+    /// Enables Keychain fallback for Copilot when gh CLI token is unavailable.
+    static let manualPATEnabledKey = "copilotManualPATEnabled"
+}
+
 extension UserDefaults {
     func bool(forKey key: String, defaultValue: Bool) -> Bool {
         guard object(forKey: key) != nil else { return defaultValue }

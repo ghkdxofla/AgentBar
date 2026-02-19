@@ -34,6 +34,7 @@ struct SettingsView: View {
     @AppStorage("geminiDailyLimit") private var geminiDailyLimit: Double = 1_000
 
     @AppStorage("copilotEnabled") private var copilotEnabled = true
+    @AppStorage(CopilotCredentialSettings.manualPATEnabledKey) private var copilotManualPATEnabled = false
 
     @AppStorage("cursorEnabled") private var cursorEnabled = true
     @AppStorage("cursorPlan") private var cursorPlan: String = CursorPlan.pro.rawValue
@@ -587,6 +588,9 @@ struct SettingsView: View {
             hasSavedToken: hasSavedCopilotPAT
         )
         hasSavedCopilotPAT = outcome.hasSavedToken
+        if outcome.didSave {
+            copilotManualPATEnabled = true
+        }
         copilotPAT = outcome.tokenFieldValue
         return outcome.didSave
     }
@@ -649,7 +653,11 @@ struct SettingsView: View {
     }
 
     private func loadAPIKeys() {
-        hasSavedCopilotPAT = KeychainManager.load(account: ServiceType.copilot.keychainAccount) != nil
+        if copilotManualPATEnabled {
+            hasSavedCopilotPAT = KeychainManager.load(account: ServiceType.copilot.keychainAccount) != nil
+        } else {
+            hasSavedCopilotPAT = false
+        }
         hasSavedZaiAPIKey = KeychainManager.load(account: ServiceType.zai.keychainAccount) != nil
         copilotPAT = ""
         zaiAPIKey = ""

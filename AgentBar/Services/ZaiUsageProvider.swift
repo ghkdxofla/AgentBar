@@ -28,6 +28,8 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     private let apiClient: APIClient
     private let credentialProvider: @Sendable () -> String?
+    private let credentialLock = NSLock()
+    nonisolated(unsafe) private var cachedCredential: String??
 
     /// Minimum cache TTL to avoid excessive API requests (Z.ai is API-based).
     static let minCacheTTL: TimeInterval = 60
@@ -43,10 +45,11 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         self.credentialProvider = credentialProvider ?? {
             KeychainManager.load(account: ServiceType.zai.keychainAccount)
         }
+        self.cachedCredential = nil
     }
 
     func isConfigured() async -> Bool {
-        credentialProvider() != nil
+        resolveCredential() != nil
     }
 
     /// Returns cached response if within minimum TTL, nil otherwise.
@@ -74,7 +77,7 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
             return cached
         }
 
-        guard let apiKey = credentialProvider() else {
+        guard let apiKey = resolveCredential() else {
             throw APIError.unauthorized
         }
 
@@ -161,6 +164,19 @@ final class ZaiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
                 ]
             )
         }
+    }
+
+    private func resolveCredential() -> String? {
+        credentialLock.lock()
+        if let cachedCredential {
+            credentialLock.unlock()
+            return cachedCredential
+        }
+
+        let loadedCredential = credentialProvider()
+        cachedCredential = loadedCredential
+        credentialLock.unlock()
+        return loadedCredential
     }
 
 }

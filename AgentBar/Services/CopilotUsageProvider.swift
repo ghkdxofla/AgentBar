@@ -58,7 +58,13 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         } else {
             self.primaryCredentialProvider = { Self.readGHCLIToken() }
             self.fallbackCredentialProvider = fallbackCredentialProvider ?? {
-                KeychainManager.load(account: ServiceType.copilot.keychainAccount)
+                guard UserDefaults.standard.bool(
+                    forKey: CopilotCredentialSettings.manualPATEnabledKey,
+                    defaultValue: false
+                ) else {
+                    return nil
+                }
+                return KeychainManager.load(account: ServiceType.copilot.keychainAccount)
             }
         }
     }
