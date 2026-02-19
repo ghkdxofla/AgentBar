@@ -1,5 +1,10 @@
 # AgentBar Development Log
 
+## Iteration 83: Change Codex color from emerald to gray
+- **ServiceType darkColor/lightColor**: Codex changed from emerald-500/300 to gray-500/300 (`0.42, 0.45, 0.49` / `0.71, 0.73, 0.76`)
+- Test updated: `testCodexDarkColorIsGray500`
+- All 273 tests passing
+
 ## Iteration 82: Hide non-5h/7d services from Secondary in History tab
 - **ServiceType.hasFiveHourSevenDayStructure**: Computed property checking `fiveHourLabel == "5h" && weeklyLabel == "7d"` — only Claude and Codex qualify; Z.ai (MCP) is excluded because MCP monthly is not comparable to 7d cycles
 - **UsageHistoryViewModel**: Filter services by `hasFiveHourSevenDayStructure` when `selectedWindow == .secondary`
