@@ -733,3 +733,8 @@
 - **Top-edge alignment fix**: Removed the standalone title row above the line chart so the chart box starts at the same vertical origin as the daily heatmap grid.
 - **Height alignment fix**: Set the trend chart box height to match the computed heatmap grid height, ensuring the two visual boxes align vertically.
 - **Future-proofing**: Replaced hardcoded heatmap spacing values with shared constants so future tile-size changes do not reintroduce misalignment.
+
+## Iteration 76: Hide weekday y-axis in secondary-window heatmap
+- **Secondary context clarity**: In `UsageHistoryTabView`, the heatmap weekday y-axis (Sun/Tue/Thu/Sat) is now shown only for primary-window panels.
+- **Requested UX behavior**: Secondary-window panels no longer render weekday y-axis labels, reducing semantic mismatch when users interpret secondary data in reset-cycle context.
+- **Regression coverage**: Added `UsageHistoryTabViewTests.testShowsWeekdayAxisOnlyForPrimaryWindow` to lock the axis-visibility rule (`primary` shows axis, `secondary` hides axis).

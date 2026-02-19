@@ -100,16 +100,9 @@ struct UsageHistoryTabView: View {
     private func heatmapSection(_ panel: UsageHistoryServicePanel) -> some View {
         let groups = groupedHeatmapCells(panel.heatmapCells)
         return HStack(alignment: .top, spacing: 6) {
-            VStack(alignment: .trailing, spacing: heatmapTileSpacing) {
-                Text("Sun").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
-                spacerLabel
-                Text("Tue").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
-                spacerLabel
-                Text("Thu").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
-                spacerLabel
-                Text("Sat").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
+            if shouldShowWeekdayAxis(for: panel) {
+                weekdayAxis
             }
-            .padding(.top, 1)
 
             HStack(alignment: .top, spacing: heatmapTileSpacing) {
                 ForEach(groups.indices, id: \.self) { weekIndex in
@@ -250,6 +243,27 @@ struct UsageHistoryTabView: View {
         Text(" ")
             .font(.caption2)
             .frame(height: heatmapTileSize)
+    }
+
+    private var weekdayAxis: some View {
+        VStack(alignment: .trailing, spacing: heatmapTileSpacing) {
+            Text("Sun").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
+            spacerLabel
+            Text("Tue").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
+            spacerLabel
+            Text("Thu").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
+            spacerLabel
+            Text("Sat").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
+        }
+        .padding(.top, 1)
+    }
+
+    private func shouldShowWeekdayAxis(for panel: UsageHistoryServicePanel) -> Bool {
+        Self.showsWeekdayAxis(for: panel.displayWindow)
+    }
+
+    static func showsWeekdayAxis(for displayWindow: UsageHistoryWindow) -> Bool {
+        displayWindow == .primary
     }
 
     private func panelWindowTitle(_ panel: UsageHistoryServicePanel) -> String {
