@@ -1,5 +1,20 @@
 import Foundation
 
+enum NotificationSoundMode: String, CaseIterable, Sendable {
+    case system
+    case mute
+
+    static let defaultsKey = "notificationSoundMode"
+
+    static func resolve(from defaults: UserDefaults) -> NotificationSoundMode {
+        guard let rawValue = defaults.string(forKey: defaultsKey),
+              let mode = NotificationSoundMode(rawValue: rawValue) else {
+            return .system
+        }
+        return mode
+    }
+}
+
 extension UserDefaults {
     func bool(forKey key: String, defaultValue: Bool) -> Bool {
         guard object(forKey: key) != nil else { return defaultValue }

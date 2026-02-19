@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("notificationClaudeHookEventsEnabled") private var notificationClaudeHookEventsEnabled = true
     @AppStorage("notificationOpencodeHookEventsEnabled") private var notificationOpencodeHookEventsEnabled = true
     @AppStorage("notificationShowMessagePreview") private var notificationShowMessagePreview = false
+    @AppStorage(NotificationSoundMode.defaultsKey) private var notificationSoundMode = NotificationSoundMode.system.rawValue
     #if AGENTBAR_NOTIFICATION_SOUNDS
     @AppStorage("notificationSoundPackPath") private var notificationSoundPackPath: String = ""
     @AppStorage("notificationSoundVolume") private var notificationSoundVolume: Double = 0.7
@@ -75,6 +76,7 @@ struct SettingsView: View {
         .onAppear {
             migrateLegacyClaudePlanIfNeeded()
             migrateLegacyCursorPlanIfNeeded()
+            sanitizeNotificationSoundModeIfNeeded()
             loadAPIKeys()
             refreshHookConfigurationStatus()
         }
@@ -346,6 +348,20 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .disabled(!notificationsEnabled)
 
+                Picker("Notification sound", selection: $notificationSoundMode) {
+                    Text("System default").tag(NotificationSoundMode.system.rawValue)
+                    Text("Mute").tag(NotificationSoundMode.mute.rawValue)
+                }
+                .disabled(!notificationsEnabled)
+                .onChange(of: notificationSoundMode) { _ in
+                    notifyNotificationsSettingsChanged()
+                }
+
+                Text("Mute keeps notifications visible while disabling all sounds, including the system default sound.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .disabled(!notificationsEnabled)
+
                 Button("Request Notification Permission") {
                     AgentNotifyNotificationService.requestAuthorizationPrompt()
                 }
@@ -606,6 +622,11 @@ struct SettingsView: View {
         if resolvedPlan != .custom {
             cursorMonthlyLimit = resolvedPlan.monthlyRequestEstimate
         }
+    }
+
+    private func sanitizeNotificationSoundModeIfNeeded() {
+        guard NotificationSoundMode(rawValue: notificationSoundMode) == nil else { return }
+        notificationSoundMode = NotificationSoundMode.system.rawValue
     }
 
     private func loadAPIKeys() {

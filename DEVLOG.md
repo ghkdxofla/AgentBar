@@ -601,3 +601,10 @@
 - **Consolidated Plan enum tests** (5 → 1): Merged `testCodexPlanPlusLimits`, `testCodexPlanAllCasesIncludesPlus`, `testClaudePlanEnumHasExpectedCases`, `testClaudePlanRoundTrips`, `testClaudePlanLegacyMaxMigratesTo5x` into single `testPlanEnumsRoundTripAndHaveExpectedCases`
 - **Test count**: 236 → 225 (11 tests removed via consolidation)
 - All 225 tests passing
+
+## Iteration 71: Add explicit mute mode for Agent notifications
+- **Notification sound mode setting**: Added `notificationSoundMode` (`system` / `mute`) and exposed it in Settings > Notifications > Agent Notifications as a dedicated `Notification sound` picker with `Mute` option.
+- **Silent-but-visible notifications**: `AgentNotifyNotificationService` now resolves `NotificationSoundMode` per-post and sets `content.sound = nil` when mode is `mute`, preventing both custom sound pack playback and macOS default notification sound while still posting the notification.
+- **Settings data hygiene**: Added invalid-value sanitization in `SettingsView.onAppear` so unknown stored sound mode values fall back to `system`.
+- **Behavioral test coverage**: Extended `AgentNotifyNotificationServiceBehaviorTests` with `testPostMutesSoundWhenSoundModeIsMute` to verify mute mode suppresses sound payloads.
+- All 253 tests passing

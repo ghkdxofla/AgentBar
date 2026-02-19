@@ -65,13 +65,18 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         let showMessagePreview = defaults.bool(forKey: "notificationShowMessagePreview", defaultValue: false)
         let detail = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
         content.body = "\(event.type.notificationStatusLabel): \(detail)"
+        let soundMode = NotificationSoundMode.resolve(from: defaults)
 
-        #if AGENTBAR_NOTIFICATION_SOUNDS
-        let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type, service: event.service)
-        content.sound = didPlayCustomSound ? nil : .default
-        #else
-        content.sound = .default
-        #endif
+        if soundMode == .mute {
+            content.sound = nil
+        } else {
+            #if AGENTBAR_NOTIFICATION_SOUNDS
+            let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type, service: event.service)
+            content.sound = didPlayCustomSound ? nil : .default
+            #else
+            content.sound = .default
+            #endif
+        }
 
         let request = UNNotificationRequest(
             identifier: "agentbar-agent-notify-\(UUID().uuidString)",

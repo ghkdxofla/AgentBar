@@ -64,7 +64,8 @@ final class AgentNotifyNotificationServiceBehaviorTests: XCTestCase {
                 await recorder.record(
                     identifier: request.identifier,
                     title: request.content.title,
-                    body: request.content.body
+                    body: request.content.body,
+                    hasSound: request.content.sound != nil
                 )
             }
         )
@@ -83,6 +84,42 @@ final class AgentNotifyNotificationServiceBehaviorTests: XCTestCase {
         XCTAssertTrue(payload.identifier.hasPrefix("agentbar-agent-notify-"))
         XCTAssertEqual(payload.title, "OpenAI Codex")
         XCTAssertEqual(payload.body, "Input required: Agent is waiting for your input.")
+    }
+
+    func testPostMutesSoundWhenSoundModeIsMute() async {
+        let suiteName = "AgentBarTests.AgentNotifyNotificationService.Mute.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(NotificationSoundMode.mute.rawValue, forKey: NotificationSoundMode.defaultsKey)
+
+        let recorder = PostedRequestRecorder()
+        let service = AgentNotifyNotificationService(
+            defaults: defaults,
+            addRequestOverride: { request in
+                await recorder.record(
+                    identifier: request.identifier,
+                    title: request.content.title,
+                    body: request.content.body,
+                    hasSound: request.content.sound != nil
+                )
+            }
+        )
+
+        let event = AgentNotifyEvent(
+            service: .claude,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 20),
+            message: "done",
+            sessionID: "session-2"
+        )
+
+        await service.post(event: event)
+
+        let payload = await recorder.singlePayload()
+        XCTAssertFalse(payload.hasSound)
     }
 
     func testPostSwallowsAddRequestErrors() async {
@@ -139,13 +176,13 @@ private actor AuthorizationRecorder {
 }
 
 private actor PostedRequestRecorder {
-    private var payloads: [(identifier: String, title: String, body: String)] = []
+    private var payloads: [(identifier: String, title: String, body: String, hasSound: Bool)] = []
 
-    func record(identifier: String, title: String, body: String) {
-        payloads.append((identifier, title, body))
+    func record(identifier: String, title: String, body: String, hasSound: Bool) {
+        payloads.append((identifier, title, body, hasSound))
     }
 
-    func singlePayload() -> (identifier: String, title: String, body: String) {
+    func singlePayload() -> (identifier: String, title: String, body: String, hasSound: Bool) {
         payloads[0]
     }
 }
