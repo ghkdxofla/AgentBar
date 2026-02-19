@@ -60,6 +60,11 @@ enum ServiceType: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// Whether this service uses the standard 5h / 7d dual-window structure.
+    var hasFiveHourSevenDayStructure: Bool {
+        fiveHourLabel == "5h" && weeklyLabel == "7d"
+    }
+
     var keychainAccount: String {
         switch self {
         case .claude:  "claude"

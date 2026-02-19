@@ -118,7 +118,7 @@ final class UsageHistoryViewModelTests: XCTestCase {
     }
 
     @MainActor
-    func testCyclePanelIsDisabledForNon7DSecondaryWindow() async {
+    func testNon5h7dServiceIsExcludedFromSecondaryWindow() async {
         let now = makeDate(2026, 2, 19, 12, 0)
         let service: ServiceType = .zai
         let records = [
@@ -143,13 +143,8 @@ final class UsageHistoryViewModelTests: XCTestCase {
         vm.selectedWindow = .secondary
         await vm.refresh()
 
-        guard let panel = panel(for: service, in: vm) else {
-            XCTFail("Expected a panel for \(service.rawValue)")
-            return
-        }
-        XCTAssertFalse(panel.isSevenDayCycleAvailable)
-        XCTAssertTrue(panel.cycleCells.isEmpty)
-        XCTAssertEqual(panel.cycleSummary, .empty)
+        XCTAssertNil(panel(for: service, in: vm), "Z.ai (MCP) should not appear in secondary view")
+        XCTAssertTrue(vm.servicePanels.isEmpty)
     }
 
     @MainActor

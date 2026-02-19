@@ -135,7 +135,10 @@ final class UsageHistoryViewModel: ObservableObject {
             to: gridStart
         ) ?? now
 
-        let services = await store.availableServices(since: gridStart, until: now)
+        let allServices = await store.availableServices(since: gridStart, until: now)
+        let services = selectedWindow == .secondary
+            ? allServices.filter(\.hasFiveHourSevenDayStructure)
+            : allServices
         let orderedServices = services.sorted {
             Self.serviceOrderIndex(for: $0) < Self.serviceOrderIndex(for: $1)
         }
