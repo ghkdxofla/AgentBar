@@ -52,8 +52,8 @@ ARGS=(
   --window-pos 200 120
   --window-size 600 400
   --icon-size 128
-  --icon "AgentBar.app" 150 200
-  --app-drop-link 450 200
+  --icon "AgentBar.app" 150 165
+  --app-drop-link 450 165
   --hide-extension "AgentBar.app"
   --no-internet-enable
 )
