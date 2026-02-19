@@ -1,5 +1,13 @@
 # AgentBar Development Log
 
+## Iteration 78: Test execution optimization with xctestplan
+- **AgentBar.xctestplan (Fast)**: Excludes 3 slow integration test classes (NotifySocketListenerLifecycleTests, HookScriptFallbackTests, AgentNotifyMonitorSocketReceiveTests). Parallel execution enabled. 249 tests, ~15s.
+- **AgentBarFull.xctestplan (Full)**: All 267 tests with parallel execution. ~22s. For pre-commit validation.
+- **Shared xcscheme**: Created AgentBar.xcscheme linking Fast plan as default, Full plan as alternate.
+- **CLAUDE.md updated**: Added fast/full/single-class test commands to Build & Run section.
+- **TEST_HOST kept**: Removing TEST_HOST/BUNDLE_LOADER caused linker errors since tests use `@testable import AgentBar`. Kept app-hosted testing; speedup comes from parallelism and slow test exclusion.
+- All 267 tests passing
+
 ## Iteration 77: Usage History Step 6 - build and runtime handoff
 - Rebuilt debug app with `xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet`
 - Attempted runtime handoff:

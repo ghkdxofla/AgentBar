@@ -1,0 +1,31 @@
+{
+  "configurations" : [
+    {
+      "id" : "9A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testExecutionOrdering" : "random",
+    "testTimeoutsEnabled" : false
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "skippedTests" : [
+        "NotifySocketListenerLifecycleTests",
+        "HookScriptFallbackTests",
+        "AgentNotifyMonitorSocketReceiveTests"
+      ],
+      "target" : {
+        "containerPath" : "container:AgentBar.xcodeproj",
+        "identifier" : "31EAA8BB726B7C71AF4E7048",
+        "name" : "AgentBarTests"
+      }
+    }
+  ],
+  "version" : 1
+}

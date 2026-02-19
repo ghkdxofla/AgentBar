@@ -13,7 +13,7 @@ User communicates in Korean. Respond in Korean for conversation, English for cod
 
 ### Every change MUST follow this sequence:
 1. **Implement** the change
-2. **Build & test**: `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS'` — all tests must pass
+2. **Build & test**: `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS' -derivedDataPath build -testPlan AgentBarFull -quiet` — all tests must pass
 3. **Visual smoke test**: Run `/build-run` skill (if installed) to build and relaunch the app. If `/build-run` is unavailable, use: `xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet && (pkill -x AgentBar || true) && open build/Build/Products/Debug/AgentBar.app`. Verify that the popover opens correctly, all existing UI elements (header with gear icon, service rows, footer with "Last updated" and Quit button) are visible and not clipped.
 4. **Update DEVLOG.md**: Add a new `## Iteration N:` entry describing what changed and why. Include "All N tests passing" at the end.
 5. **Commit**: Use conventional commit style (`feat:`, `fix:`, `refactor:`, etc.). Never skip commit or doc update unless explicitly told to.
@@ -46,7 +46,9 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 - Skill setup: `/build-run` is an external Codex skill from `$CODEX_HOME/skills` (not defined in this repository)
 - **Build + Run (fallback, no skill)**: `xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet && (pkill -x AgentBar || true) && open build/Build/Products/Debug/AgentBar.app`
 - Build only: `xcodebuild build -project AgentBar.xcodeproj -scheme AgentBar -configuration Debug -derivedDataPath build -quiet`
-- Test: `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS'`
+- Test (fast, default): `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS' -derivedDataPath build -testPlan AgentBar -quiet`
+- Test (full, pre-commit): `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS' -derivedDataPath build -testPlan AgentBarFull -quiet`
+- Test (single class): `xcodebuild test -project AgentBar.xcodeproj -scheme AgentBar -destination 'platform=macOS' -derivedDataPath build -only-testing:AgentBarTests/<ClassName>`
 - Release signing verify: `DEVELOPMENT_TEAM=YOUR_TEAM_ID ./scripts/verify-release-signing.sh`
 - DMG: `hdiutil create -volname AgentBar -srcfolder build/Build/Products/Release/AgentBar.app -ov -format UDZO AgentBar.dmg`
 
