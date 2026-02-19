@@ -70,6 +70,10 @@ struct SettingsView: View {
                 .tabItem { Label("Usage", systemImage: "chart.bar") }
                 .tag(SettingsTab.usage)
 
+            historyTab
+                .tabItem { Label("History", systemImage: "calendar") }
+                .tag(SettingsTab.history)
+
             notificationsTab
                 .tabItem { Label("Notifications", systemImage: "bell") }
                 .tag(SettingsTab.notifications)
@@ -322,6 +326,12 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: - Notifications Tab
+
+    private var historyTab: some View {
+        UsageHistoryTabView()
     }
 
     // MARK: - Notifications Tab
@@ -753,6 +763,7 @@ struct SettingsView: View {
 
 enum SettingsTab {
     case usage
+    case history
     case notifications
 }
 

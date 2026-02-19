@@ -1,5 +1,13 @@
 # AgentBar Development Log
 
+## Iteration 75: Usage History Step 4 - Settings History tab and UI
+- Added `UsageHistoryTabView` in `AgentBar/Views/Settings/UsageHistoryTabView.swift`
+- Added `History` tab in `SettingsView` with service/window/range controls
+- Implemented `Daily Heatmap` contribution-style grid with tooltip + legend + summary cards
+- Implemented conditional `7d Cycle Consistency` section with cycle strip and summary metrics
+- Added empty states for no history and insufficient 7d cycle data
+- Build passes
+
 ## Iteration 74: Usage History Step 3 - History view model and cycle analytics
 - Added `UsageHistoryViewModel` in `AgentBar/ViewModels/UsageHistoryViewModel.swift`
 - Implemented daily heatmap data generation (`7 x weeks`) and daily summary metrics
