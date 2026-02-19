@@ -143,6 +143,99 @@ final class AgentNotifyNotificationServiceBehaviorTests: XCTestCase {
         let attempts = await recorder.attempts()
         XCTAssertEqual(attempts, 1)
     }
+
+    #if AGENTBAR_NOTIFICATION_SOUNDS
+    func testPostPlaysCustomSoundAfterNotificationRequestAdded() async {
+        let suiteName = "AgentBarTests.AgentNotifyNotificationService.CustomSoundOrder.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let requestRecorder = PostedRequestRecorder()
+        let callOrder = CallOrderRecorder()
+
+        let service = AgentNotifyNotificationService(
+            defaults: defaults,
+            addRequestOverride: { request in
+                callOrder.record("add")
+                await requestRecorder.record(
+                    identifier: request.identifier,
+                    title: request.content.title,
+                    body: request.content.body,
+                    hasSound: request.content.sound != nil
+                )
+            },
+            shouldUseCustomSoundOverride: { _ in true },
+            playCustomSoundOverride: { _ in
+                callOrder.record("play")
+                return true
+            }
+        )
+
+        let event = AgentNotifyEvent(
+            service: .codex,
+            type: .taskCompleted,
+            timestamp: Date(timeIntervalSince1970: 30),
+            message: "done",
+            sessionID: "session-3"
+        )
+
+        await service.post(event: event)
+
+        let payload = await requestRecorder.singlePayload()
+        XCTAssertFalse(payload.hasSound)
+        XCTAssertEqual(callOrder.snapshot(), ["add", "play"])
+    }
+
+    func testPostTriggersFallbackSoundWhenCustomPlaybackFails() async {
+        let suiteName = "AgentBarTests.AgentNotifyNotificationService.CustomSoundFallback.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            XCTFail("Failed to create UserDefaults suite")
+            return
+        }
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let requestRecorder = PostedRequestRecorder()
+        let callOrder = CallOrderRecorder()
+
+        let service = AgentNotifyNotificationService(
+            defaults: defaults,
+            addRequestOverride: { request in
+                callOrder.record("add")
+                await requestRecorder.record(
+                    identifier: request.identifier,
+                    title: request.content.title,
+                    body: request.content.body,
+                    hasSound: request.content.sound != nil
+                )
+            },
+            shouldUseCustomSoundOverride: { _ in true },
+            playCustomSoundOverride: { _ in
+                callOrder.record("play")
+                return false
+            },
+            playFallbackSoundOverride: {
+                callOrder.record("fallback")
+            }
+        )
+
+        let event = AgentNotifyEvent(
+            service: .claude,
+            type: .decisionRequired,
+            timestamp: Date(timeIntervalSince1970: 40),
+            message: "Need input",
+            sessionID: "session-4"
+        )
+
+        await service.post(event: event)
+
+        let payload = await requestRecorder.singlePayload()
+        XCTAssertFalse(payload.hasSound)
+        XCTAssertEqual(callOrder.snapshot(), ["add", "play", "fallback"])
+    }
+    #endif
 }
 
 private actor AuthorizationRecorder {
@@ -201,4 +294,22 @@ private actor ErrorPathRecorder {
 
 private enum StubAddError: Error {
     case failed
+}
+
+private final class CallOrderRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls: [String] = []
+
+    func record(_ value: String) {
+        lock.lock()
+        calls.append(value)
+        lock.unlock()
+    }
+
+    func snapshot() -> [String] {
+        lock.lock()
+        let copied = calls
+        lock.unlock()
+        return copied
+    }
 }

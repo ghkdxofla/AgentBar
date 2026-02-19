@@ -1,6 +1,9 @@
 import Foundation
 import UserNotifications
 import os.log
+#if AGENTBAR_NOTIFICATION_SOUNDS
+import AppKit
+#endif
 
 protocol AgentNotifyNotificationServiceProtocol: Sendable {
     func requestAuthorizationIfNeeded() async
@@ -19,6 +22,9 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
     private let authorizationStatusOverride: (@Sendable () async -> Int)?
     private let requestAuthorizationOverride: (@Sendable () async -> Bool)?
     private let addRequestOverride: (@Sendable (UNNotificationRequest) async throws -> Void)?
+    private let shouldUseCustomSoundOverride: (@Sendable (AgentNotifyEvent) -> Bool)?
+    private let playCustomSoundOverride: (@Sendable (AgentNotifyEvent) -> Bool)?
+    private let playFallbackSoundOverride: (@Sendable () -> Void)?
     private var didCheckAuthorization = false
 
     init(
@@ -28,7 +34,10 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         postContentOverride: (@Sendable (_ title: String, _ body: String) async throws -> Void)? = nil,
         authorizationStatusOverride: (@Sendable () async -> Int)? = nil,
         requestAuthorizationOverride: (@Sendable () async -> Bool)? = nil,
-        addRequestOverride: (@Sendable (UNNotificationRequest) async throws -> Void)? = nil
+        addRequestOverride: (@Sendable (UNNotificationRequest) async throws -> Void)? = nil,
+        shouldUseCustomSoundOverride: (@Sendable (AgentNotifyEvent) -> Bool)? = nil,
+        playCustomSoundOverride: (@Sendable (AgentNotifyEvent) -> Bool)? = nil,
+        playFallbackSoundOverride: (@Sendable () -> Void)? = nil
     ) {
         self.center = center
         self.defaults = defaults
@@ -37,6 +46,9 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         self.authorizationStatusOverride = authorizationStatusOverride
         self.requestAuthorizationOverride = requestAuthorizationOverride
         self.addRequestOverride = addRequestOverride
+        self.shouldUseCustomSoundOverride = shouldUseCustomSoundOverride
+        self.playCustomSoundOverride = playCustomSoundOverride
+        self.playFallbackSoundOverride = playFallbackSoundOverride
     }
 
     nonisolated static func requestAuthorizationPrompt() {
@@ -66,13 +78,14 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
         let detail = showMessagePreview ? event.notificationBody : event.redactedNotificationBody
         content.body = "\(event.type.notificationStatusLabel): \(detail)"
         let soundMode = NotificationSoundMode.resolve(from: defaults)
+        var shouldPlayCustomSound = false
 
         if soundMode == .mute {
             content.sound = nil
         } else {
             #if AGENTBAR_NOTIFICATION_SOUNDS
-            let didPlayCustomSound = NotifySoundManager.shared.play(for: event.type, service: event.service)
-            content.sound = didPlayCustomSound ? nil : .default
+            shouldPlayCustomSound = shouldUseCustomSound(for: event)
+            content.sound = shouldPlayCustomSound ? nil : .default
             #else
             content.sound = .default
             #endif
@@ -94,6 +107,17 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
             } else {
                 try await add(request)
             }
+            #if AGENTBAR_NOTIFICATION_SOUNDS
+            if shouldPlayCustomSound {
+                let didPlayCustomSound = playCustomSound(for: event)
+                if !didPlayCustomSound {
+                    playFallbackSound()
+                    logger.debug(
+                        "Custom sound playback failed. Played fallback sound service=\(event.service.rawValue, privacy: .public) type=\(event.type.rawValue, privacy: .public)."
+                    )
+                }
+            }
+            #endif
             logger.debug(
                 "Posted notification service=\(event.service.rawValue, privacy: .public) type=\(event.type.rawValue, privacy: .public)."
             )
@@ -145,4 +169,28 @@ actor AgentNotifyNotificationService: AgentNotifyNotificationServiceProtocol {
             }
         }
     }
+
+    #if AGENTBAR_NOTIFICATION_SOUNDS
+    private func shouldUseCustomSound(for event: AgentNotifyEvent) -> Bool {
+        if let shouldUseCustomSoundOverride {
+            return shouldUseCustomSoundOverride(event)
+        }
+        return NotifySoundManager.shared.canPlay(for: event.type, service: event.service)
+    }
+
+    private func playCustomSound(for event: AgentNotifyEvent) -> Bool {
+        if let playCustomSoundOverride {
+            return playCustomSoundOverride(event)
+        }
+        return NotifySoundManager.shared.play(for: event.type, service: event.service)
+    }
+
+    private func playFallbackSound() {
+        if let playFallbackSoundOverride {
+            playFallbackSoundOverride()
+            return
+        }
+        NSSound.beep()
+    }
+    #endif
 }

@@ -2,6 +2,19 @@
 
 > Iterations 1–69 archived in [DEVLOG-archive.md](DEVLOG-archive.md).
 
+## Iteration 92: Align notification delivery and custom sound playback
+- **Notification ordering refactor**: `AgentNotifyNotificationService` now posts `UNNotificationRequest` first, then plays custom sound. This reduces timing skew between Notification Center card creation and audible feedback.
+- **Custom sound preflight**: Added `NotifySoundManager.canPlay(for:service:)` so notification content can choose between custom path (`sound=nil`) and system default (`.default`) before posting.
+- **Playback failure hardening**: `NotifySoundManager.play()` / `playTest()` now verify `AVAudioPlayer.play()` success instead of assuming playback started; failed starts no longer report success.
+- **Fallback behavior**: When custom sound is selected but fails to start after notification delivery, service now plays a fallback alert tone to avoid silent notifications.
+- **Tests added**:
+  - `AgentNotifyNotificationServiceBehaviorTests.testPostPlaysCustomSoundAfterNotificationRequestAdded`
+  - `AgentNotifyNotificationServiceBehaviorTests.testPostTriggersFallbackSoundWhenCustomPlaybackFails`
+  - `NotifySoundManagerTests.testCanPlayReturnsTrueWhenCategoryHasExistingFile`
+  - `NotifySoundManagerTests.testCanPlayReturnsFalseWhenCategoryFilesAreMissing`
+  - `NotifySoundManagerTests.testPlayReturnsFalseWhenAudioFileCannotBeDecoded`
+- `./scripts/test.sh` 통과
+
 ## Iteration 91: Archive old DEVLOG iterations
 - **DEVLOG split**: Moved iterations 1–69 (plus superseded 70–76) to `DEVLOG-archive.md`. DEVLOG.md reduced from 811 to ~190 lines, keeping only iterations 70–91 which reflect the current codebase state.
 - All 279 tests passing

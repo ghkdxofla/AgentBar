@@ -94,6 +94,21 @@ final class NotifySoundManager: @unchecked Sendable {
         eventType.cespCategory
     }
 
+    func canPlay(for eventType: AgentNotifyEventType, service: ServiceType? = nil) -> Bool {
+        let category = Self.cespCategory(for: eventType)
+
+        guard let packPath = resolvePackPath(for: service),
+              !packPath.isEmpty,
+              let m = resolveManifest(at: packPath) else {
+            return false
+        }
+
+        return m.soundFiles(for: category).contains { file in
+            let soundURL = URL(fileURLWithPath: packPath).appendingPathComponent(file)
+            return fileManager.fileExists(atPath: soundURL.path)
+        }
+    }
+
     func play(for eventType: AgentNotifyEventType, service: ServiceType? = nil) -> Bool {
         let category = Self.cespCategory(for: eventType)
 
@@ -112,8 +127,10 @@ final class NotifySoundManager: @unchecked Sendable {
             return false
         }
 
+        let lastPlayed: String?
         lock.lock()
-        let lastPlayed = lastPlayedPerCategory[category]
+        lastPlayed = lastPlayedPerCategory[category]
+        lock.unlock()
         let candidates: [String]
         if sounds.count > 1, let lastPlayed {
             candidates = sounds.filter { $0 != lastPlayed }
@@ -121,33 +138,23 @@ final class NotifySoundManager: @unchecked Sendable {
             candidates = sounds
         }
 
-        guard let chosen = candidates.randomElement() else {
-            lock.unlock()
-            return false
-        }
-
-        lastPlayedPerCategory[category] = chosen
-        lock.unlock()
-
-        saveLastPlayedState()
+        guard let chosen = candidates.randomElement() else { return false }
 
         let soundURL = URL(fileURLWithPath: packPath)
             .appendingPathComponent(chosen)
 
         guard fileManager.fileExists(atPath: soundURL.path) else { return false }
 
-        do {
-            let audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
-            audioPlayer.volume = currentVolume
-            audioPlayer.play()
-
-            lock.lock()
-            player = audioPlayer
-            lock.unlock()
-            return true
-        } catch {
+        guard let audioPlayer = startedPlayer(from: soundURL) else {
             return false
         }
+
+        lock.lock()
+        lastPlayedPerCategory[category] = chosen
+        player = audioPlayer
+        lock.unlock()
+        saveLastPlayedState()
+        return true
     }
 
     func playTest(category: String, service: ServiceType? = nil) -> Bool {
@@ -170,17 +177,28 @@ final class NotifySoundManager: @unchecked Sendable {
 
         guard fileManager.fileExists(atPath: soundURL.path) else { return false }
 
+        guard let audioPlayer = startedPlayer(from: soundURL) else {
+            return false
+        }
+
+        lock.lock()
+        player = audioPlayer
+        lock.unlock()
+        return true
+    }
+
+    private func startedPlayer(from soundURL: URL) -> AVAudioPlayer? {
         do {
             let audioPlayer = try AVAudioPlayer(contentsOf: soundURL)
             audioPlayer.volume = currentVolume
-            audioPlayer.play()
-
-            lock.lock()
-            player = audioPlayer
-            lock.unlock()
-            return true
+            _ = audioPlayer.prepareToPlay()
+            let didStartPlayback = audioPlayer.play()
+            guard didStartPlayback else {
+                return nil
+            }
+            return audioPlayer
         } catch {
-            return false
+            return nil
         }
     }
 
@@ -269,6 +287,7 @@ final class NotifySoundManager: @unchecked Sendable {
         eventType.cespCategory
     }
 
+    func canPlay(for eventType: AgentNotifyEventType, service: ServiceType? = nil) -> Bool { false }
     func play(for eventType: AgentNotifyEventType, service: ServiceType? = nil) -> Bool { false }
     func playTest(category: String, service: ServiceType? = nil) -> Bool { false }
 }

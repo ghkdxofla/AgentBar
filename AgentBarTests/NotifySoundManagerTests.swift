@@ -126,6 +126,72 @@ final class NotifySoundManagerTests: XCTestCase {
         XCTAssertFalse(result)
     }
 
+    func testCanPlayReturnsTrueWhenCategoryHasExistingFile() throws {
+        let manifest = """
+        {"name": "Global", "sounds": {"task.complete": ["a.wav"]}}
+        """
+        try manifest.write(
+            to: tempDir.appendingPathComponent("openpeon.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try Data().write(to: tempDir.appendingPathComponent("a.wav"))
+
+        let suiteName = "AgentBarTests.SoundManager.CanPlayTrue.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(tempDir.path, forKey: "notificationSoundPackPath")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = NotifySoundManager(defaults: defaults)
+        XCTAssertTrue(manager.canPlay(for: .taskCompleted))
+    }
+
+    func testCanPlayReturnsFalseWhenCategoryFilesAreMissing() throws {
+        let manifest = """
+        {"name": "Global", "sounds": {"task.complete": ["missing.wav"]}}
+        """
+        try manifest.write(
+            to: tempDir.appendingPathComponent("openpeon.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let suiteName = "AgentBarTests.SoundManager.CanPlayMissing.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(tempDir.path, forKey: "notificationSoundPackPath")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = NotifySoundManager(defaults: defaults)
+        XCTAssertFalse(manager.canPlay(for: .taskCompleted))
+    }
+
+    func testPlayReturnsFalseWhenAudioFileCannotBeDecoded() throws {
+        let manifest = """
+        {"name": "Global", "sounds": {"task.complete": ["broken.wav"]}}
+        """
+        try manifest.write(
+            to: tempDir.appendingPathComponent("openpeon.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "not-audio".write(
+            to: tempDir.appendingPathComponent("broken.wav"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let suiteName = "AgentBarTests.SoundManager.PlayDecodeFailure.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults.set(tempDir.path, forKey: "notificationSoundPackPath")
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = NotifySoundManager(defaults: defaults)
+        XCTAssertFalse(manager.play(for: .taskCompleted))
+    }
+
     func testPlayUsesGlobalPackWhenNoAgentOverride() throws {
         let manifest = """
         {"name": "Global", "sounds": {"task.complete": ["a.wav"]}}

@@ -32,6 +32,7 @@ macOS menu bar app that tracks AI coding assistant usage in one place.
 - Configurable refresh interval, per-service enable/disable
 - Plan/limit controls and API key management
 - Sound pack support via CESP registry
+- Custom notification audio is played after notification delivery, with fallback alert tone on playback failure
 
 ## Install
 
