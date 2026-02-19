@@ -43,6 +43,7 @@ final class CopilotUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     }
     nonisolated(unsafe) private static var cachedGHCLIToken: String?
     nonisolated(unsafe) private static var ghTokenLastLookupAt: Date?
+
     typealias GHCLIProcessRuntime = CLIProcessRuntime
 
     init(

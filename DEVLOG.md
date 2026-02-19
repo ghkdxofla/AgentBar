@@ -1,5 +1,10 @@
 # AgentBar Development Log
 
+## Iteration 81: Eliminate Keychain permission dialogs via permanent load cache
+- **KeychainManager load cache**: Added in-process `[String: CachedValue]` cache to `load(account:)` — first call hits Security framework, all subsequent calls return cached result with zero SecItemCopyMatching calls. Invalidated by `save()`/`delete()` only
+- **KeychainManager dataProtection skip**: When `errSecMissingEntitlement` is detected (ad-hoc signing), subsequent calls skip the dataProtection store query entirely
+- All 273 tests passing
+
 ## Iteration 80: History readability update + daily trend line
 - Added per-service `Daily Usage Trend` line chart to the right side of the heatmap using stored daily peak usage values
 - Extended day history persistence to keep peak/average `used` values and corresponding unit metadata

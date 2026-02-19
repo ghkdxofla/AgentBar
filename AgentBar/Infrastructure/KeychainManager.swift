@@ -20,6 +20,18 @@ enum KeychainError: Error, LocalizedError {
 enum KeychainManager {
     private static let service = "com.agentbar.apikeys"
 
+    // Remember when dataProtection is unavailable (ad-hoc signing) to avoid redundant Keychain dialogs.
+    private static let dpLock = NSLock()
+    nonisolated(unsafe) private static var dataProtectionUnavailable = false
+
+    // In-process cache for load results. Invalidated by save()/delete().
+    // Prevents repeated SecItemCopyMatching calls that trigger macOS Keychain permission dialogs.
+    private struct CachedValue {
+        let value: String?
+    }
+    private static let loadCacheLock = NSLock()
+    nonisolated(unsafe) private static var loadCache: [String: CachedValue] = [:]
+
     enum Store {
         case dataProtection
         case legacy
@@ -54,6 +66,7 @@ enum KeychainManager {
 
     static func save(key: String, account: String) throws {
         try save(key: key, account: account, securityAPI: SystemSecurityAPI())
+        invalidateLoadCache(account: account)
     }
 
     static func save(key: String, account: String, securityAPI: any SecurityAPI) throws {
@@ -74,7 +87,9 @@ enum KeychainManager {
         }
 
         // Some environments cannot write Data Protection keychain.
-        if dataProtectionStatus != errSecMissingEntitlement {
+        if dataProtectionStatus == errSecMissingEntitlement {
+            markDataProtectionUnavailable()
+        } else {
             throw KeychainError.saveFailed(dataProtectionStatus)
         }
 
@@ -90,7 +105,25 @@ enum KeychainManager {
     }
 
     static func load(account: String) -> String? {
-        load(account: account, securityAPI: SystemSecurityAPI())
+        loadCacheLock.lock()
+        if let cached = loadCache[account] {
+            loadCacheLock.unlock()
+            return cached.value
+        }
+        loadCacheLock.unlock()
+
+        let value: String?
+        if isDataProtectionUnavailable {
+            value = loadLegacyOnly(account: account, securityAPI: SystemSecurityAPI())
+        } else {
+            value = load(account: account, securityAPI: SystemSecurityAPI())
+        }
+
+        loadCacheLock.lock()
+        loadCache[account] = CachedValue(value: value)
+        loadCacheLock.unlock()
+
+        return value
     }
 
     static func load(account: String, securityAPI: any SecurityAPI) -> String? {
@@ -100,6 +133,9 @@ enum KeychainManager {
                 return nil
             }
             return String(data: data, encoding: .utf8)
+        }
+        if dataProtectionValue.status == errSecMissingEntitlement {
+            markDataProtectionUnavailable()
         }
         guard shouldFallbackToLegacyLoad(for: dataProtectionValue.status) else {
             return nil
@@ -127,6 +163,7 @@ enum KeychainManager {
 
     static func delete(account: String) throws {
         try delete(account: account, securityAPI: SystemSecurityAPI())
+        invalidateLoadCache(account: account)
     }
 
     static func delete(account: String, securityAPI: any SecurityAPI) throws {
@@ -210,5 +247,35 @@ enum KeychainManager {
 
     private static func shouldFallbackToLegacyLoad(for dataProtectionStatus: OSStatus) -> Bool {
         dataProtectionStatus == errSecItemNotFound || dataProtectionStatus == errSecMissingEntitlement
+    }
+
+    // MARK: - Data Protection Availability Cache
+
+    private static var isDataProtectionUnavailable: Bool {
+        dpLock.lock()
+        defer { dpLock.unlock() }
+        return dataProtectionUnavailable
+    }
+
+    private static func markDataProtectionUnavailable() {
+        dpLock.lock()
+        dataProtectionUnavailable = true
+        dpLock.unlock()
+    }
+
+    private static func invalidateLoadCache(account: String) {
+        loadCacheLock.lock()
+        loadCache.removeValue(forKey: account)
+        loadCacheLock.unlock()
+    }
+
+    /// Legacy-only fast path: skips dataProtection query entirely when entitlement is known to be missing.
+    private static func loadLegacyOnly(account: String, securityAPI: any SecurityAPI) -> String? {
+        let legacyValue = copyValue(account: account, store: .legacy, securityAPI: securityAPI)
+        guard legacyValue.status == errSecSuccess,
+              let data = legacyValue.data else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
     }
 }
