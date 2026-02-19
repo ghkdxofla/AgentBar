@@ -727,3 +727,9 @@
 - **Info.plist injection verified**: Confirmed Debug build output now writes `GitCommitHash` (for untagged commits) and keeps `GitVersionTag` absent when no exact tag exists, preventing unintended fallback to `CFBundleShortVersionString` (`1.0`).
 - **Version resolution hardened**: Refactored `DetailPopoverView` version logic into `resolvedVersionString(from:)` with whitespace-safe normalization and explicit fallback order: tag → commit hash → short version → `unknown`.
 - **New tests**: Added `DetailPopoverViewTests` coverage for version priority rules and missing-value fallback behavior.
+
+## Iteration 75: Align daily heatmap tiles and trend chart box vertically
+- **Shared sizing constants**: Introduced shared tile/spacing constants in `UsageHistoryTabView` and derived `heatmapGridHeight` from those values.
+- **Top-edge alignment fix**: Removed the standalone title row above the line chart so the chart box starts at the same vertical origin as the daily heatmap grid.
+- **Height alignment fix**: Set the trend chart box height to match the computed heatmap grid height, ensuring the two visual boxes align vertically.
+- **Future-proofing**: Replaced hardcoded heatmap spacing values with shared constants so future tile-size changes do not reintroduce misalignment.

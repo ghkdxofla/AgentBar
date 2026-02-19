@@ -2,6 +2,14 @@ import SwiftUI
 
 struct UsageHistoryTabView: View {
     @StateObject private var viewModel: UsageHistoryViewModel
+    private let heatmapTileSize: CGFloat = 12
+    private let heatmapTileSpacing: CGFloat = 3
+    private let heatmapRows = 7
+
+    private var heatmapGridHeight: CGFloat {
+        let rows = CGFloat(heatmapRows)
+        return (rows * heatmapTileSize) + ((rows - 1) * heatmapTileSpacing)
+    }
 
     init(viewModel: UsageHistoryViewModel = UsageHistoryViewModel()) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -92,24 +100,24 @@ struct UsageHistoryTabView: View {
     private func heatmapSection(_ panel: UsageHistoryServicePanel) -> some View {
         let groups = groupedHeatmapCells(panel.heatmapCells)
         return HStack(alignment: .top, spacing: 6) {
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("Sun").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+            VStack(alignment: .trailing, spacing: heatmapTileSpacing) {
+                Text("Sun").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
                 spacerLabel
-                Text("Tue").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+                Text("Tue").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
                 spacerLabel
-                Text("Thu").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+                Text("Thu").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
                 spacerLabel
-                Text("Sat").font(.caption2).foregroundStyle(.secondary).frame(height: 12)
+                Text("Sat").font(.caption2).foregroundStyle(.secondary).frame(height: heatmapTileSize)
             }
             .padding(.top, 1)
 
-            HStack(alignment: .top, spacing: 3) {
+            HStack(alignment: .top, spacing: heatmapTileSpacing) {
                 ForEach(groups.indices, id: \.self) { weekIndex in
-                    VStack(spacing: 3) {
+                    VStack(spacing: heatmapTileSpacing) {
                         ForEach(groups[weekIndex]) { cell in
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(tileColor(level: cell.level, service: panel.service))
-                                .frame(width: 12, height: 12)
+                                .frame(width: heatmapTileSize, height: heatmapTileSize)
                                 .help(dayTooltip(for: cell))
                         }
                     }
@@ -146,15 +154,11 @@ struct UsageHistoryTabView: View {
 
     private func trendChartSection(_ panel: UsageHistoryServicePanel) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Daily Usage Trend")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
             UsageTrendLineChartView(
                 points: panel.trendPoints,
                 service: panel.service
             )
-            .frame(width: 190, height: 96)
+            .frame(width: 190, height: heatmapGridHeight)
 
             HStack(spacing: 6) {
                 Text(panel.trendPoints.first.map { dateString($0.date) } ?? "-")
@@ -245,7 +249,7 @@ struct UsageHistoryTabView: View {
     private var spacerLabel: some View {
         Text(" ")
             .font(.caption2)
-            .frame(height: 12)
+            .frame(height: heatmapTileSize)
     }
 
     private func panelWindowTitle(_ panel: UsageHistoryServicePanel) -> String {
