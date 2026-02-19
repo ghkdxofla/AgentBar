@@ -431,6 +431,7 @@
 				450ECC00D4FA325F92A901F3 /* Sources */,
 				C31588BAE861A398141AA981 /* Resources */,
 				738BBDBE43F3D1937A5C45F2 /* Frameworks */,
+				1FEB277D9B6FE5F35758D251 /* Embed Git Version Info */,
 			);
 			buildRules = (
 			);
@@ -487,6 +488,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1FEB277D9B6FE5F35758D251 /* Embed Git Version Info */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Git Version Info";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nINFO_PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\nPLIST_BUDDY=\"/usr/libexec/PlistBuddy\"\n\nGIT_HASH=\"$(/usr/bin/git -C \"${SRCROOT}\" rev-parse --short HEAD 2>/dev/null || true)\"\nGIT_TAG=\"$(/usr/bin/git -C \"${SRCROOT}\" describe --tags --exact-match 2>/dev/null || true)\"\n\nif [[ -n \"${GIT_HASH}\" ]]; then\n  \"${PLIST_BUDDY}\" -c \"Set :GitCommitHash ${GIT_HASH}\" \"${INFO_PLIST}\" 2>/dev/null \\\n    || \"${PLIST_BUDDY}\" -c \"Add :GitCommitHash string ${GIT_HASH}\" \"${INFO_PLIST}\"\nelse\n  \"${PLIST_BUDDY}\" -c \"Delete :GitCommitHash\" \"${INFO_PLIST}\" 2>/dev/null || true\nfi\n\nif [[ -n \"${GIT_TAG}\" ]]; then\n  \"${PLIST_BUDDY}\" -c \"Set :GitVersionTag ${GIT_TAG}\" \"${INFO_PLIST}\" 2>/dev/null \\\n    || \"${PLIST_BUDDY}\" -c \"Add :GitVersionTag string ${GIT_TAG}\" \"${INFO_PLIST}\"\nelse\n  \"${PLIST_BUDDY}\" -c \"Delete :GitVersionTag\" \"${INFO_PLIST}\" 2>/dev/null || true\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		183B9300456E53AE419C918F /* Sources */ = {

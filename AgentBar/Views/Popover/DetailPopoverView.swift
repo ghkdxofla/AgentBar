@@ -129,16 +129,27 @@ struct DetailPopoverView: View {
     }
     #endif
 
-    private static let versionString: String = {
-        let info = Bundle.main.infoDictionary
-        if let tag = info?["GitVersionTag"] as? String, !tag.isEmpty {
+    static func resolvedVersionString(from info: [String: Any]?) -> String {
+        if let tag = normalizedString(info?["GitVersionTag"] as? String) {
             return tag
         }
-        if let hash = info?["GitCommitHash"] as? String, !hash.isEmpty {
+        if let hash = normalizedString(info?["GitCommitHash"] as? String) {
             return hash
         }
-        return info?["CFBundleShortVersionString"] as? String ?? "unknown"
-    }()
+        if let shortVersion = normalizedString(info?["CFBundleShortVersionString"] as? String) {
+            return shortVersion
+        }
+        return "unknown"
+    }
+
+    private static func normalizedString(_ rawValue: String?) -> String? {
+        guard let value = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    private static let versionString = resolvedVersionString(from: Bundle.main.infoDictionary)
 
     private func relativeTimeString() -> String {
         guard let latest = viewModel.usageData.map(\.lastUpdated).max() else {

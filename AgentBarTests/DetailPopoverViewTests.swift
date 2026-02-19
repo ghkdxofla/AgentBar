@@ -133,6 +133,39 @@ final class DetailPopoverViewTests: XCTestCase {
         XCTAssertTrue(sorted.contains { $0.service == .claude && !$0.isAvailable })
     }
 
+    func testResolvedVersionStringPrefersTagOverCommitHash() {
+        let version = DetailPopoverView.resolvedVersionString(from: [
+            "GitVersionTag": "v1.2.3",
+            "GitCommitHash": "abc1234",
+            "CFBundleShortVersionString": "1.0"
+        ])
+
+        XCTAssertEqual(version, "v1.2.3")
+    }
+
+    func testResolvedVersionStringUsesCommitHashWithoutTag() {
+        let version = DetailPopoverView.resolvedVersionString(from: [
+            "GitVersionTag": "   ",
+            "GitCommitHash": "abc1234",
+            "CFBundleShortVersionString": "1.0"
+        ])
+
+        XCTAssertEqual(version, "abc1234")
+    }
+
+    func testResolvedVersionStringFallsBackToBundleVersionWhenTagAndHashMissing() {
+        let version = DetailPopoverView.resolvedVersionString(from: [
+            "CFBundleShortVersionString": "1.0"
+        ])
+
+        XCTAssertEqual(version, "1.0")
+    }
+
+    func testResolvedVersionStringReturnsUnknownWhenAllValuesMissing() {
+        XCTAssertEqual(DetailPopoverView.resolvedVersionString(from: nil), "unknown")
+        XCTAssertEqual(DetailPopoverView.resolvedVersionString(from: [:]), "unknown")
+    }
+
     private func makeUsageRows(count: Int) -> [UsageData] {
         let services = ServiceType.allCases
         return (0..<count).map { index in

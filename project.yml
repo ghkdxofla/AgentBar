@@ -19,6 +19,31 @@ targets:
       - path: AgentBar
     dependencies:
       - sdk: libsqlite3.tbd
+    postBuildScripts:
+      - name: Embed Git Version Info
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+
+          INFO_PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          PLIST_BUDDY="/usr/libexec/PlistBuddy"
+
+          GIT_HASH="$(/usr/bin/git -C "${SRCROOT}" rev-parse --short HEAD 2>/dev/null || true)"
+          GIT_TAG="$(/usr/bin/git -C "${SRCROOT}" describe --tags --exact-match 2>/dev/null || true)"
+
+          if [[ -n "${GIT_HASH}" ]]; then
+            "${PLIST_BUDDY}" -c "Set :GitCommitHash ${GIT_HASH}" "${INFO_PLIST}" 2>/dev/null \
+              || "${PLIST_BUDDY}" -c "Add :GitCommitHash string ${GIT_HASH}" "${INFO_PLIST}"
+          else
+            "${PLIST_BUDDY}" -c "Delete :GitCommitHash" "${INFO_PLIST}" 2>/dev/null || true
+          fi
+
+          if [[ -n "${GIT_TAG}" ]]; then
+            "${PLIST_BUDDY}" -c "Set :GitVersionTag ${GIT_TAG}" "${INFO_PLIST}" 2>/dev/null \
+              || "${PLIST_BUDDY}" -c "Add :GitVersionTag string ${GIT_TAG}" "${INFO_PLIST}"
+          else
+            "${PLIST_BUDDY}" -c "Delete :GitVersionTag" "${INFO_PLIST}" 2>/dev/null || true
+          fi
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.agentbar.app

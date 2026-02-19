@@ -721,3 +721,9 @@
 - **Popover behavior wired**: `DetailPopoverView` now reads the same setting and conditionally hides the `Buy Me a Coffee` CTA while keeping the rest of footer/layout unchanged.
 - **Regression coverage**: Added `DetailPopoverViewTests` coverage for hidden/visible state via debug helper.
 - All 255 tests passing
+
+## Iteration 74: Fix popover version fallback to commit hash when no tag exists
+- **Build pipeline fix**: Regenerated `AgentBar.xcodeproj` from `project.yml` so the `Embed Git Version Info` post-build script is actually present in the project and runs on every build.
+- **Info.plist injection verified**: Confirmed Debug build output now writes `GitCommitHash` (for untagged commits) and keeps `GitVersionTag` absent when no exact tag exists, preventing unintended fallback to `CFBundleShortVersionString` (`1.0`).
+- **Version resolution hardened**: Refactored `DetailPopoverView` version logic into `resolvedVersionString(from:)` with whitespace-safe normalization and explicit fallback order: tag → commit hash → short version → `unknown`.
+- **New tests**: Added `DetailPopoverViewTests` coverage for version priority rules and missing-value fallback behavior.
