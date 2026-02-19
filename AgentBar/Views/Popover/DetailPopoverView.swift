@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DetailPopoverView: View {
     @ObservedObject var viewModel: UsageViewModel
+    @AppStorage(BuyMeACoffeeSettings.hideButtonKey) private var hideBuyMeACoffeeButton = false
     private let openExternalURL: (URL) -> Void
     private var displayUsageData: [UsageData] {
         Self.sortedForDisplay(viewModel.usageData)
@@ -51,14 +52,16 @@ struct DetailPopoverView: View {
 
             Spacer(minLength: 0)
 
-            // Buy Me a Coffee
-            Button(action: openBMC) {
-                Label("Buy Me a Coffee", systemImage: "cup.and.saucer.fill")
-                    .font(.caption)
+            if !hideBuyMeACoffeeButton {
+                // Buy Me a Coffee
+                Button(action: openBMC) {
+                    Label("Buy Me a Coffee", systemImage: "cup.and.saucer.fill")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .foregroundStyle(.orange)
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .foregroundStyle(.orange)
-            .frame(maxWidth: .infinity)
 
             // Footer
             Divider()
@@ -119,6 +122,10 @@ struct DetailPopoverView: View {
     #if DEBUG
     func triggerBMCForTesting() {
         openBMC()
+    }
+
+    func isBMCButtonVisibleForTesting() -> Bool {
+        !hideBuyMeACoffeeButton
     }
     #endif
 

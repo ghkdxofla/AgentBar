@@ -15,6 +15,10 @@ enum NotificationSoundMode: String, CaseIterable, Sendable {
     }
 }
 
+enum BuyMeACoffeeSettings {
+    static let hideButtonKey = "hideBuyMeACoffeeButton"
+}
+
 extension UserDefaults {
     func bool(forKey key: String, defaultValue: Bool) -> Bool {
         guard object(forKey: key) != nil else { return defaultValue }

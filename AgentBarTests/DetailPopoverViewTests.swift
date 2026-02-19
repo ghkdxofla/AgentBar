@@ -60,19 +60,37 @@ final class DetailPopoverViewTests: XCTestCase {
     }
 
     func testBuyMeACoffeeActionOpensExpectedURL() {
-        let viewModel = UsageViewModel(providers: [])
-        var openedURLs: [URL] = []
+        withBuyMeACoffeeHidden(false) {
+            let viewModel = UsageViewModel(providers: [])
+            var openedURLs: [URL] = []
 
-        let view = DetailPopoverView(viewModel: viewModel) { url in
-            openedURLs.append(url)
+            let view = DetailPopoverView(viewModel: viewModel) { url in
+                openedURLs.append(url)
+            }
+            view.triggerBMCForTesting()
+
+            XCTAssertEqual(
+                openedURLs.first?.absoluteString,
+                "https://buymeacoffee.com/_scari",
+                "Expected tapping Buy Me a Coffee to attempt opening the BMC support URL."
+            )
         }
-        view.triggerBMCForTesting()
+    }
 
-        XCTAssertEqual(
-            openedURLs.first?.absoluteString,
-            "https://buymeacoffee.com/_scari",
-            "Expected tapping Buy Me a Coffee to attempt opening the BMC support URL."
-        )
+    func testBuyMeACoffeeButtonCanBeHiddenFromSettings() {
+        withBuyMeACoffeeHidden(true) {
+            let viewModel = UsageViewModel(providers: [])
+            let view = DetailPopoverView(viewModel: viewModel)
+            XCTAssertFalse(view.isBMCButtonVisibleForTesting())
+        }
+    }
+
+    func testBuyMeACoffeeButtonVisibleWhenNotHidden() {
+        withBuyMeACoffeeHidden(false) {
+            let viewModel = UsageViewModel(providers: [])
+            let view = DetailPopoverView(viewModel: viewModel)
+            XCTAssertTrue(view.isBMCButtonVisibleForTesting())
+        }
     }
 
     func testSortedForDisplayOrdersByHighestUsageDescending() {
@@ -189,6 +207,24 @@ final class DetailPopoverViewTests: XCTestCase {
             }
         }
         return nil
+    }
+
+    private func withBuyMeACoffeeHidden(
+        _ isHidden: Bool,
+        testBody: () -> Void
+    ) {
+        let defaults = UserDefaults.standard
+        let key = BuyMeACoffeeSettings.hideButtonKey
+        let previousValue = defaults.object(forKey: key)
+        defaults.set(isHidden, forKey: key)
+        defer {
+            if let previousValue {
+                defaults.set(previousValue, forKey: key)
+            } else {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        testBody()
     }
 
 }

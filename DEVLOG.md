@@ -613,3 +613,10 @@
 - **Notification Sounds placement**: Moved the `Notification Sounds` section above `Agent Sources` in the Notifications tab (`SettingsView.notificationsTab`) so sound controls appear earlier in the workflow.
 - **No behavior changes**: Kept existing sound/source toggles and handlers unchanged; this is a presentation-order update only.
 - All 253 tests passing
+
+## Iteration 73: Add BMC hide setting in Usage Settings
+- **Usage tab setting added**: Added `Hide Buy Me a Coffee button` toggle at the bottom of Usage Settings (`Support` section) backed by `hideBuyMeACoffeeButton`.
+- **User-facing guidance copy**: Added descriptive text for donors: "If you've already donated and the BMC button feels distracting, you can hide it."
+- **Popover behavior wired**: `DetailPopoverView` now reads the same setting and conditionally hides the `Buy Me a Coffee` CTA while keeping the rest of footer/layout unchanged.
+- **Regression coverage**: Added `DetailPopoverViewTests` coverage for hidden/visible state via debug helper.
+- All 255 tests passing
