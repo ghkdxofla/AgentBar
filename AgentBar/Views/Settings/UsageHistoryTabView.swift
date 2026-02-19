@@ -11,6 +11,7 @@ struct UsageHistoryTabView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 controlsSection
+                guideText
 
                 if viewModel.servicePanels.isEmpty {
                     Text("No history yet. Keep AgentBar running to collect usage.")
@@ -30,6 +31,13 @@ struct UsageHistoryTabView: View {
         .onAppear {
             Task { await viewModel.refresh() }
         }
+    }
+
+    private var guideText: some View {
+        Text("Guide: Daily Heatmap uses 1 tile = 1 day (left labels are weekdays). 7d Cycle Consistency uses 1 tile = 1 reset cycle.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var controlsSection: some View {
@@ -65,6 +73,10 @@ struct UsageHistoryTabView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+
+            Text("Daily Heatmap (1 tile = 1 day)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
 
             heatmapSection(panel)
             dailySummarySection(panel)
@@ -103,12 +115,15 @@ struct UsageHistoryTabView: View {
                     }
                 }
             }
+
+            Spacer(minLength: 10)
+            trendChartSection(panel)
         }
     }
 
     private func cycleConsistencySection(_ panel: UsageHistoryServicePanel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("7d Cycle Consistency")
+            Text("7d Cycle Consistency (1 tile = 1 reset cycle)")
                 .font(.subheadline.weight(.semibold))
 
             if panel.cycleCells.isEmpty {
@@ -127,6 +142,37 @@ struct UsageHistoryTabView: View {
                 cycleSummarySection(panel.cycleSummary)
             }
         }
+    }
+
+    private func trendChartSection(_ panel: UsageHistoryServicePanel) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Daily Usage Trend")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            UsageTrendLineChartView(
+                points: panel.trendPoints,
+                service: panel.service
+            )
+            .frame(width: 190, height: 96)
+
+            HStack(spacing: 6) {
+                Text(panel.trendPoints.first.map { dateString($0.date) } ?? "-")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(panel.trendPoints.last.map { dateString($0.date) } ?? "-")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let latestValue = panel.trendPoints.last?.value {
+                Text("Latest: \(formatUsageValue(latestValue, unit: panel.trendUnit))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 200, alignment: .leading)
     }
 
     private func dailySummarySection(_ panel: UsageHistoryServicePanel) -> some View {
@@ -283,5 +329,85 @@ struct UsageHistoryTabView: View {
 
     private func formatOneDecimal(_ value: Double) -> String {
         String(format: "%.1f", value)
+    }
+
+    private func formatUsageValue(_ value: Double, unit: UsageUnit?) -> String {
+        switch unit {
+        case .tokens:
+            if value >= 1_000_000 {
+                return String(format: "%.1fM tokens", value / 1_000_000)
+            }
+            if value >= 1_000 {
+                return String(format: "%.0fK tokens", value / 1_000)
+            }
+            return String(format: "%.0f tokens", value)
+        case .requests:
+            return String(format: "%.0f req", value)
+        case .dollars:
+            return String(format: "$%.2f", value)
+        case .percent:
+            return String(format: "%.0f%%", value)
+        case nil:
+            return String(format: "%.0f", value)
+        }
+    }
+}
+
+private struct UsageTrendLineChartView: View {
+    let points: [UsageHistoryTrendPoint]
+    let service: ServiceType
+
+    var body: some View {
+        GeometryReader { geo in
+            let rect = geo.frame(in: .local)
+            let maxValue = max(points.map(\.value).max() ?? 0, 1)
+            let normalizedPoints = normalizedPathPoints(in: rect, maxValue: maxValue)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.gray.opacity(0.08))
+
+                if normalizedPoints.count >= 2 {
+                    Path { path in
+                        guard let first = normalizedPoints.first else { return }
+                        path.move(to: first)
+                        for point in normalizedPoints.dropFirst() {
+                            path.addLine(to: point)
+                        }
+                    }
+                    .stroke(service.darkColor, style: StrokeStyle(lineWidth: 1.8, lineJoin: .round))
+
+                    Path { path in
+                        guard let first = normalizedPoints.first,
+                              let last = normalizedPoints.last else { return }
+                        path.move(to: CGPoint(x: first.x, y: rect.maxY))
+                        path.addLine(to: first)
+                        for point in normalizedPoints.dropFirst() {
+                            path.addLine(to: point)
+                        }
+                        path.addLine(to: CGPoint(x: last.x, y: rect.maxY))
+                        path.closeSubpath()
+                    }
+                    .fill(service.lightColor.opacity(0.25))
+                } else {
+                    Text("No trend data")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func normalizedPathPoints(in rect: CGRect, maxValue: Double) -> [CGPoint] {
+        guard !points.isEmpty else { return [] }
+
+        let count = points.count
+        return points.enumerated().map { index, point in
+            let xRatio = count > 1 ? Double(index) / Double(count - 1) : 0
+            let x = rect.minX + (rect.width * xRatio)
+            let yRatio = min(max(point.value / maxValue, 0), 1)
+            let y = rect.maxY - (rect.height * yRatio)
+            return CGPoint(x: x, y: y)
+        }
     }
 }

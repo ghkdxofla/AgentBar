@@ -9,6 +9,8 @@ struct UsageHistoryHeatmapCell: Identifiable, Sendable {
     let sampleCount: Int
     let peakRatio: Double
     let averageRatio: Double
+    let usedValue: Double
+    let unit: UsageUnit?
 }
 
 struct UsageHistorySummary: Sendable, Equatable {
@@ -69,6 +71,13 @@ struct UsageHistoryServicePanel: Identifiable, Sendable {
     let cycleCells: [UsageHistoryCycleCell]
     let isSevenDayCycleAvailable: Bool
     let usageFrequencyDays: Int
+    let trendPoints: [UsageHistoryTrendPoint]
+    let trendUnit: UsageUnit?
+}
+
+struct UsageHistoryTrendPoint: Sendable {
+    let date: Date
+    let value: Double
 }
 
 @MainActor
@@ -173,6 +182,12 @@ final class UsageHistoryViewModel: ObservableObject {
                 now: now
             )
             let dailySummary = makeDailySummary(from: heatmapCells, now: now)
+            let trendPoints = heatmapCells
+                .filter { $0.date <= now }
+                .map { UsageHistoryTrendPoint(date: $0.date, value: $0.usedValue) }
+            let trendUnit = heatmapCells
+                .compactMap(\.unit)
+                .first ?? fallbackUnit(for: service, window: displayWindow)
 
             let isSevenDayCycleAvailable = (
                 displayWindow == .secondary &&
@@ -210,7 +225,9 @@ final class UsageHistoryViewModel: ObservableObject {
                     cycleSummary: cycleSummary,
                     cycleCells: cycleCells,
                     isSevenDayCycleAvailable: isSevenDayCycleAvailable,
-                    usageFrequencyDays: frequencyDays
+                    usageFrequencyDays: frequencyDays,
+                    trendPoints: trendPoints,
+                    trendUnit: trendUnit
                 )
             )
         }
@@ -291,7 +308,9 @@ final class UsageHistoryViewModel: ObservableObject {
                     level: 0,
                     sampleCount: 0,
                     peakRatio: 0,
-                    averageRatio: 0
+                    averageRatio: 0,
+                    usedValue: 0,
+                    unit: nil
                 )
             }
 
@@ -300,16 +319,22 @@ final class UsageHistoryViewModel: ObservableObject {
             let peakRatio: Double
             let averageRatio: Double
             let sampleCount: Int
+            let usedValue: Double
+            let unit: UsageUnit?
 
             switch window {
             case .primary:
                 peakRatio = record?.primaryPeakRatio ?? 0
                 averageRatio = record?.primaryAverageRatio ?? 0
                 sampleCount = record?.sampleCount ?? 0
+                usedValue = record?.primaryPeakUsed ?? 0
+                unit = record?.primaryUnitRawValue.flatMap(UsageUnit.init(rawValue:))
             case .secondary:
                 peakRatio = record?.secondaryPeakRatio ?? 0
                 averageRatio = record?.secondaryAverageRatio ?? 0
                 sampleCount = record?.sampleCount ?? 0
+                usedValue = record?.secondaryPeakUsed ?? 0
+                unit = record?.secondaryUnitRawValue.flatMap(UsageUnit.init(rawValue:))
             }
 
             let clampedPeak = Self.clampRatio(peakRatio)
@@ -320,7 +345,9 @@ final class UsageHistoryViewModel: ObservableObject {
                 level: Self.level(for: clampedPeak),
                 sampleCount: sampleCount,
                 peakRatio: clampedPeak,
-                averageRatio: Self.clampRatio(averageRatio)
+                averageRatio: Self.clampRatio(averageRatio),
+                usedValue: usedValue,
+                unit: unit
             )
         }
     }
@@ -478,6 +505,24 @@ final class UsageHistoryViewModel: ObservableObject {
     private static func average(_ values: [Int]) -> Double? {
         guard !values.isEmpty else { return nil }
         return Double(values.reduce(0, +)) / Double(values.count)
+    }
+
+    private func fallbackUnit(for service: ServiceType, window: UsageHistoryWindow) -> UsageUnit? {
+        switch window {
+        case .primary:
+            switch service {
+            case .codex: return .tokens
+            case .gemini, .copilot, .cursor: return .requests
+            case .claude, .zai, .opencode: return .percent
+            }
+        case .secondary:
+            switch service {
+            case .codex: return .tokens
+            case .claude: return .percent
+            case .zai: return .requests
+            case .gemini, .copilot, .cursor, .opencode: return nil
+            }
+        }
     }
 
     private static func cellID(date: Date) -> String {

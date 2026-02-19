@@ -1,5 +1,15 @@
 # AgentBar Development Log
 
+## Iteration 80: History readability update + daily trend line
+- Added per-service `Daily Usage Trend` line chart to the right side of the heatmap using stored daily peak usage values
+- Extended day history persistence to keep peak/average `used` values and corresponding unit metadata
+- Added top guide text in History tab clarifying tile semantics:
+  - Daily Heatmap: `1 tile = 1 day` (weekday ticks on the left)
+  - 7d Cycle Consistency: `1 tile = 1 reset cycle`
+- Updated cycle section title to explicitly include tile meaning
+- Updated plan document to include guide text requirement
+- Build and tests pass
+
 ## Iteration 79: History tab refinement - all services view and ordering
 - Moved `History` tab to the rightmost position in Settings (`Usage` -> `Notifications` -> `History`)
 - Reworked `UsageHistoryViewModel` from single-service state to all-service panels

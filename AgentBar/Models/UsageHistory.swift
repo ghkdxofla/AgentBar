@@ -9,6 +9,12 @@ struct UsageHistoryDayRecord: Codable, Sendable, Equatable {
     var secondaryAverageRatio: Double?
     var sampleCount: Int
     var lastSampleAt: Date
+    var primaryPeakUsed: Double? = nil
+    var primaryAverageUsed: Double? = nil
+    var primaryUnitRawValue: String? = nil
+    var secondaryPeakUsed: Double? = nil
+    var secondaryAverageUsed: Double? = nil
+    var secondaryUnitRawValue: String? = nil
 }
 
 struct UsageHistorySecondarySample: Codable, Sendable, Equatable {

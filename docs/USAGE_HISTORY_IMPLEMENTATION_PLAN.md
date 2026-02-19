@@ -247,6 +247,9 @@ struct UsageHistoryCycleSummary: Sendable, Equatable {
 1. 상단 컨트롤
 - 윈도우 Picker (`primary`/`secondary`)
 - 기간 Picker (`4w`/`8w`/`12w`)
+- 짧은 가이드 텍스트:
+  - Daily Heatmap: `1 tile = 1 day`
+  - 7d Cycle Consistency: `1 tile = 1 reset cycle`
 
 2. 서비스 패널 목록
 - 선택 가능한 모든 서비스를 한 화면에 동시 표시

@@ -44,12 +44,18 @@ actor UsageHistoryStore: UsageHistoryStoreProtocol {
         for usage in samples where usage.isAvailable {
             let primaryRatio = Self.clampRatio(usage.fiveHourUsage.percentage)
             let secondaryRatio = usage.weeklyUsage.map { Self.clampRatio($0.percentage) }
+            let secondaryUsed = usage.weeklyUsage?.used
+            let secondaryUnit = usage.weeklyUsage?.unit
 
             upsertDayRecord(
                 service: usage.service,
                 dayStart: dayStart,
                 primaryRatio: primaryRatio,
                 secondaryRatio: secondaryRatio,
+                primaryUsed: usage.fiveHourUsage.used,
+                secondaryUsed: secondaryUsed,
+                primaryUnit: usage.fiveHourUsage.unit,
+                secondaryUnit: secondaryUnit,
                 recordedAt: recordedAt
             )
 
@@ -125,6 +131,10 @@ actor UsageHistoryStore: UsageHistoryStoreProtocol {
         dayStart: Date,
         primaryRatio: Double,
         secondaryRatio: Double?,
+        primaryUsed: Double,
+        secondaryUsed: Double?,
+        primaryUnit: UsageUnit,
+        secondaryUnit: UsageUnit?,
         recordedAt: Date
     ) {
         if let index = state.dayRecords.firstIndex(where: {
@@ -138,6 +148,12 @@ actor UsageHistoryStore: UsageHistoryStoreProtocol {
             record.primaryAverageRatio = (
                 (record.primaryAverageRatio * Double(previousCount)) + primaryRatio
             ) / Double(nextCount)
+            let existingPrimaryAverageUsed = record.primaryAverageUsed ?? 0
+            record.primaryAverageUsed = (
+                (existingPrimaryAverageUsed * Double(previousCount)) + primaryUsed
+            ) / Double(nextCount)
+            record.primaryPeakUsed = max(record.primaryPeakUsed ?? 0, primaryUsed)
+            record.primaryUnitRawValue = primaryUnit.rawValue
 
             if let secondaryRatio {
                 let previousSecondaryAverage = record.secondaryAverageRatio ?? 0
@@ -146,6 +162,19 @@ actor UsageHistoryStore: UsageHistoryStoreProtocol {
                 ) / Double(nextCount)
                 record.secondaryAverageRatio = nextSecondaryAverage
                 record.secondaryPeakRatio = max(record.secondaryPeakRatio ?? 0, secondaryRatio)
+
+                if let secondaryUsed {
+                    let existingSecondaryAverageUsed = record.secondaryAverageUsed ?? 0
+                    let nextSecondaryAverageUsed = (
+                        (existingSecondaryAverageUsed * Double(previousCount)) + secondaryUsed
+                    ) / Double(nextCount)
+                    record.secondaryAverageUsed = nextSecondaryAverageUsed
+                    record.secondaryPeakUsed = max(record.secondaryPeakUsed ?? 0, secondaryUsed)
+                }
+
+                if let secondaryUnit {
+                    record.secondaryUnitRawValue = secondaryUnit.rawValue
+                }
             }
 
             record.sampleCount = nextCount
@@ -163,7 +192,13 @@ actor UsageHistoryStore: UsageHistoryStoreProtocol {
                 secondaryPeakRatio: secondaryRatio,
                 secondaryAverageRatio: secondaryRatio,
                 sampleCount: 1,
-                lastSampleAt: recordedAt
+                lastSampleAt: recordedAt,
+                primaryPeakUsed: primaryUsed,
+                primaryAverageUsed: primaryUsed,
+                primaryUnitRawValue: primaryUnit.rawValue,
+                secondaryPeakUsed: secondaryUsed,
+                secondaryAverageUsed: secondaryUsed,
+                secondaryUnitRawValue: secondaryUnit?.rawValue
             )
         )
     }
