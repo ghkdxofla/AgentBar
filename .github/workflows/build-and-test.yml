@@ -1,0 +1,143 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Prevent concurrent runs on the same branch to avoid artifact conflicts
+# and wasted runner minutes from redundant builds.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, Test, and Package
+    runs-on: macos-15
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Source
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # -----------------------------------------------------------------------
+      # 2. Toolchain
+      # -----------------------------------------------------------------------
+      - name: Select Xcode
+        # macos-15 ships with Xcode 16.x at /Applications/Xcode.app.
+        # Pinning explicitly keeps the path deterministic if the runner ever
+        # has multiple Xcode installations side-by-side.
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Show Xcode and SDK versions
+        run: |
+          xcode-select --print-path
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      # -----------------------------------------------------------------------
+      # 3. Cache – DerivedData
+      #
+      # The cache key includes the full project.pbxproj hash so it is
+      # invalidated whenever dependencies or build settings change, but
+      # shared across runs that touch only Swift source files.
+      # -----------------------------------------------------------------------
+      - name: Cache DerivedData
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.1
+        with:
+          path: build
+          key: deriveddata-${{ runner.os }}-${{ hashFiles('AgentBar.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            deriveddata-${{ runner.os }}-
+
+      # -----------------------------------------------------------------------
+      # 4. Test – AgentBarFull plan
+      #
+      # CODE_SIGN_* overrides disable signing entirely so the runner does not
+      # need a Developer ID certificate or provisioning profile.
+      # libsqlite3.tbd is a system-provided stub and is available on all
+      # macOS runners without any extra steps.
+      # -----------------------------------------------------------------------
+      - name: Run full test suite (AgentBarFull)
+        run: |
+          xcodebuild test \
+            -project AgentBar.xcodeproj \
+            -scheme AgentBar \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            -testPlan AgentBarFull \
+            -quiet \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      # -----------------------------------------------------------------------
+      # 5. Build – Release configuration
+      # -----------------------------------------------------------------------
+      - name: Build Release
+        run: |
+          xcodebuild build \
+            -project AgentBar.xcodeproj \
+            -scheme AgentBar \
+            -configuration Release \
+            -derivedDataPath build \
+            -quiet \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      # -----------------------------------------------------------------------
+      # 6. Package – zip the .app for artifact upload
+      #
+      # ditto preserves macOS-specific metadata (resource forks, extended
+      # attributes) better than plain zip when round-tripping on macOS.
+      # -----------------------------------------------------------------------
+      - name: Zip AgentBar.app
+        run: |
+          ditto -c -k --keepParent \
+            build/Build/Products/Release/AgentBar.app \
+            AgentBar.app.zip
+
+      # -----------------------------------------------------------------------
+      # 7. Package – create distributable DMG
+      #
+      # UDZO = zlib-compressed read-only image, widely compatible and
+      # smaller than uncompressed formats.
+      # -----------------------------------------------------------------------
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname AgentBar \
+            -srcfolder build/Build/Products/Release/AgentBar.app \
+            -ov \
+            -format UDZO \
+            AgentBar.dmg
+
+      # -----------------------------------------------------------------------
+      # 8. Upload artifacts
+      #
+      # Both the zipped .app and the .dmg are retained for 30 days so that
+      # releases can be assembled without re-running the workflow.
+      # -----------------------------------------------------------------------
+      - name: Upload AgentBar.app (zip)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: AgentBar-app-${{ github.sha }}
+          path: AgentBar.app.zip
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload AgentBar.dmg
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: AgentBar-dmg-${{ github.sha }}
+          path: AgentBar.dmg
+          retention-days: 30
+          if-no-files-found: error
