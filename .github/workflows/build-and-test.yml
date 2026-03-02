@@ -43,43 +43,49 @@ jobs:
           xcodebuild -showsdks
 
       # -----------------------------------------------------------------------
-      # 3. Cache – DerivedData
+      # 3. Generate scheme via XcodeGen
       #
-      # The cache key includes the full project.pbxproj hash so it is
-      # invalidated whenever dependencies or build settings change, but
-      # shared across runs that touch only Swift source files.
+      # The project uses XcodeGen (project.yml) to generate xcodeproj.
+      # Schemes are not checked into source control, so we regenerate them
+      # in CI to ensure test plans are properly attached.
+      # -----------------------------------------------------------------------
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # -----------------------------------------------------------------------
+      # 4. Cache – DerivedData
       # -----------------------------------------------------------------------
       - name: Cache DerivedData
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.1
         with:
           path: build
-          key: deriveddata-${{ runner.os }}-${{ hashFiles('AgentBar.xcodeproj/project.pbxproj') }}
+          key: deriveddata-${{ runner.os }}-${{ hashFiles('project.yml') }}
           restore-keys: |
             deriveddata-${{ runner.os }}-
 
       # -----------------------------------------------------------------------
-      # 4. Test – AgentBarFull plan
+      # 5. Test – all tests in AgentBarTests target
       #
       # CODE_SIGN_* overrides disable signing entirely so the runner does not
       # need a Developer ID certificate or provisioning profile.
-      # libsqlite3.tbd is a system-provided stub and is available on all
-      # macOS runners without any extra steps.
       # -----------------------------------------------------------------------
-      - name: Run full test suite (AgentBarFull)
+      - name: Run full test suite
         run: |
           xcodebuild test \
             -project AgentBar.xcodeproj \
             -scheme AgentBar \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath build \
-            -testPlan AgentBarFull \
             -quiet \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
       # -----------------------------------------------------------------------
-      # 5. Build – Release configuration
+      # 6. Build – Release configuration
       # -----------------------------------------------------------------------
       - name: Build Release
         run: |
