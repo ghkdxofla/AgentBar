@@ -6,6 +6,43 @@ struct GeminiLogRecord: Decodable, Sendable {
     let timestamp: String?
 }
 
+struct GeminiSessionFile: Decodable, Sendable {
+    let messages: [GeminiSessionMessage]?
+}
+
+struct GeminiSessionMessage: Decodable, Sendable {
+    let timestamp: String?
+    let type: String?
+    let content: GeminiMessageContent?
+}
+
+enum GeminiMessageContent: Decodable, Sendable {
+    case text(String)
+    case parts([GeminiContentPart])
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let str = try? container.decode(String.self) {
+            self = .text(str)
+        } else if let parts = try? container.decode([GeminiContentPart].self) {
+            self = .parts(parts)
+        } else {
+            self = .text("")
+        }
+    }
+
+    var textValue: String {
+        switch self {
+        case .text(let str): return str
+        case .parts(let parts): return parts.compactMap(\.text).joined(separator: " ")
+        }
+    }
+}
+
+struct GeminiContentPart: Decodable, Sendable {
+    let text: String?
+}
+
 final class GeminiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
     let serviceType: ServiceType = .gemini
 
@@ -128,7 +165,10 @@ final class GeminiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
         let decoder = JSONDecoder()
 
         for case let fileURL as URL in enumerator {
-            guard fileURL.lastPathComponent == "logs.json" else { continue }
+            let name = fileURL.lastPathComponent
+            let isLogsFile = name == "logs.json"
+            let isSessionFile = name.hasPrefix("session-") && fileURL.pathExtension == "json"
+            guard isLogsFile || isSessionFile else { continue }
 
             if let attrs = try? fm.attributesOfItem(atPath: fileURL.path),
                let modDate = attrs[.modificationDate] as? Date,
@@ -136,19 +176,42 @@ final class GeminiUsageProvider: UsageProviderProtocol, @unchecked Sendable {
                 continue
             }
 
-            guard let data = try? Data(contentsOf: fileURL),
-                  let records = try? decoder.decode([GeminiLogRecord].self, from: data) else {
-                continue
-            }
+            guard let data = try? Data(contentsOf: fileURL) else { continue }
 
-            for record in records {
-                guard isCountablePrompt(record) else { continue }
-                guard let ts = record.timestamp, let date = DateUtils.parseISO8601(ts) else { continue }
-                events.append(date)
+            if isLogsFile {
+                guard let records = try? decoder.decode([GeminiLogRecord].self, from: data) else { continue }
+                for record in records {
+                    guard isCountablePrompt(record) else { continue }
+                    guard let ts = record.timestamp, let date = DateUtils.parseISO8601(ts) else { continue }
+                    events.append(date)
+                }
+            } else {
+                guard let sessionFile = try? decoder.decode(GeminiSessionFile.self, from: data),
+                      let messages = sessionFile.messages else { continue }
+                for message in messages {
+                    guard isCountablePrompt(message) else { continue }
+                    guard let ts = message.timestamp, let date = DateUtils.parseISO8601(ts) else { continue }
+                    events.append(date)
+                }
             }
         }
 
         return events
+    }
+
+    private func isCountablePrompt(_ message: GeminiSessionMessage) -> Bool {
+        guard message.type == "user" else { return false }
+        guard let content = message.content else { return false }
+
+        let trimmed = content.textValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        if trimmed.hasPrefix("/") { return false }
+
+        let lower = trimmed.lowercased()
+        if lower == "exit" || lower == "quit" { return false }
+
+        return true
     }
 
     private func isCountablePrompt(_ record: GeminiLogRecord) -> Bool {

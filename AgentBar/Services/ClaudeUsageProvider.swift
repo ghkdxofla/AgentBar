@@ -289,11 +289,26 @@ final class ClaudeUsageProvider: UsageProviderProtocol, @unchecked Sendable {
 
     /// Parses the OAuth access token from the raw JSON credential blob.
     static func parseAccessToken(from jsonString: String) -> String? {
-        guard let data = jsonString.data(using: .utf8),
-              let creds = try? JSONDecoder().decode(ClaudeOAuthCredentials.self, from: data) else {
+        // Primary: standard JSON decoding
+        if let data = jsonString.data(using: .utf8),
+           let creds = try? JSONDecoder().decode(ClaudeOAuthCredentials.self, from: data) {
+            return creds.claudeAiOauth.accessToken
+        }
+        // Fallback: regex extraction for truncated JSON
+        return extractAccessTokenViaRegex(from: jsonString)
+    }
+
+    private static func extractAccessTokenViaRegex(from jsonString: String) -> String? {
+        guard let regex = try? NSRegularExpression(
+            pattern: #""accessToken"\s*:\s*"([^"]+)""#
+        ) else { return nil }
+        let range = NSRange(jsonString.startIndex..., in: jsonString)
+        guard let match = regex.firstMatch(in: jsonString, range: range),
+              let tokenRange = Range(match.range(at: 1), in: jsonString) else {
             return nil
         }
-        return creds.claudeAiOauth.accessToken
+        let token = String(jsonString[tokenRange])
+        return token.isEmpty ? nil : token
     }
 
     private static func cacheTTLFromRefreshInterval() -> TimeInterval {

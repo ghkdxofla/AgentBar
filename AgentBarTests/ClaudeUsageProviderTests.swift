@@ -523,6 +523,31 @@ final class ClaudeUsageProviderTests: XCTestCase {
         XCTAssertNil(ClaudeUsageProvider.parseAccessToken(from: "{\"other\":\"field\"}"))
     }
 
+    func testParseAccessTokenFromTruncatedJSON() {
+        // Simulates keychain truncation mid-way through mcpOAuth data
+        let json = """
+        {"claudeAiOauth":{"accessToken":"sk-ant-oauth-valid-token"},"mcpOauth":{"server1":{"accessToken":"mcp-tok
+        """
+        XCTAssertEqual(ClaudeUsageProvider.parseAccessToken(from: json), "sk-ant-oauth-valid-token")
+    }
+
+    func testParseAccessTokenFromBloatedJSON() {
+        // Full credential with mcpOAuth entries (valid JSON but large)
+        let json = """
+        {"claudeAiOauth":{"accessToken":"sk-ant-oauth-real-token"},"mcpOauth":{"atlassian":{"accessToken":"atl-123","expiresAt":9999999999},"sentry":{"accessToken":"snt-456","expiresAt":9999999999}}}
+        """
+        XCTAssertEqual(ClaudeUsageProvider.parseAccessToken(from: json), "sk-ant-oauth-real-token")
+    }
+
+    func testParseAccessTokenRegexFallbackOnlyMatchesAccessToken() {
+        // Ensure it picks the FIRST accessToken (claudeAiOauth's, not mcpOauth's)
+        // Even if JSON is truncated before closing
+        let json = """
+        {"claudeAiOauth":{"accessToken":"primary-token"},"mcpOauth":{"srv":{"accessToken":"secondary-tok
+        """
+        XCTAssertEqual(ClaudeUsageProvider.parseAccessToken(from: json), "primary-token")
+    }
+
     func testIgnoresExtraFields() async throws {
         let defaults = makeDefaultsSuite()
         let json = """

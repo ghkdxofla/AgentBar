@@ -88,6 +88,114 @@ final class GeminiUsageProviderTests: XCTestCase {
         XCTAssertFalse(configured)
     }
 
+    func testCountsPromptsFromNewSessionFormat() async throws {
+        let now = Date(timeIntervalSince1970: 1_770_000_000) // 2026-01-15T08:00:00Z
+        let sessionJSON = """
+        {
+          "sessionId": "abc123",
+          "messages": [
+            {
+              "id": "m1",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-30)))",
+              "type": "user",
+              "content": [{"text": "Build me a parser"}]
+            },
+            {
+              "id": "m2",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-20)))",
+              "type": "user",
+              "content": [{"text": "/about"}]
+            },
+            {
+              "id": "m3",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-10)))",
+              "type": "user",
+              "content": [{"text": "exit"}]
+            },
+            {
+              "id": "m4",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-5)))",
+              "type": "assistant",
+              "content": [{"text": "Here is a parser..."}]
+            },
+            {
+              "id": "m5",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-2 * 3600)))",
+              "type": "user",
+              "content": [{"text": "Summarize this file"}]
+            },
+            {
+              "id": "m6",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-30 * 3600)))",
+              "type": "user",
+              "content": [{"text": "Old request"}]
+            }
+          ]
+        }
+        """
+        try writeSessionFile(sessionJSON)
+
+        let provider = GeminiUsageProvider(
+            logsRootDir: tempDir,
+            dailyRequestLimit: 1_000,
+            nowProvider: { now },
+            defaults: testDefaults
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.service, .gemini)
+        XCTAssertEqual(usage.fiveHourUsage.unit, .requests)
+        // Daily window: "Build me a parser" (-30s) + "Summarize this file" (-2h) = 2
+        // "/about" (command), "exit" (quit), assistant message, and "Old request" (-30h outside day) excluded
+        XCTAssertEqual(usage.fiveHourUsage.used, 2)
+        XCTAssertNil(usage.weeklyUsage)
+    }
+
+    func testCountsPromptsFromMixedFormats() async throws {
+        let now = Date(timeIntervalSince1970: 1_770_000_000) // 2026-01-15T08:00:00Z
+
+        // Write a logs.json with one countable prompt
+        try writeLogs([
+            #"{"sessionId":"s","messageId":0,"type":"user","message":"Hello from logs","timestamp":"\#(iso8601(now.addingTimeInterval(-60)))"}"#
+        ])
+
+        // Write a session-*.json with two countable prompts
+        let sessionJSON = """
+        {
+          "sessionId": "xyz789",
+          "messages": [
+            {
+              "id": "m1",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-45)))",
+              "type": "user",
+              "content": [{"text": "Hello from session"}]
+            },
+            {
+              "id": "m2",
+              "timestamp": "\(iso8601(now.addingTimeInterval(-15)))",
+              "type": "user",
+              "content": "Plain string content"
+            }
+          ]
+        }
+        """
+        try writeSessionFile(sessionJSON)
+
+        let provider = GeminiUsageProvider(
+            logsRootDir: tempDir,
+            dailyRequestLimit: 1_000,
+            nowProvider: { now },
+            defaults: testDefaults
+        )
+
+        let usage = try await provider.fetchUsage()
+
+        XCTAssertEqual(usage.service, .gemini)
+        // 1 from logs.json + 2 from session file = 3
+        XCTAssertEqual(usage.fiveHourUsage.used, 3)
+    }
+
     // MARK: - Helpers
 
     private func writeLogs(_ records: [String]) throws {
@@ -97,6 +205,13 @@ final class GeminiUsageProviderTests: XCTestCase {
         let file = runDir.appendingPathComponent("logs.json")
         let content = "[\n\(records.joined(separator: ",\n"))\n]"
         try content.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    private func writeSessionFile(_ sessionJSON: String, name: String = "session-2026-01-15T08-00-abcd1234.json") throws {
+        let chatsDir = tempDir.appendingPathComponent("project-1/chats")
+        try FileManager.default.createDirectory(at: chatsDir, withIntermediateDirectories: true)
+        let file = chatsDir.appendingPathComponent(name)
+        try sessionJSON.write(to: file, atomically: true, encoding: .utf8)
     }
 
     private func iso8601(_ date: Date) -> String {
